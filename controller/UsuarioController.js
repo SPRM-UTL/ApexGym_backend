@@ -31,5 +31,25 @@ export class UsuarioController extends BaseController {
             return this.respuestaError(res, error);
         }
     }
+    
+    actualizarUsuario = async (req, res) => {
+        const { id, nombre, email, contrasenia } = req.body;
+        try {
+            const nuevoUsuario = await usuarioDao.update(id,{ nombre, email, contrasenia });
+            return this.respuestaExito(res, nuevoUsuario, "Usuario actualizado exitosamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+    
+    eliminarUsuario = async (req, res) => {
+        const { id } = req.body;
+        try {
+            const eliminarUsuario = await usuarioDao.delete(id);
+            return this.respuestaExito(res, eliminarUsuario, "Usuario eliminado exitosamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
 }
 
