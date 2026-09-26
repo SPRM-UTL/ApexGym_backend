@@ -42,12 +42,14 @@ model Token {
 }
 
 model Seccion {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique @db.VarChar(100)
-  descripcion String?   @db.Text
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id             Int       @id @default(autoincrement())
+  nombre         String    @unique @db.VarChar(100)
+  descripcion    String?   @db.Text
+  imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
+  imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
 
   modulos Modulo[]
 
