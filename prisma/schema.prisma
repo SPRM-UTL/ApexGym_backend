@@ -7,13 +7,160 @@ datasource db {
 }
 
 model Usuario {
+  id              Int              @id @default(autoincrement())
+  nombre          String           @db.VarChar(150)
+  email           String           @unique @db.VarChar(191)
+  contrasenia     String           @map("contrasenia") @db.VarChar(255)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  deletedAt       DateTime?        @map("deleted_at")
+  tokens          Token[]
+  usuarioRols     UsuarioRol[]
+  usuarioPermisos UsuarioPermiso[]
+
+  @@map("usuarios")
+}
+
+enum TipoToken {
+  TOKEN_SESION
+  RECUPERACION_CONTRASENIA
+  VERIFICACION_CORREO
+}
+
+model Token {
+  id         Int       @id @default(autoincrement())
+  usuarioId  Int       @map("usuario_id")
+  tipoToken  TipoToken @map("tipo_token")
+  token      String    @unique @db.VarChar(191)
+  tiempoVida Int       @map("tiempo_vida")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("tokens")
+}
+
+model Seccion {
   id          Int       @id @default(autoincrement())
-  nombre      String
-  email       String
-  contrasenia String    @map("contrasenia")
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  @@map("usuarios")
+  modulos Modulo[]
+
+  @@map("secciones")
+}
+
+model Modulo {
+  id          Int       @id @default(autoincrement())
+  seccionId   Int       @map("seccion_id")
+  nombre      String    @db.VarChar(100)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  seccion  Seccion   @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  permisos Permiso[]
+
+  @@unique([seccionId, nombre], name: "modulo_seccion_unico")
+  @@map("modulos")
+}
+
+model Accion {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(50)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  permisos Permiso[]
+
+  @@map("acciones")
+}
+
+enum MetodoHttp {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  ALL
+}
+
+model Permiso {
+  id          Int        @id @default(autoincrement())
+  moduloId    Int        @map("modulo_id")
+  accionId    Int        @map("accion_id")
+  metodo      MetodoHttp
+  descripcion String?    @db.Text
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  modulo Modulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  accion Accion @relation(fields: [accionId], references: [id], onDelete: Cascade)
+
+  roles    RolPermiso[]
+  usuarios UsuarioPermiso[]
+
+  @@unique([moduloId, accionId, metodo], name: "permiso_unico")
+  @@map("permisos")
+}
+
+model Rol {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  permisos RolPermiso[]
+  usuarios UsuarioRol[]
+
+  @@map("roles")
+}
+
+model RolPermiso {
+  rolId     Int       @map("rol_id")
+  permisoId Int       @map("permiso_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
+  @@map("roles_permisos")
+}
+
+model UsuarioRol {
+  usuarioId Int       @map("usuario_id")
+  rolId     Int       @map("rol_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+  @@map("usuarios_roles")
+}
+
+model UsuarioPermiso {
+  usuarioId Int       @map("usuario_id")
+  permisoId Int       @map("permiso_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, permisoId])
+  @@map("usuarios_permisos")
 }
