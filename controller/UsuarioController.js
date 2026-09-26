@@ -1,4 +1,5 @@
 import { usuarioDao } from "../dao/UsuarioDao.js";
+import { tokenDao } from "../dao/TokenDao.js";
 import { BaseController } from "./BaseController.js";
 
 export class UsuarioController extends BaseController {
@@ -7,16 +8,24 @@ export class UsuarioController extends BaseController {
     }
 
     verificarCredenciales = async (req, res) => {
-        const { email, password } = req.body;
+        const { email, contrasenia } = req.body;
 
         try {
-            const usuario = await usuarioDao.getByCredenciales(email, password);
+            const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
             if (!usuario) {
                 throw new Error("Credenciales inválidas");
             }
 
-            return this.respuestaExito(res, usuario, "Credenciales válidas");
+            const token = await tokenDao.crearTokenSesion(usuario.id);
 
+            return this.respuestaExito(
+                res,
+                {
+                    usuario,
+                    token: token.token
+                },
+                "Credenciales válidas"
+            );
         } catch (error) {
             return this.respuestaError(res, error);
         }
