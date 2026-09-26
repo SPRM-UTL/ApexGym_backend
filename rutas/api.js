@@ -8,6 +8,8 @@ const usuarioRoutes = express.Router();
 
 // Públicas
 usuarioRoutes.post('/registrarUsuario', usuarioController.registrarUsuario.bind(usuarioController));
+usuarioRoutes.put('/actualizarUsuario', usuarioController.actualizarUsuario.bind(usuarioController));
+usuarioRoutes.delete('/eliminarUsuario', usuarioController.eliminarUsuario.bind(usuarioController));
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
 
 // Protegidas

@@ -35,7 +35,10 @@ export class UsuarioDao extends BaseDao {
     }
 
     async update(id, data) {
-        const datosAActualizar = { ...data };
+        const datosAActualizar = {
+            nombre: data.nombre,
+            email: data.email
+        };
 
         if (datosAActualizar.contrasenia) {
             datosAActualizar.contrasenia = await encriptarContrasena(datosAActualizar.contrasenia);
@@ -47,6 +50,22 @@ export class UsuarioDao extends BaseDao {
             },
             data: datosAActualizar,
             omit: this.omit
+        });
+    }
+    
+    async delete(id) {
+        const usuarioExistente = await this.getById(id);
+        if (!usuarioExistente) {
+            throw new Error("El usuario no existe");
+        }
+
+        return this.model.update({
+            where: {
+                id: id,
+            },
+            data: {
+                deletedAt: new Date(),
+            },
         });
     }
 
