@@ -19,7 +19,14 @@ export class TokenDao extends BaseDao {
                 tiempoVida
             },
             include: {
-                usuario: true
+                usuario: {
+                    omit: {
+                        contrasenia: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        deletedAt: true,
+                    },
+                },
             }
         });
     }
@@ -30,7 +37,14 @@ export class TokenDao extends BaseDao {
                 token
             },
             include: {
-                usuario: true
+                usuario: {
+                    omit: {
+                        contrasenia: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        deletedAt: true,
+                    },
+                },
             }
         });
     }
