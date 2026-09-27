@@ -106,7 +106,15 @@ export class UsuarioDao extends BaseDao {
             where: {
                 email: email,
                 deletedAt: null,
-            }
+            },
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null, rol: { deletedAt: null } },
+                    select: {
+                        rol: { select: { id: true, nombre: true, descripcion: true } },
+                    },
+                },
+            },
         });
 
         if (!usuario) {
@@ -119,8 +127,11 @@ export class UsuarioDao extends BaseDao {
             return null;
         }
 
-        const { contrasenia, createdAt, updatedAt, deletedAt, ...usuarioSeguro } = usuario;
-        return usuarioSeguro;
+        const { contrasenia, createdAt, updatedAt, deletedAt, usuarioRols, ...usuarioSeguro } = usuario;
+        return {
+            ...usuarioSeguro,
+            roles: usuarioRols.map(({ rol }) => rol),
+        };
     }
 }
 

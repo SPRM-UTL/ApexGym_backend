@@ -74,6 +74,48 @@ model Modulo {
   @@map("modulos")
 }
 
+model AreaTrabajo {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(100)
+  descripcion String?   @db.Text
+  estado      String    @db.VarChar(30)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  tiposActividad TipoActividad[]
+
+  @@map("areas_trabajos")
+}
+
+model TipoActividad {
+  id            Int       @id @default(autoincrement())
+  areaTrabajoId Int?      @map("area_trabajo_id")
+  nombre        String    @db.VarChar(150)
+  descripcion   String?   @db.Text
+  estado        String    @db.VarChar(30)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  areaTrabajo AreaTrabajo? @relation(fields: [areaTrabajoId], references: [id], onDelete: SetNull)
+
+  @@map("tipos_actividades")
+}
+
+model ConfiguracionSistema {
+  id          Int       @id @default(autoincrement())
+  clave       String    @unique @db.VarChar(100)
+  valor       String    @db.Text
+  tipoDato    String    @map("tipo_dato") @db.VarChar(30)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@map("configuraciones_sistema")
+}
+
 model Accion {
   id          Int       @id @default(autoincrement())
   nombre      String    @unique @db.VarChar(50)
