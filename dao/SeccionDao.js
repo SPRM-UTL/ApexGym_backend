@@ -78,6 +78,8 @@ export class SeccionDao extends BaseDao {
                         id: true,
                         nombre: true,
                         descripcion: true,
+                        imagenUrl: true,
+                        imagenPublicId: true,
                     },
                     orderBy: { nombre: "asc" },
                 },

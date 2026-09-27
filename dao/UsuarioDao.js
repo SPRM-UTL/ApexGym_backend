@@ -16,6 +16,28 @@ export class UsuarioDao extends BaseDao {
         );
     }
 
+    async getAll() {
+        const usuarios = await this.prisma.usuario.findMany({
+            where: { deletedAt: null },
+            omit: this.omit,
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null },
+                    include: {
+                        rol: {
+                            select: { id: true, nombre: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        return usuarios.map(({ usuarioRols, ...u }) => ({
+            ...u,
+            roles: usuarioRols.map((ur) => ur.rol),
+        }));
+    }
+
     async create(data) {
         const usuarioExistente = await this.getByEmail(data.email);
         if (usuarioExistente) {
