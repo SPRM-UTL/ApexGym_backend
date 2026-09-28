@@ -16,6 +16,28 @@ export class UsuarioDao extends BaseDao {
         );
     }
 
+    async getAll() {
+        const usuarios = await this.prisma.usuario.findMany({
+            where: { deletedAt: null },
+            omit: this.omit,
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null },
+                    include: {
+                        rol: {
+                            select: { id: true, nombre: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        return usuarios.map(({ usuarioRols, ...u }) => ({
+            ...u,
+            roles: usuarioRols.map((ur) => ur.rol),
+        }));
+    }
+
     async create(data) {
         const usuarioExistente = await this.getByEmail(data.email);
         if (usuarioExistente) {
@@ -35,7 +57,10 @@ export class UsuarioDao extends BaseDao {
     }
 
     async update(id, data) {
-        const datosAActualizar = { ...data };
+        const datosAActualizar = {
+            nombre: data.nombre,
+            email: data.email
+        };
 
         if (datosAActualizar.contrasenia) {
             datosAActualizar.contrasenia = await encriptarContrasena(datosAActualizar.contrasenia);
@@ -47,6 +72,22 @@ export class UsuarioDao extends BaseDao {
             },
             data: datosAActualizar,
             omit: this.omit
+        });
+    }
+    
+    async delete(id) {
+        const usuarioExistente = await this.getById(id);
+        if (!usuarioExistente) {
+            throw new Error("El usuario no existe");
+        }
+
+        return this.model.update({
+            where: {
+                id: id,
+            },
+            data: {
+                deletedAt: new Date(),
+            },
         });
     }
 
@@ -65,7 +106,15 @@ export class UsuarioDao extends BaseDao {
             where: {
                 email: email,
                 deletedAt: null,
-            }
+            },
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null, rol: { deletedAt: null } },
+                    select: {
+                        rol: { select: { id: true, nombre: true, descripcion: true } },
+                    },
+                },
+            },
         });
 
         if (!usuario) {
@@ -78,8 +127,11 @@ export class UsuarioDao extends BaseDao {
             return null;
         }
 
-        const { contrasenia, createdAt, updatedAt, deletedAt, ...usuarioSeguro } = usuario;
-        return usuarioSeguro;
+        const { contrasenia, createdAt, updatedAt, deletedAt, usuarioRols, ...usuarioSeguro } = usuario;
+        return {
+            ...usuarioSeguro,
+            roles: usuarioRols.map(({ rol }) => rol),
+        };
     }
 }
 

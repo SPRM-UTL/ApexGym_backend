@@ -1,4 +1,5 @@
 import { usuarioDao } from "../dao/UsuarioDao.js";
+import { tokenDao } from "../dao/TokenDao.js";
 import { BaseController } from "./BaseController.js";
 
 export class UsuarioController extends BaseController {
@@ -7,16 +8,24 @@ export class UsuarioController extends BaseController {
     }
 
     verificarCredenciales = async (req, res) => {
-        const { email, password } = req.body;
+        const { email, contrasenia } = req.body;
 
         try {
-            const usuario = await usuarioDao.getByCredenciales(email, password);
+            const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
             if (!usuario) {
                 throw new Error("Credenciales inválidas");
             }
 
-            return this.respuestaExito(res, usuario, "Credenciales válidas");
+            const token = await tokenDao.crearTokenSesion(usuario.id);
 
+            return this.respuestaExito(
+                res,
+                {
+                    usuario,
+                    token: token.token
+                },
+                "Credenciales válidas"
+            );
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -27,6 +36,26 @@ export class UsuarioController extends BaseController {
         try {
             const nuevoUsuario = await usuarioDao.create({ nombre, email, contrasenia });
             return this.respuestaExito(res, nuevoUsuario, "Usuario registrado exitosamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+    
+    actualizarUsuario = async (req, res) => {
+        const { id, nombre, email, contrasenia } = req.body;
+        try {
+            const nuevoUsuario = await usuarioDao.update(id,{ nombre, email, contrasenia });
+            return this.respuestaExito(res, nuevoUsuario, "Usuario actualizado exitosamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+    
+    eliminarUsuario = async (req, res) => {
+        const { id } = req.body;
+        try {
+            const eliminarUsuario = await usuarioDao.delete(id);
+            return this.respuestaExito(res, eliminarUsuario, "Usuario eliminado exitosamente");
         } catch (error) {
             return this.respuestaError(res, error);
         }

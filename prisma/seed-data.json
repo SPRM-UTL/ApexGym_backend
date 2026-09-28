@@ -1,0 +1,62 @@
+{
+  "acciones": [
+    { "nombre": "Listar", "descripcion": "Ver listado de registros", "metodo": "GET" },
+    { "nombre": "Crear", "descripcion": "Crear nuevos registros", "metodo": "POST" },
+    { "nombre": "Editar", "descripcion": "Editar registros existentes", "metodo": "PUT" },
+    { "nombre": "Eliminar", "descripcion": "Eliminar registros", "metodo": "DELETE" }
+  ],
+  "secciones": [
+    {
+      "nombre": "Administración",
+      "descripcion": "Sección de administración del sistema",
+      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Usuarios",
+          "descripcion": "Gestión de usuarios del sistema",
+          "imagenUrl": "https://concepto.de/wp-content/uploads/2018/10/usuario-e1539725586690.jpg",
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        },
+        {
+          "nombre": "Configuración del Sistema",
+          "descripcion": "Gestión de parámetros configurables del sistema",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        },
+        {
+          "nombre": "Administración de roles",
+          "descripcion": "Gestión de roles y permisos del sistema",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        }
+      ]
+    },
+    {
+      "nombre": "Rendimiento Laboral",
+      "descripcion": "Catálogos para el seguimiento del rendimiento laboral",
+      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Tipos de Actividad",
+          "descripcion": "Gestión de tipos de actividad laboral",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "nombre": "Administrador",
+      "descripcion": "Acceso total a la administración del sistema",
+      "permisos": "todos",
+      "asignarAlPrimerUsuario": true
+    }
+  ]
+}
