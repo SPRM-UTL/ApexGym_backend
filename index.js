@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { api } from './rutas/api.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,8 +15,9 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Servir estáticamente la carpeta de imágenes guardadas en el servidor
+// Servir estáticamente carpetas del servidor
 app.use('/imagenes', express.static(path.join(__dirname, 'public/imagenes')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', api);
 
