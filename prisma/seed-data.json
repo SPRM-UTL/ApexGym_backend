@@ -49,6 +49,21 @@
           "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
         }
       ]
+    },
+    {
+      "nombre": "Inventario",
+      "descripcion": "Gestión de productos y categorías",
+      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Categorías de Productos",
+          "descripcion": "Administración de categorías de productos",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        }
+      ]
     }
   ],
   "roles": [

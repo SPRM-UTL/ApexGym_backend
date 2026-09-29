@@ -6,7 +6,10 @@ import { TipoActividadController } from '../controller/TipoActividadController.j
 import { AreaTrabajoController } from '../controller/AreaTrabajoController.js';
 import { ConfiguracionSistemaController } from '../controller/ConfiguracionSistemaController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
+import { CategoriaProductoController } from '../controller/CategoriaProductoController.js'
+
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+
 
 const router = express.Router();
 const usuarioController = new UsuarioController();
@@ -15,6 +18,8 @@ const rolController = new RolController();
 const tipoActividadController = new TipoActividadController();
 const areaTrabajoController = new AreaTrabajoController();
 const configuracionSistemaController = new ConfiguracionSistemaController();
+const categoriaProductoController = new CategoriaProductoController();
+const CategoriaProductoRoutes = express.Router();
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
 const rolRoutes = express.Router();
@@ -155,6 +160,37 @@ configuracionSistemaRoutes.delete(
     configuracionSistemaController.eliminar.bind(configuracionSistemaController)
 );
 
+// ── Rutas de Categorías de Productos ───────────────────────────────────────
+CategoriaProductoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Listar'),
+    categoriaProductoController.obtenerTodos.bind(categoriaProductoController)
+);
+
+CategoriaProductoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Crear'),
+    categoriaProductoController.crear.bind(categoriaProductoController)
+);
+
+CategoriaProductoRoutes.put(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Editar'),
+    categoriaProductoController.actualizar.bind(categoriaProductoController)
+);
+
+CategoriaProductoRoutes.delete(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Eliminar'),
+    categoriaProductoController.eliminar.bind(categoriaProductoController)
+);
+
+
+router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/secciones', seccionRoutes);
 router.use('/roles', rolRoutes);
