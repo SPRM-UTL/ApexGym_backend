@@ -1,6 +1,3 @@
--- AlterTable
-ALTER TABLE `usuarios` ADD COLUMN `foto_url` VARCHAR(500) NULL;
-
 -- CreateTable
 CREATE TABLE `categoria_productos` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
