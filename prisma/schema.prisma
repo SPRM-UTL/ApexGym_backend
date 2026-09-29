@@ -101,6 +101,8 @@ model Caja {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  aperturasCaja AperturaCaja[]
+
   @@map("cajas")
 }
 
@@ -158,6 +160,10 @@ model Empleado {
   areaTrabajo    AreaTrabajo    @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
   estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
   usuario        Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  aperturasCaja   AperturaCaja[]
+  movimientosCaja MovimientoCaja[]
+  cortesCaja      CorteCaja[]
 
   @@map("empleados")
 }
@@ -285,14 +291,73 @@ model UsuarioPermiso {
   @@map("usuarios_permisos")
 }
 
-model CategoriaProducto{
-  id Int               @id @default(autoincrement())
-  nombre String        @unique @db.VarChar(100)
-  descripcion String?  @map("descripcion")
-  estado String        @default("activo")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-  deletedAt DateTime?  @map("deleted_at")
- 
+model CategoriaProducto {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @map("descripcion")
+  estado      String    @default("activo")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
   @@map("categoria_productos")
+}
+
+model AperturaCaja {
+  id            Int       @id @default(autoincrement())
+  cajaId        Int       @map("caja_id")
+  empleadoId    Int       @map("empleado_id")
+  montoInicial  Decimal   @map("monto_inicial") @db.Decimal(10, 2)
+  fechaApertura DateTime  @map("fecha_apertura")
+  estado        String    @default("ABIERTA") @db.VarChar(20)
+  observaciones String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  caja     Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
+  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  movimientos MovimientoCaja[]
+  cortes      CorteCaja[]
+
+  @@map("aperturas_caja")
+}
+
+model MovimientoCaja {
+  id             Int       @id @default(autoincrement())
+  aperturaCajaId Int       @map("apertura_caja_id")
+  empleadoId     Int       @map("empleado_id")
+  tipo           String    @db.VarChar(20)
+  monto          Decimal   @db.Decimal(10, 2)
+  concepto       String    @db.VarChar(255)
+  observaciones  String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
+  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@map("movimientos_caja")
+}
+
+model CorteCaja {
+  id              Int       @id @default(autoincrement())
+  aperturaCajaId  Int       @map("apertura_caja_id")
+  empleadoId      Int       @map("empleado_id")
+  efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
+  totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
+  totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
+  diferencia      Decimal   @db.Decimal(10, 2)
+  observaciones   String?   @db.Text
+  fechaCorte      DateTime  @default(now()) @map("fecha_corte")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
+  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@map("cortes_caja")
 }

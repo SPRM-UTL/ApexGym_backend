@@ -9,6 +9,9 @@ import { CajaController } from '../controller/CajaController.js';
 import { PuestoController } from '../controller/PuestoController.js';
 import { EstadoEmpleadoController } from '../controller/EstadoEmpleadoController.js';
 import { EmpleadoController } from '../controller/EmpleadoController.js';
+import { AperturaCajaController } from '../controller/AperturaCajaController.js';
+import { MovimientoCajaController } from '../controller/MovimientoCajaController.js';
+import { CorteCajaController } from '../controller/CorteCajaController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
 import { CategoriaProductoController } from '../controller/CategoriaProductoController.js'
 
@@ -28,6 +31,9 @@ const cajaController = new CajaController();
 const puestoController = new PuestoController();
 const estadoEmpleadoController = new EstadoEmpleadoController();
 const empleadoController = new EmpleadoController();
+const aperturaCajaController = new AperturaCajaController();
+const movimientoCajaController = new MovimientoCajaController();
+const corteCajaController = new CorteCajaController();
 
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
@@ -39,6 +45,9 @@ const cajaRoutes = express.Router();
 const puestoRoutes = express.Router();
 const estadoEmpleadoRoutes = express.Router();
 const empleadoRoutes = express.Router();
+const aperturaCajaRoutes = express.Router();
+const movimientoCajaRoutes = express.Router();
+const corteCajaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -357,8 +366,102 @@ CategoriaProductoRoutes.delete(
     categoriaProductoController.eliminar.bind(categoriaProductoController)
 );
 
+// ── Rutas de Apertura de Caja ────────────────────────────────────────────────
+aperturaCajaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Listar'),
+    aperturaCajaController.obtenerTodos.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Listar'),
+    aperturaCajaController.obtenerPorId.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Crear'),
+    aperturaCajaController.crear.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Editar'),
+    aperturaCajaController.actualizar.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Eliminar'),
+    aperturaCajaController.eliminar.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.post(
+    '/:id/cerrar',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Editar'),
+    aperturaCajaController.cerrar.bind(aperturaCajaController)
+);
 
-router.use('/categorias-productos', CategoriaProductoRoutes);
+// ── Rutas de Movimientos de Caja ─────────────────────────────────────────────
+movimientoCajaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerTodos.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.get(
+    '/apertura/:aperturaCajaId',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerPorApertura.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerPorId.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Crear'),
+    movimientoCajaController.crear.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Eliminar'),
+    movimientoCajaController.eliminar.bind(movimientoCajaController)
+);
+
+// ── Rutas de Corte de Caja ───────────────────────────────────────────────────
+corteCajaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Listar'),
+    corteCajaController.obtenerTodos.bind(corteCajaController)
+);
+corteCajaRoutes.get(
+    '/apertura/:aperturaCajaId',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Listar'),
+    corteCajaController.obtenerPorApertura.bind(corteCajaController)
+);
+corteCajaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Listar'),
+    corteCajaController.obtenerPorId.bind(corteCajaController)
+);
+corteCajaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Crear'),
+    corteCajaController.crear.bind(corteCajaController)
+);
+
 router.use('/usuarios', usuarioRoutes);
 router.use('/secciones', seccionRoutes);
 router.use('/roles', rolRoutes);
@@ -368,6 +471,10 @@ router.use('/configuraciones-sistema', configuracionSistemaRoutes);
 router.use('/cajas', cajaRoutes);
 router.use('/puestos', puestoRoutes);
 router.use('/estados-empleado', estadoEmpleadoRoutes);
+router.use('/categorias-productos', CategoriaProductoRoutes);
+router.use('/aperturas-caja', aperturaCajaRoutes);
+router.use('/movimientos-caja', movimientoCajaRoutes);
+router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 
 export { router as api };
