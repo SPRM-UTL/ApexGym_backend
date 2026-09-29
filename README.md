@@ -6,3 +6,12 @@ npx prisma migrate dev --name init
 # Solo aplica por ejemplo si se esta trabajando un cambio especifico, la toma como sqlalchemy
 
 npx prisma migrate dev --name agregar_tabla_usuarios
+
+
+# Post crear la migracion ejecutarla
+npx prisma generate
+npx prisma migrate deploy
+
+
+# Estado de la BD comparativa a las migraciones
+npx prisma validate

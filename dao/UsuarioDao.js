@@ -16,37 +16,158 @@ export class UsuarioDao extends BaseDao {
         );
     }
 
+    async getAll() {
+        const usuarios = await this.prisma.usuario.findMany({
+            where: { deletedAt: null },
+            omit: this.omit,
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null },
+                    include: {
+                        rol: {
+                            select: { id: true, nombre: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        return usuarios.map(({ usuarioRols, ...u }) => ({
+            ...u,
+            roles: usuarioRols.map((ur) => ur.rol),
+        }));
+    }
+
     async create(data) {
         const usuarioExistente = await this.getByEmail(data.email);
         if (usuarioExistente) {
             throw new Error("El correo electrónico ya se encuentra registrado y activo");
         }
 
-        const datosACrear = { ...data };
+        const { rolId, ...restoDatos } = data;
+        const datosACrear = { ...restoDatos };
 
         if (datosACrear.contrasenia) {
             datosACrear.contrasenia = await encriptarContrasena(datosACrear.contrasenia);
         }
 
-        return this.model.create({
-            data: datosACrear,
-            omit: this.omit
+        return this.prisma.$transaction(async (tx) => {
+            const nuevoUsuario = await tx.usuario.create({
+                data: datosACrear,
+                omit: this.omit
+            });
+
+            if (rolId !== undefined && rolId !== null && rolId !== "") {
+                await this.sincronizarRolUsuario(tx, nuevoUsuario.id, rolId);
+            }
+
+            return this.obtenerPorIdConRoles(tx, nuevoUsuario.id);
         });
     }
 
     async update(id, data) {
-        const datosAActualizar = { ...data };
+        const usuarioId = Number(id);
+        const datosAActualizar = {
+            nombre: data.nombre,
+            email: data.email
+        };
 
-        if (datosAActualizar.contrasenia) {
-            datosAActualizar.contrasenia = await encriptarContrasena(datosAActualizar.contrasenia);
+        if (data.contrasenia) {
+            datosAActualizar.contrasenia = await encriptarContrasena(data.contrasenia);
+        }
+
+        if (data.fotoUrl !== undefined) {
+            datosAActualizar.fotoUrl = data.fotoUrl;
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            await tx.usuario.update({
+                where: {
+                    id: usuarioId,
+                },
+                data: datosAActualizar,
+                omit: this.omit
+            });
+
+            if (data.rolId !== undefined) {
+                await this.sincronizarRolUsuario(tx, usuarioId, data.rolId);
+            }
+
+            return this.obtenerPorIdConRoles(tx, usuarioId);
+        });
+    }
+
+    async sincronizarRolUsuario(tx, usuarioId, rolId) {
+        const idRol = rolId ? Number(rolId) : null;
+
+        await tx.usuarioRol.updateMany({
+            where: {
+                usuarioId,
+                deletedAt: null,
+                ...(Number.isInteger(idRol) && idRol > 0 ? { rolId: { not: idRol } } : {}),
+            },
+            data: {
+                deletedAt: new Date(),
+            },
+        });
+
+        if (Number.isInteger(idRol) && idRol > 0) {
+            await tx.usuarioRol.upsert({
+                where: {
+                    usuarioId_rolId: {
+                        usuarioId,
+                        rolId: idRol,
+                    },
+                },
+                update: {
+                    deletedAt: null,
+                },
+                create: {
+                    usuarioId,
+                    rolId: idRol,
+                },
+            });
+        }
+    }
+
+    async obtenerPorIdConRoles(tx, id) {
+        const usuario = await tx.usuario.findUnique({
+            where: { id },
+            omit: this.omit,
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null, rol: { deletedAt: null } },
+                    include: {
+                        rol: {
+                            select: { id: true, nombre: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!usuario) return null;
+
+        const { usuarioRols, ...u } = usuario;
+        return {
+            ...u,
+            roles: usuarioRols.map((ur) => ur.rol),
+        };
+    }
+    
+    async delete(id) {
+        const usuarioExistente = await this.getById(id);
+        if (!usuarioExistente) {
+            throw new Error("El usuario no existe");
         }
 
         return this.model.update({
             where: {
                 id: id,
             },
-            data: datosAActualizar,
-            omit: this.omit
+            data: {
+                deletedAt: new Date(),
+            },
         });
     }
 
@@ -65,7 +186,15 @@ export class UsuarioDao extends BaseDao {
             where: {
                 email: email,
                 deletedAt: null,
-            }
+            },
+            include: {
+                usuarioRols: {
+                    where: { deletedAt: null, rol: { deletedAt: null } },
+                    select: {
+                        rol: { select: { id: true, nombre: true, descripcion: true } },
+                    },
+                },
+            },
         });
 
         if (!usuario) {
@@ -78,8 +207,11 @@ export class UsuarioDao extends BaseDao {
             return null;
         }
 
-        const { contrasenia, createdAt, updatedAt, deletedAt, ...usuarioSeguro } = usuario;
-        return usuarioSeguro;
+        const { contrasenia, createdAt, updatedAt, deletedAt, usuarioRols, ...usuarioSeguro } = usuario;
+        return {
+            ...usuarioSeguro,
+            roles: usuarioRols.map(({ rol }) => rol),
+        };
     }
 }
 
