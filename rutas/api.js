@@ -5,6 +5,10 @@ import { RolController } from '../controller/RolController.js';
 import { TipoActividadController } from '../controller/TipoActividadController.js';
 import { AreaTrabajoController } from '../controller/AreaTrabajoController.js';
 import { ConfiguracionSistemaController } from '../controller/ConfiguracionSistemaController.js';
+import { CajaController } from '../controller/CajaController.js';
+import { PuestoController } from '../controller/PuestoController.js';
+import { EstadoEmpleadoController } from '../controller/EstadoEmpleadoController.js';
+import { EmpleadoController } from '../controller/EmpleadoController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -14,12 +18,21 @@ const rolController = new RolController();
 const tipoActividadController = new TipoActividadController();
 const areaTrabajoController = new AreaTrabajoController();
 const configuracionSistemaController = new ConfiguracionSistemaController();
+const cajaController = new CajaController();
+const puestoController = new PuestoController();
+const estadoEmpleadoController = new EstadoEmpleadoController();
+const empleadoController = new EmpleadoController();
+
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
 const rolRoutes = express.Router();
 const tipoActividadRoutes = express.Router();
 const areaTrabajoRoutes = express.Router();
 const configuracionSistemaRoutes = express.Router();
+const cajaRoutes = express.Router();
+const puestoRoutes = express.Router();
+const estadoEmpleadoRoutes = express.Router();
+const empleadoRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -109,6 +122,7 @@ rolRoutes.delete(
     rolController.eliminar.bind(rolController)
 );
 
+// ── Rutas de tipos de actividad ──────────────────────────────────────────────
 tipoActividadRoutes.get(
     '/',
     autenticarUsuario,
@@ -134,13 +148,39 @@ tipoActividadRoutes.delete(
     tipoActividadController.eliminar.bind(tipoActividadController)
 );
 
+// ── Rutas de áreas de trabajo ────────────────────────────────────────────────
 areaTrabajoRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Tipos de Actividad', 'Listar'),
+    verificarPermiso('Áreas de Trabajo', 'Listar'),
     areaTrabajoController.obtenerTodos.bind(areaTrabajoController)
 );
+areaTrabajoRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Áreas de Trabajo', 'Listar'),
+    areaTrabajoController.obtenerPorId.bind(areaTrabajoController)
+);
+areaTrabajoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Áreas de Trabajo', 'Crear'),
+    areaTrabajoController.crear.bind(areaTrabajoController)
+);
+areaTrabajoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Áreas de Trabajo', 'Editar'),
+    areaTrabajoController.actualizar.bind(areaTrabajoController)
+);
+areaTrabajoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Áreas de Trabajo', 'Eliminar'),
+    areaTrabajoController.eliminar.bind(areaTrabajoController)
+);
 
+// ── Rutas de configuración del sistema ──────────────────────────────────────
 configuracionSistemaRoutes.get(
     '/',
     autenticarUsuario,
@@ -166,11 +206,143 @@ configuracionSistemaRoutes.delete(
     configuracionSistemaController.eliminar.bind(configuracionSistemaController)
 );
 
+// ── Rutas de Cajas ───────────────────────────────────────────────────────────
+cajaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Cajas', 'Listar'),
+    cajaController.obtenerTodos.bind(cajaController)
+);
+cajaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Cajas', 'Listar'),
+    cajaController.obtenerPorId.bind(cajaController)
+);
+cajaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Cajas', 'Crear'),
+    cajaController.crear.bind(cajaController)
+);
+cajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Cajas', 'Editar'),
+    cajaController.actualizar.bind(cajaController)
+);
+cajaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Cajas', 'Eliminar'),
+    cajaController.eliminar.bind(cajaController)
+);
+
+// ── Rutas de Puestos ─────────────────────────────────────────────────────────
+puestoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Puestos', 'Listar'),
+    puestoController.obtenerTodos.bind(puestoController)
+);
+puestoRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Puestos', 'Listar'),
+    puestoController.obtenerPorId.bind(puestoController)
+);
+puestoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Puestos', 'Crear'),
+    puestoController.crear.bind(puestoController)
+);
+puestoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Puestos', 'Editar'),
+    puestoController.actualizar.bind(puestoController)
+);
+puestoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Puestos', 'Eliminar'),
+    puestoController.eliminar.bind(puestoController)
+);
+
+// ── Rutas de Estados de Empleado ─────────────────────────────────────────────
+estadoEmpleadoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Empleado', 'Listar'),
+    estadoEmpleadoController.obtenerTodos.bind(estadoEmpleadoController)
+);
+estadoEmpleadoRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Empleado', 'Listar'),
+    estadoEmpleadoController.obtenerPorId.bind(estadoEmpleadoController)
+);
+estadoEmpleadoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Empleado', 'Crear'),
+    estadoEmpleadoController.crear.bind(estadoEmpleadoController)
+);
+estadoEmpleadoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Empleado', 'Editar'),
+    estadoEmpleadoController.actualizar.bind(estadoEmpleadoController)
+);
+estadoEmpleadoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Empleado', 'Eliminar'),
+    estadoEmpleadoController.eliminar.bind(estadoEmpleadoController)
+);
+
+// ── Rutas de Empleados ───────────────────────────────────────────────────────
+empleadoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Empleados', 'Listar'),
+    empleadoController.obtenerTodos.bind(empleadoController)
+);
+empleadoRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empleados', 'Listar'),
+    empleadoController.obtenerPorId.bind(empleadoController)
+);
+empleadoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Empleados', 'Crear'),
+    empleadoController.crear.bind(empleadoController)
+);
+empleadoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empleados', 'Editar'),
+    empleadoController.actualizar.bind(empleadoController)
+);
+empleadoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empleados', 'Eliminar'),
+    empleadoController.eliminar.bind(empleadoController)
+);
+
 router.use('/usuarios', usuarioRoutes);
 router.use('/secciones', seccionRoutes);
 router.use('/roles', rolRoutes);
 router.use('/tipos-actividad', tipoActividadRoutes);
 router.use('/areas-trabajo', areaTrabajoRoutes);
 router.use('/configuraciones-sistema', configuracionSistemaRoutes);
+router.use('/cajas', cajaRoutes);
+router.use('/puestos', puestoRoutes);
+router.use('/estados-empleado', estadoEmpleadoRoutes);
+router.use('/empleados', empleadoRoutes);
 
 export { router as api };

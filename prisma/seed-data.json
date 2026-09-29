@@ -49,6 +49,57 @@
           "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
         }
       ]
+    },
+    {
+      "nombre": "Ventas y Caja",
+      "descripcion": "Gestión de ventas, aperturas y movimiento de cajas",
+      "imagenUrl": null,
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Cajas",
+          "descripcion": "Gestión de cajas del establecimiento",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        }
+      ]
+    },
+    {
+      "nombre": "Empleados",
+      "descripcion": "Gestión de personal, puestos, áreas y estados laborales",
+      "imagenUrl": null,
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Áreas de Trabajo",
+          "descripcion": "Gestión de áreas de trabajo",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        },
+        {
+          "nombre": "Puestos",
+          "descripcion": "Gestión de puestos de trabajo",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        },
+        {
+          "nombre": "Estados de Empleado",
+          "descripcion": "Gestión de estados de empleados",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        },
+        {
+          "nombre": "Empleados",
+          "descripcion": "Gestión de la información del personal",
+          "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+        }
+      ]
     }
   ],
   "roles": [

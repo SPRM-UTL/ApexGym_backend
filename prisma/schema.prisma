@@ -17,6 +17,7 @@ model Usuario {
   tokens          Token[]
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
+  empleados       Empleado[]
 
   @@map("usuarios")
 }
@@ -84,8 +85,80 @@ model AreaTrabajo {
   deletedAt   DateTime? @map("deleted_at")
 
   tiposActividad TipoActividad[]
+  puestos        Puesto[]
+  empleados      Empleado[]
 
   @@map("areas_trabajos")
+}
+
+model Caja {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @db.VarChar(100)
+  ubicacion String?   @db.VarChar(255)
+  estado    String    @db.VarChar(30)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("cajas")
+}
+
+model Puesto {
+  id            Int       @id @default(autoincrement())
+  areaTrabajoId Int       @map("area_trabajo_id")
+  nombre        String    @db.VarChar(100)
+  descripcion   String?   @db.Text
+  salarioBase   Decimal   @map("salario_base") @db.Decimal(10, 2)
+  estado        String    @db.VarChar(30)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  areaTrabajo AreaTrabajo @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
+  empleados   Empleado[]
+
+  @@map("puestos")
+}
+
+model EstadoEmpleado {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(100)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  empleados Empleado[]
+
+  @@map("estados_empleados")
+}
+
+model Empleado {
+  id               Int       @id @default(autoincrement())
+  puestoId         Int       @map("puesto_id")
+  areaTrabajoId    Int       @map("area_trabajo_id")
+  estadoEmpleadoId Int       @map("estado_empleado_id")
+  usuarioId        Int?      @map("usuario_id")
+  nombre           String    @db.VarChar(100)
+  apellidoPaterno  String    @map("apellido_paterno") @db.VarChar(100)
+  apellidoMaterno  String?   @map("apellido_materno") @db.VarChar(100)
+  telefono         String    @db.VarChar(20)
+  correo           String?   @db.VarChar(191)
+  direccion        String?   @db.Text
+  fechaNacimiento  DateTime  @map("fecha_nacimiento")
+  fechaIngreso     DateTime  @map("fecha_ingreso")
+  imagenUrl        String?   @map("imagen_url") @db.LongText
+  imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  puesto         Puesto         @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  areaTrabajo    AreaTrabajo    @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
+  estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
+  usuario        Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@map("empleados")
 }
 
 model TipoActividad {

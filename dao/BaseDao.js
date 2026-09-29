@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
@@ -15,10 +16,22 @@ const adapter = new PrismaMariaDb(pool);
 export const prisma = new PrismaClient({ adapter });
 
 export class BaseDao {
+    /**
+     * @param {string} modelName - Nombre del modelo Prisma
+     * @param {object} [configuracion] - Opciones de configuración del DAO
+     */
     constructor(modelName, configuracion = {}) {
         this.prisma = prisma;
         this.model = prisma[modelName];
-        this.omit = configuracion.omit || {};
+
+        // Omisión automática de campos delicados / de auditoría (createdAt, updatedAt, deletedAt)
+        // para evitar descargar información innecesaria o sensible en las respuestas.
+        this.omit = {
+            createdAt: true,
+            updatedAt: true,
+            deletedAt: true,
+            ...(configuracion.omit || {})
+        };
     }
 
     async getAll(additionalWhere = {}) {
