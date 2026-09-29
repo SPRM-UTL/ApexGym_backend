@@ -210,3 +210,15 @@ model UsuarioPermiso {
   @@id([usuarioId, permisoId])
   @@map("usuarios_permisos")
 }
+
+model CategoriaProducto{
+  id Int               @id @default(autoincrement())
+  nombre String        @unique @db.VarChar(100)
+  descripcion String?  @map("descripcion")
+  estado String        @default("activo")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
+ 
+  @@map("categoria_productos")
+}
