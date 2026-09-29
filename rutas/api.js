@@ -8,6 +8,9 @@ import { ConfiguracionSistemaController } from '../controller/ConfiguracionSiste
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
 import { CategoriaProductoController } from '../controller/CategoriaProductoController.js'
 
+import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+
+
 const router = express.Router();
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
@@ -39,6 +42,7 @@ usuarioRoutes.post(
     '/registrarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Crear'),
+    uploadFotoUsuario,
     usuarioController.registrarUsuario.bind(usuarioController)
 );
 
@@ -46,6 +50,7 @@ usuarioRoutes.put(
     '/actualizarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Editar'),
+    uploadFotoUsuario,
     usuarioController.actualizarUsuario.bind(usuarioController)
 );
 
@@ -54,20 +59,6 @@ usuarioRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Eliminar'),
     usuarioController.eliminarUsuario.bind(usuarioController)
-);
-
-usuarioRoutes.post(
-    '/asignarRol',
-    autenticarUsuario,
-    verificarPermiso('Usuarios', 'Editar'),
-    rolController.asignarRol.bind(rolController)
-);
-
-usuarioRoutes.delete(
-    '/removerRol',
-    autenticarUsuario,
-    verificarPermiso('Usuarios', 'Editar'),
-    rolController.removerRol.bind(rolController)
 );
 
 // ── Rutas de secciones ───────────────────────────────────────────────────────
