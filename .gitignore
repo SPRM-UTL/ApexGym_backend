@@ -22,4 +22,4 @@ repomix-output.xml
 
 # Directorios de imágenes y archivos subidos
 uploads/
-public/uploads/
+public/uploads/.vs/ 
