@@ -65,6 +65,8 @@ export class BaseDao {
             },
             data: {
                 deletedAt: new Date(),
+                //evitamos que devuelva todos los campos
+                ommit: this.omit
             },
         });
     }

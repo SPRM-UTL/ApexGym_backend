@@ -67,10 +67,17 @@ export class UsuarioDao extends BaseDao {
 
     async update(id, data) {
         const usuarioId = Number(id);
-        const datosAActualizar = {
-            nombre: data.nombre,
-            email: data.email
-        };
+
+        //aqui solo hice consistencia en como guarda las variables del nuevo usuario
+        const datosAActualizar = {};
+
+        if (data.nombre !== undefined) {
+            datosAActualizar.nombre = data.nombre;
+        }
+
+        if (data.email !== undefined) {
+            datosAActualizar.email = data.email;
+        }
 
         if (data.contrasenia) {
             datosAActualizar.contrasenia = await encriptarContrasena(data.contrasenia);
