@@ -19,3 +19,7 @@ yarn-error.log*
 
 # Repomix
 repomix-output.xml
+
+# Directorios de imágenes y archivos subidos
+uploads/
+public/uploads/.vs/ 

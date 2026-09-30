@@ -1,21 +1,20 @@
-import { areaTrabajoDao } from '../dao/AreaTrabajoDao.js';
+import { estadoEmpleadoDao } from '../dao/EstadoEmpleadoDao.js';
 import { BaseController } from './BaseController.js';
 
-export class AreaTrabajoController extends BaseController {
+export class EstadoEmpleadoController extends BaseController {
     constructor() {
-        super(areaTrabajoDao);
+        super(estadoEmpleadoDao);
     }
 
     crear = async (req, res) => {
         try {
-            const { nombre, descripcion, estado } = req.body;
-            this.validar({ nombre, estado });
+            const { nombre, descripcion } = req.body;
+            this.validar({ nombre });
             const registro = await this.dao.create({
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
-                estado: estado.trim().toUpperCase(),
             });
-            return this.respuestaExito(res, registro, 'Área de trabajo creada correctamente');
+            return this.respuestaExito(res, registro, 'Estado de empleado creado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -25,14 +24,13 @@ export class AreaTrabajoController extends BaseController {
         try {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
-            const { nombre, descripcion, estado } = req.body;
-            this.validar({ nombre, estado });
+            const { nombre, descripcion } = req.body;
+            this.validar({ nombre });
             const registro = await this.dao.update(id, {
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
-                estado: estado.trim().toUpperCase(),
             });
-            return this.respuestaExito(res, registro, 'Área de trabajo actualizada correctamente');
+            return this.respuestaExito(res, registro, 'Estado de empleado actualizado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -43,16 +41,15 @@ export class AreaTrabajoController extends BaseController {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
             const registro = await this.dao.delete(id);
-            return this.respuestaExito(res, registro, 'Área de trabajo eliminada correctamente');
+            return this.respuestaExito(res, registro, 'Estado de empleado eliminado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
     };
 
-    validar({ nombre, estado }) {
-        if (!nombre?.trim()) throw new Error('El nombre del área de trabajo es requerido');
-        if (!estado?.trim()) throw new Error('El estado del área de trabajo es requerido');
+    validar({ nombre }) {
+        if (!nombre?.trim()) throw new Error('El nombre del estado de empleado es requerido');
     }
 }
 
-export const areaTrabajoController = new AreaTrabajoController();
+export const estadoEmpleadoController = new EstadoEmpleadoController();
