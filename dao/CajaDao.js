@@ -1,8 +1,8 @@
 import { BaseDao } from './BaseDao.js';
 
-export class AreaTrabajoDao extends BaseDao {
+export class CajaDao extends BaseDao {
     constructor() {
-        super('areaTrabajo', {
+        super('caja', {
             // Omisión de información delicada y campos de auditoría (createdAt, updatedAt, deletedAt)
             omit: {
                 createdAt: true,
@@ -13,4 +13,4 @@ export class AreaTrabajoDao extends BaseDao {
     }
 }
 
-export const areaTrabajoDao = new AreaTrabajoDao();
+export const cajaDao = new CajaDao();
