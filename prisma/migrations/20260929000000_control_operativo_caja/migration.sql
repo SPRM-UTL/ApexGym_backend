@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE `aperturas_caja` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `caja_id` INTEGER NOT NULL,
