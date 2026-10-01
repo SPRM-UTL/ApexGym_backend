@@ -7,6 +7,7 @@ import { AreaTrabajoController } from '../controller/AreaTrabajoController.js';
 import { ConfiguracionSistemaController } from '../controller/ConfiguracionSistemaController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
 import { CategoriaProductoController } from '../controller/CategoriaProductoController.js'
+import { ProductoController } from '../controller/ProductoController.js';
 
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
@@ -19,6 +20,8 @@ const tipoActividadController = new TipoActividadController();
 const areaTrabajoController = new AreaTrabajoController();
 const configuracionSistemaController = new ConfiguracionSistemaController();
 const categoriaProductoController = new CategoriaProductoController();
+const productoController = new ProductoController();
+const productoRoutes = express.Router(); 
 const CategoriaProductoRoutes = express.Router();
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
@@ -188,8 +191,36 @@ CategoriaProductoRoutes.delete(
     verificarPermiso('Categorías de Productos', 'Eliminar'),
     categoriaProductoController.eliminar.bind(categoriaProductoController)
 );
+//------Productos ------------------
+productoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Listar'),
+    productoController.obtenerTodos.bind(productoController)
+)
 
+productoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Crear'),
+    productoController.crear.bind(productoController)
+)
 
+productoRoutes.put(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Editar'),
+    productoController.actualizar.bind(productoController)
+)
+
+productoRoutes.delete(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Eliminar'),
+    productoController.eliminar.bind(productoController)
+)
+
+router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/secciones', seccionRoutes);
