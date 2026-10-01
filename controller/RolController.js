@@ -56,24 +56,4 @@ export class RolController extends BaseController {
     validar(nombre) {
         if (!nombre?.trim()) throw new Error('El nombre del rol es requerido');
     }
-
-    asignarRol = async (req, res) => {
-        const { usuarioId, rolId } = req.body;
-        try {
-            const resultado = await rolDao.asignarARol(Number(usuarioId), Number(rolId));
-            return this.respuestaExito(res, resultado, "Rol asignado exitosamente");
-        } catch (error) {
-            return this.respuestaError(res, error);
-        }
-    };
-
-    removerRol = async (req, res) => {
-        const { usuarioId, rolId } = req.body;
-        try {
-            const resultado = await rolDao.removerDeUsuario(Number(usuarioId), Number(rolId));
-            return this.respuestaExito(res, resultado, "Rol removido exitosamente");
-        } catch (error) {
-            return this.respuestaError(res, error);
-        }
-    };
 }

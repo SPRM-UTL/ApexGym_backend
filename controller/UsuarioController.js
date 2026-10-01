@@ -1,6 +1,7 @@
 import { usuarioDao } from "../dao/UsuarioDao.js";
 import { tokenDao } from "../dao/TokenDao.js";
 import { BaseController } from "./BaseController.js";
+import { eliminarArchivoSubido } from "../middleware/uploadMiddleware.js";
 
 export class UsuarioController extends BaseController {
     constructor() {
@@ -32,21 +33,48 @@ export class UsuarioController extends BaseController {
     }
 
     registrarUsuario = async (req, res) => {
-        const { nombre, email, contrasenia } = req.body;
+        const { nombre, email, contrasenia, rolId } = req.body;
+        const fotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : null;
+
         try {
-            const nuevoUsuario = await usuarioDao.create({ nombre, email, contrasenia });
+            const datos = { nombre, email, contrasenia, rolId };
+            if (fotoUrl) {
+                datos.fotoUrl = fotoUrl;
+            }
+            const nuevoUsuario = await usuarioDao.create(datos);
             return this.respuestaExito(res, nuevoUsuario, "Usuario registrado exitosamente");
         } catch (error) {
+            if (fotoUrl) {
+                eliminarArchivoSubido(fotoUrl);
+            }
             return this.respuestaError(res, error);
         }
     }
     
     actualizarUsuario = async (req, res) => {
-        const { id, nombre, email, contrasenia } = req.body;
+        const { id, nombre, email, contrasenia, rolId } = req.body;
+        const nuevaFotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : undefined;
+
         try {
-            const nuevoUsuario = await usuarioDao.update(id,{ nombre, email, contrasenia });
+            const usuarioId = Number(id);
+            const usuarioPrevio = nuevaFotoUrl ? await usuarioDao.getById(usuarioId) : null;
+
+            const datos = { nombre, email, contrasenia, rolId };
+            if (nuevaFotoUrl !== undefined) {
+                datos.fotoUrl = nuevaFotoUrl;
+            }
+
+            const nuevoUsuario = await usuarioDao.update(usuarioId, datos);
+
+            if (nuevaFotoUrl && usuarioPrevio?.fotoUrl && usuarioPrevio.fotoUrl !== nuevaFotoUrl) {
+                eliminarArchivoSubido(usuarioPrevio.fotoUrl);
+            }
+
             return this.respuestaExito(res, nuevoUsuario, "Usuario actualizado exitosamente");
         } catch (error) {
+            if (nuevaFotoUrl) {
+                eliminarArchivoSubido(nuevaFotoUrl);
+            }
             return this.respuestaError(res, error);
         }
     }

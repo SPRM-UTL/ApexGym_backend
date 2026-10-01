@@ -11,13 +11,29 @@ export class BaseController {
 
     obtenerTodos = async (req, res) => {
         try {
-            const usuarios = await this.dao.getAll();
-            if (!usuarios) {
+            const registros = await this.dao.getAll();
+            if (!registros) {
                 throw new Error("No se encontraron registros");
             }
 
-            return this.respuestaExito(res, usuarios, "Registros obtenidos exitosamente");
+            return this.respuestaExito(res, registros, "Registros obtenidos exitosamente");
 
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+
+    obtenerPorId = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) {
+                throw new Error("ID no válido");
+            }
+            const registro = await this.dao.getById(id);
+            if (!registro) {
+                return this.respuestaNoEncontrado(res, "Registro no encontrado");
+            }
+            return this.respuestaExito(res, registro, "Registro obtenido exitosamente");
         } catch (error) {
             return this.respuestaError(res, error);
         }

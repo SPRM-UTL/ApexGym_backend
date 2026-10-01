@@ -158,26 +158,6 @@ export class RolDao extends BaseDao {
             }
         }
     }
-
-    async asignarARol(usuarioId, rolId) {
-        return this.prisma.usuarioRol.create({
-            data: {
-                usuarioId,
-                rolId,
-            },
-        });
-    }
-
-    async removerDeUsuario(usuarioId, rolId) {
-        return this.prisma.usuarioRol.update({
-            where: {
-                usuarioId_rolId: { usuarioId, rolId },
-            },
-            data: {
-                deletedAt: new Date(),
-            },
-        });
-    }
 }
 
 export const rolDao = new RolDao();
