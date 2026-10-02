@@ -9,6 +9,7 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
+import bcrypt from 'bcryptjs'; // 1. Importante para encriptar la contraseña
 import 'dotenv/config';
 import seedData from './seed-data.json' with { type: 'json' };
 import { encriptarContrasena } from '../utilidades/utilesSeguridad.js';
@@ -41,7 +42,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
 });
 
 const upsertModulo = async (seccionId, modulo) => {
-    // Buscar por nombre permite mover un módulo entre secciones sin duplicarlo.
     const existente = await prisma.modulo.findFirst({
         where: { nombre: modulo.nombre },
     });
@@ -90,6 +90,27 @@ const upsertRol = (rol) => prisma.rol.upsert({
     update: { descripcion: rol.descripcion, deletedAt: null },
     create: { nombre: rol.nombre, descripcion: rol.descripcion },
 });
+
+// Función para insertar/actualizar usuarios desde el JSON
+const upsertUsuario = async (usuario) => {
+    // Si tu JSON usa usuario.password o usuario.contrasenia, lo tomamos aquí:
+    const plainPassword = usuario.password || usuario.contrasenia;
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    return prisma.usuario.upsert({
+        where: { email: usuario.email },
+        update: {
+            nombre: usuario.nombre,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+            deletedAt: null,
+        },
+        create: {
+            nombre: usuario.nombre,
+            email: usuario.email,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+        },
+    });
+};
 
 async function sincronizarPermisosRol(rolId, permisosIds) {
     const ids = [...new Set(permisosIds)];
@@ -160,6 +181,14 @@ async function main() {
     console.log('Iniciando seed declarativo...');
 
     const defaultUser = await crearUsuarioDefault();
+
+    // 2. CREACIÓN DE USUARIOS (Primero para que existan antes de asignar roles)
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            const usuario = await upsertUsuario(usuarioData);
+            console.log(`Usuario preparado: ${usuario.nombre} <${usuario.email}>`);
+        }
+    }
 
     const acciones = new Map();
     for (const accion of seedData.acciones) {
