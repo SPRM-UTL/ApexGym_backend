@@ -291,11 +291,85 @@ model UsuarioPermiso {
   @@map("usuarios_permisos")
 }
 
+model EstadoCliente {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(150)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  clientes Cliente[]
+
+  @@map("estados_clientes")
+}
+
+model Cliente {
+  id                         Int           @id @default(autoincrement())
+  estadoClienteId            Int           @map("estado_cliente_id")
+  nombre                     String        @db.VarChar(150)
+  apellidoPaterno            String        @map("apellido_paterno") @db.VarChar(150)
+  apellidoMaterno            String?       @map("apellido_materno") @db.VarChar(150)
+  fechaNacimiento            DateTime      @map("fecha_nacimiento") @db.Date
+  genero                     String        @db.VarChar(50)
+  telefono                   String        @db.VarChar(20)
+  correo                     String?       @db.VarChar(150)
+  direccion                  String?       @db.Text
+  contactoEmergenciaNombre   String?       @map("contacto_emergencia_nombre") @db.VarChar(150)
+  contactoEmergenciaTelefono String?       @map("contacto_emergencia_telefono") @db.VarChar(20)
+  fechaRegistro              DateTime      @map("fecha_registro") @db.Date
+  createdAt                  DateTime      @default(now()) @map("created_at")
+  updatedAt                  DateTime      @updatedAt @map("updated_at")
+  deletedAt                  DateTime?     @map("deleted_at")
+
+  estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
+
+  @@map("clientes")
+}
+
+model EstadoMembresia {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(150)
+  descripcion String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@map("estados_membresias")
+}
+
+model TipoMembresia {
+  id           Int       @id @default(autoincrement())
+  nombre       String    @db.VarChar(150)
+  descripcion  String?   @db.Text
+  duracionDias Int       @map("duracion_dias")
+  precio       Decimal   @db.Decimal(10, 2)
+  estado       String    @db.VarChar(30)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@map("tipos_membresias")
+}
+
+model TipoVisita {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(150)
+  descripcion String?   @db.Text
+  costo       Decimal   @db.Decimal(10, 2)
+  estado      String    @db.VarChar(30)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@map("tipos_visitas")
+}
+
 model CategoriaProducto {
   id          Int       @id @default(autoincrement())
   nombre      String    @unique @db.VarChar(100)
-  descripcion String?   @map("descripcion")
-  estado      String    @default("activo")
+  descripcion String?   @db.Text
+  estado      String    @default("activo") @db.VarChar(30)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
