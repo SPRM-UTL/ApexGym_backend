@@ -11,6 +11,7 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 import 'dotenv/config';
 import seedData from './seed-data.json' with { type: 'json' };
+import { encriptarContrasena } from '../utilidades/utilesSeguridad.js';
 
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
@@ -133,8 +134,32 @@ async function asignarRolAlPrimerUsuario(rolId) {
     console.log(`Rol asignado a ${usuario.nombre} <${usuario.email}>.`);
 }
 
+async function crearUsuarioDefault() {
+    const email = 'apexgym@sprm.com.mx';
+    const contraseniaPlana = 'sprm-2026';
+    const contrasenia = encriptarContrasena(contraseniaPlana);
+
+    const usuario = await prisma.usuario.upsert({
+        where: { email },
+        update: {
+            contrasenia,
+            deletedAt: null,
+        },
+        create: {
+            nombre: 'Administrador ApexGym',
+            email,
+            contrasenia,
+        },
+    });
+
+    console.log(`Usuario por defecto creado/actualizado: ${usuario.nombre} <${usuario.email}>`);
+    return usuario;
+}
+
 async function main() {
     console.log('Iniciando seed declarativo...');
+
+    const defaultUser = await crearUsuarioDefault();
 
     const acciones = new Map();
     for (const accion of seedData.acciones) {
@@ -189,7 +214,17 @@ async function main() {
             : rolData.permisos.flatMap((moduloNombre) => permisosPorModulo.get(moduloNombre) ?? []);
 
         await sincronizarPermisosRol(rol.id, permisos.map((permiso) => permiso.id));
-        if (rolData.asignarAlPrimerUsuario) await asignarRolAlPrimerUsuario(rol.id);
+        if (rolData.asignarAlPrimerUsuario) {
+            await asignarRolAlPrimerUsuario(rol.id);
+            if (defaultUser) {
+                await prisma.usuarioRol.upsert({
+                    where: { usuarioId_rolId: { usuarioId: defaultUser.id, rolId: rol.id } },
+                    update: { deletedAt: null },
+                    create: { usuarioId: defaultUser.id, rolId: rol.id },
+                });
+                console.log(`Rol ${rol.nombre} asignado a ${defaultUser.nombre} <${defaultUser.email}>.`);
+            }
+        }
         console.log(`Rol: ${rol.nombre} (${permisos.length} permisos).`);
     }
 
