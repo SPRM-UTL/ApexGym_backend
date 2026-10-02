@@ -97,21 +97,36 @@
           "descripcion": "Gestión de cajas del establecimiento",
           "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
           "imagenPublicId": null,
-          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
         },
         {
           "nombre": "Apertura de Caja",
           "descripcion": "Registro de apertura de turno y fondo de caja",
           "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&q=80",
           "imagenPublicId": null,
-          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
         },
         {
           "nombre": "Movimientos de Caja",
           "descripcion": "Entradas y salidas manuales de efectivo durante el turno",
           "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
           "imagenPublicId": null,
-          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
         },
         {
           "nombre": "Corte de Caja",
@@ -193,6 +208,74 @@
           "nombre": "Categorías de Productos",
           "descripcion": "Administración de categorías de productos",
           "imagenUrl": null,
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Gestión de Clientes",
+      "descripcion": "Módulos operativos de clientes",
+      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Clientes",
+          "descripcion": "Administración de clientes del gimnasio",
+          "imagenUrl": "https://img.freepik.com/foto-gratis/joven-atractiva-haciendo-ejercicio-gimnasio_1139-715.jpg",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Cliente",
+          "descripcion": "Catálogo de estados de clientes",
+          "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Tipos de Membresía",
+          "descripcion": "Planes de membresía disponibles",
+          "imagenUrl": "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Membresía",
+          "descripcion": "Catálogo de estados de membresía",
+          "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Tipos de Visita",
+          "descripcion": "Catálogo de accesos temporales",
+          "imagenUrl": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
             "Listar",

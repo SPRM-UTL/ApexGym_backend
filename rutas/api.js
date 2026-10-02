@@ -13,7 +13,12 @@ import { AperturaCajaController } from '../controller/AperturaCajaController.js'
 import { MovimientoCajaController } from '../controller/MovimientoCajaController.js';
 import { CorteCajaController } from '../controller/CorteCajaController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
-import { CategoriaProductoController } from '../controller/CategoriaProductoController.js'
+import { CategoriaProductoController } from '../controller/CategoriaProductoController.js';
+import { EstadoClienteController } from '../controller/EstadoClienteController.js';
+import { ClienteController } from '../controller/ClienteController.js';
+import { EstadoMembresiaController } from '../controller/EstadoMembresiaController.js';
+import { TipoMembresiaController } from '../controller/TipoMembresiaController.js';
+import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
@@ -26,6 +31,12 @@ const tipoActividadController = new TipoActividadController();
 const areaTrabajoController = new AreaTrabajoController();
 const configuracionSistemaController = new ConfiguracionSistemaController();
 const categoriaProductoController = new CategoriaProductoController();
+const estadoClienteController = new EstadoClienteController();
+const clienteController = new ClienteController();
+const estadoMembresiaController = new EstadoMembresiaController();
+const tipoMembresiaController = new TipoMembresiaController();
+const tipoVisitaController = new TipoVisitaController();
+
 const CategoriaProductoRoutes = express.Router();
 const cajaController = new CajaController();
 const puestoController = new PuestoController();
@@ -35,6 +46,11 @@ const aperturaCajaController = new AperturaCajaController();
 const movimientoCajaController = new MovimientoCajaController();
 const corteCajaController = new CorteCajaController();
 
+const estadoClienteRoutes = express.Router();
+const clienteRoutes = express.Router();
+const estadoMembresiaRoutes = express.Router();
+const tipoMembresiaRoutes = express.Router();
+const tipoVisitaRoutes = express.Router();
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
 const rolRoutes = express.Router();
@@ -462,6 +478,146 @@ corteCajaRoutes.post(
     corteCajaController.crear.bind(corteCajaController)
 );
 
+
+// ── Rutas de Estados de Cliente ──────────────────────────────────────────────
+estadoClienteRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Cliente', 'Listar'),
+    estadoClienteController.obtenerTodos.bind(estadoClienteController)
+);
+
+estadoClienteRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Cliente', 'Crear'),
+    estadoClienteController.crear.bind(estadoClienteController)
+);
+
+estadoClienteRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Cliente', 'Editar'),
+    estadoClienteController.actualizar.bind(estadoClienteController)
+);
+
+estadoClienteRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Cliente', 'Eliminar'),
+    estadoClienteController.eliminar.bind(estadoClienteController)
+);
+
+// ── Rutas de Clientes ────────────────────────────────────────────────────────
+clienteRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteController.obtenerTodos.bind(clienteController)
+);
+clienteRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Crear'),
+    clienteController.crear.bind(clienteController)
+);
+clienteRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Editar'),
+    clienteController.actualizar.bind(clienteController)
+);
+clienteRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Eliminar'),
+    clienteController.eliminar.bind(clienteController)
+);
+
+// ── Rutas de Estados de Membresía ────────────────────────────────────────────
+estadoMembresiaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Membresía', 'Listar'),
+    estadoMembresiaController.obtenerTodos.bind(estadoMembresiaController)
+);
+estadoMembresiaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Estados de Membresía', 'Crear'),
+    estadoMembresiaController.crear.bind(estadoMembresiaController)
+);
+estadoMembresiaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Membresía', 'Editar'),
+    estadoMembresiaController.actualizar.bind(estadoMembresiaController)
+);
+estadoMembresiaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Estados de Membresía', 'Eliminar'),
+    estadoMembresiaController.eliminar.bind(estadoMembresiaController)
+);
+
+// ── Rutas de Tipos de Membresía ──────────────────────────────────────────────
+tipoMembresiaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Listar'),
+    tipoMembresiaController.obtenerTodos.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Crear'),
+    tipoMembresiaController.crear.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Editar'),
+    tipoMembresiaController.actualizar.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Eliminar'),
+    tipoMembresiaController.eliminar.bind(tipoMembresiaController)
+);
+
+// ── Rutas de Tipos de Visita ─────────────────────────────────────────────────
+tipoVisitaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Visita', 'Listar'),
+    tipoVisitaController.obtenerTodos.bind(tipoVisitaController)
+);
+tipoVisitaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Visita', 'Crear'),
+    tipoVisitaController.crear.bind(tipoVisitaController)
+);
+tipoVisitaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Visita', 'Editar'),
+    tipoVisitaController.actualizar.bind(tipoVisitaController)
+);
+tipoVisitaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Visita', 'Eliminar'),
+    tipoVisitaController.eliminar.bind(tipoVisitaController)
+);
+
+router.use('/categorias-productos', CategoriaProductoRoutes);
+router.use('/estados-cliente', estadoClienteRoutes);
+router.use('/clientes', clienteRoutes);
+router.use('/estados-membresia', estadoMembresiaRoutes);
+router.use('/tipos-membresia', tipoMembresiaRoutes);
+router.use('/tipos-visita', tipoVisitaRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/secciones', seccionRoutes);
 router.use('/roles', rolRoutes);
