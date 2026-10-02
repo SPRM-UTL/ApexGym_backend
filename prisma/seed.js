@@ -256,6 +256,23 @@ async function main() {
         console.log(`Rol: ${rol.nombre} (${permisos.length} permisos).`);
     }
 
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            if (usuarioData.rolNombre) {
+                const usuario = await prisma.usuario.findUnique({ where: { email: usuarioData.email } });
+                const rol = await prisma.rol.findUnique({ where: { nombre: usuarioData.rolNombre } });
+                if (usuario && rol) {
+                    await prisma.usuarioRol.upsert({
+                        where: { usuarioId_rolId: { usuarioId: usuario.id, rolId: rol.id } },
+                        update: { deletedAt: null },
+                        create: { usuarioId: usuario.id, rolId: rol.id },
+                    });
+                    console.log(`Rol ${rol.nombre} asignado a ${usuario.nombre} <${usuario.email}>.`);
+                }
+            }
+        }
+    }
+
     console.log('Seed completado correctamente.');
 }
 
