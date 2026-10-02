@@ -19,11 +19,24 @@ export class UsuarioController extends BaseController {
 
             const token = await tokenDao.crearTokenSesion(usuario.id);
 
+            //librerias instaladas cookie-parser y helmet
+            //usamos las cookies httpOnly esto hace que no sea accesible desde ningun codigo de cliente evitando que el frontend vea el token
+            //de esta manera evitamos que nuestro tokeen codificado con Base64 lo pueda ver cualquier persona a pesar de estar codificado
+            res.cookie('token', token.token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: token.tiempoVida
+            })
+
+            
             return this.respuestaExito(
                 res,
                 {
                     usuario,
-                    token: token.token
+                    
+                    //se comento para evitar que lo guarde de nuevo en el localstorage
+                    //token: token.token
                 },
                 "Credenciales válidas"
             );
