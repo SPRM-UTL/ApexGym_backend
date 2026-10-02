@@ -9,7 +9,6 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
-import bcrypt from 'bcryptjs'; // 1. Importante para encriptar la contraseña
 import 'dotenv/config';
 import seedData from './seed-data.json' with { type: 'json' };
 import { encriptarContrasena } from '../utilidades/utilesSeguridad.js';
@@ -95,7 +94,7 @@ const upsertRol = (rol) => prisma.rol.upsert({
 const upsertUsuario = async (usuario) => {
     // Si tu JSON usa usuario.password o usuario.contrasenia, lo tomamos aquí:
     const plainPassword = usuario.password || usuario.contrasenia;
-    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    const hashedPassword = encriptarContrasena(plainPassword);
 
     return prisma.usuario.upsert({
         where: { email: usuario.email },
