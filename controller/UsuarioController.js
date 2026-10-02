@@ -25,18 +25,15 @@ export class UsuarioController extends BaseController {
             res.cookie('token', token.token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
                 maxAge: token.tiempoVida
-            })
+            });
 
-            
             return this.respuestaExito(
                 res,
                 {
                     usuario,
-                    
-                    //se comento para evitar que lo guarde de nuevo en el localstorage
-                    //token: token.token
+                    token: token.token
                 },
                 "Credenciales válidas"
             );
