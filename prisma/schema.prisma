@@ -304,16 +304,17 @@ model CategoriaProducto {
 }
 
 model AperturaCaja {
-  id            Int       @id @default(autoincrement())
-  cajaId        Int       @map("caja_id")
-  empleadoId    Int       @map("empleado_id")
-  montoInicial  Decimal   @map("monto_inicial") @db.Decimal(10, 2)
-  fechaApertura DateTime  @map("fecha_apertura")
-  estado        String    @default("ABIERTA") @db.VarChar(20)
-  observaciones String?   @db.Text
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  id             Int       @id @default(autoincrement())
+  cajaId         Int       @map("caja_id")
+  empleadoId     Int       @map("empleado_id")
+  montoInicial   Decimal   @map("monto_inicial") @db.Decimal(10, 2)
+  fechaApertura  DateTime  @map("fecha_apertura")
+  estado         String    @default("ABIERTA") @db.VarChar(20)
+  desgloseInicio String?   @map("desglose_inicio") @db.Text
+  observaciones  String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
 
   caja     Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
   empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
@@ -350,6 +351,10 @@ model CorteCaja {
   totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
   totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
   diferencia      Decimal   @db.Decimal(10, 2)
+  estado          String    @default("PENDIENTE") @db.VarChar(20)
+  desgloseInicio  String?   @map("desglose_inicio") @db.Text
+  desgloseFin     String?   @map("desglose_fin") @db.Text
+  fechaValidacion DateTime? @map("fecha_validacion")
   observaciones   String?   @db.Text
   fechaCorte      DateTime  @default(now()) @map("fecha_corte")
   createdAt       DateTime  @default(now()) @map("created_at")
