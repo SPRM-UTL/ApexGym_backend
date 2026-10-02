@@ -1,3 +1,10 @@
+/**
+ * Sistema: ApexGym Backend
+ * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
+ * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
+ *              restricción de apertura única por caja, registro de desglose de billetes
+ *              en arqueo y endpoint de validación de corte de caja.
+ */
 import express from 'express';
 import { UsuarioController } from '../controller/UsuarioController.js';
 import { SeccionController } from '../controller/SeccionController.js';
