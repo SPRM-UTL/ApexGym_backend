@@ -52,16 +52,21 @@ export const autenticarUsuario = async (req, res, next) => {
                     mensaje = "Token inválido";
                     break;
             }
-            //const response = new ResponseModel(null, 1, mensaje, 401);
+            
             //limpiamos en caso de algun error
             res.clearCookie('token', COOKIE_OPTIOMS)
+            
+            const response = new ResponseModel(null, 1, mensaje, 401);
             return res.status(401).json(response);
         }
 
         
 
         req.usuario = resultado.token.usuario;
-        req.token = resultado.token;
+        /**Se comento para evitar que le mande al frontend el token y sea vulnerable
+         * lo maneja por cookies siendo controlado solo por el backend
+        **/
+        /**req.token = resultado.token; */
 
         next();
 
