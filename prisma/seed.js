@@ -159,7 +159,7 @@ async function crearUsuarioDefault() {
 async function main() {
     console.log('Iniciando seed declarativo...');
 
-    await crearUsuarioDefault();
+    const defaultUser = await crearUsuarioDefault();
 
     const acciones = new Map();
     for (const accion of seedData.acciones) {
@@ -214,7 +214,17 @@ async function main() {
             : rolData.permisos.flatMap((moduloNombre) => permisosPorModulo.get(moduloNombre) ?? []);
 
         await sincronizarPermisosRol(rol.id, permisos.map((permiso) => permiso.id));
-        if (rolData.asignarAlPrimerUsuario) await asignarRolAlPrimerUsuario(rol.id);
+        if (rolData.asignarAlPrimerUsuario) {
+            await asignarRolAlPrimerUsuario(rol.id);
+            if (defaultUser) {
+                await prisma.usuarioRol.upsert({
+                    where: { usuarioId_rolId: { usuarioId: defaultUser.id, rolId: rol.id } },
+                    update: { deletedAt: null },
+                    create: { usuarioId: defaultUser.id, rolId: rol.id },
+                });
+                console.log(`Rol ${rol.nombre} asignado a ${defaultUser.nombre} <${defaultUser.email}>.`);
+            }
+        }
         console.log(`Rol: ${rol.nombre} (${permisos.length} permisos).`);
     }
 

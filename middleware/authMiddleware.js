@@ -1,7 +1,11 @@
 import { tokenDao } from "../dao/TokenDao.js";
 import { permisoDao } from "../dao/PermisoDao.js";
 import { ResponseModel } from "../modelos/ResponseModel.js";
-
+const COOKIE_OPTIOMS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+}
 // ── Autenticación ────────────────────────────────────────────────────────────
 /**
  * Verifica que el request tenga un Bearer token válido y no expirado.
@@ -11,8 +15,10 @@ export const autenticarUsuario = async (req, res, next) => {
 
     try {
 
-        const authHeader = req.headers.authorization;
+        const token = req.cookies?.token;
+        //const authHeader = req.headers.authorization;
 
+        /**
         if (!authHeader) {
             const response = new ResponseModel(null, 1, "Token no proporcionado", 401);
             return res.status(401).json(response);
@@ -23,7 +29,11 @@ export const autenticarUsuario = async (req, res, next) => {
         if (tipo !== "Bearer" || !token) {
             const response = new ResponseModel(null, 1, "Formato de token inválido", 401);
             return res.status(401).json(response);
-        }
+        } */
+       if (typeof token !== "string" || !token) {
+            const response = new ResponseModel(null, 1, "Formato de token inválido", 401);
+            return res.status(401).json(response);
+        } 
 
         const resultado = await tokenDao.validarTokenSesion(token);
 
@@ -42,10 +52,13 @@ export const autenticarUsuario = async (req, res, next) => {
                     mensaje = "Token inválido";
                     break;
             }
-
-            const response = new ResponseModel(null, 1, mensaje, 401);
+            //const response = new ResponseModel(null, 1, mensaje, 401);
+            //limpiamos en caso de algun error
+            res.clearCookie('token', COOKIE_OPTIOMS)
             return res.status(401).json(response);
         }
+
+        
 
         req.usuario = resultado.token.usuario;
         req.token = resultado.token;
