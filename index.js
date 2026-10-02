@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 
-import cookieParser from 'cookie-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
