@@ -14,6 +14,7 @@ import { MovimientoCajaController } from '../controller/MovimientoCajaController
 import { CorteCajaController } from '../controller/CorteCajaController.js';
 import { autenticarUsuario, verificarPermiso } from '../middleware/authMiddleware.js';
 import { CategoriaProductoController } from '../controller/CategoriaProductoController.js';
+import { ProductoController } from '../controller/ProductoController.js';
 import { EstadoClienteController } from '../controller/EstadoClienteController.js';
 import { ClienteController } from '../controller/ClienteController.js';
 import { EstadoMembresiaController } from '../controller/EstadoMembresiaController.js';
@@ -31,12 +32,14 @@ const tipoActividadController = new TipoActividadController();
 const areaTrabajoController = new AreaTrabajoController();
 const configuracionSistemaController = new ConfiguracionSistemaController();
 const categoriaProductoController = new CategoriaProductoController();
+const productoController = new ProductoController();
 const estadoClienteController = new EstadoClienteController();
 const clienteController = new ClienteController();
 const estadoMembresiaController = new EstadoMembresiaController();
 const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
 
+const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
 const cajaController = new CajaController();
 const puestoController = new PuestoController();
@@ -387,6 +390,33 @@ CategoriaProductoRoutes.delete(
     verificarPermiso('Categorías de Productos', 'Eliminar'),
     categoriaProductoController.eliminar.bind(categoriaProductoController)
 );
+//------Productos ------------------
+productoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Listar'),
+);
+
+productoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Crear'),
+    productoController.crear.bind(productoController)
+);
+
+productoRoutes.put(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Editar'),
+    productoController.actualizar.bind(productoController)
+);
+
+productoRoutes.delete(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos','Eliminar'),
+    productoController.eliminar.bind(productoController)
+);
 
 // ── Rutas de Apertura de Caja ────────────────────────────────────────────────
 aperturaCajaRoutes.get(
@@ -615,9 +645,9 @@ tipoVisitaRoutes.delete(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Tipos de Visita', 'Eliminar'),
-    tipoVisitaController.eliminar.bind(tipoVisitaController)
 );
 
+router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
 router.use('/clientes', clienteRoutes);

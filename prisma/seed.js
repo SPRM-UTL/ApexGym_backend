@@ -41,7 +41,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
 });
 
 const upsertModulo = async (seccionId, modulo) => {
-    // Buscar por nombre permite mover un módulo entre secciones sin duplicarlo.
     const existente = await prisma.modulo.findFirst({
         where: { nombre: modulo.nombre },
     });
@@ -90,6 +89,27 @@ const upsertRol = (rol) => prisma.rol.upsert({
     update: { descripcion: rol.descripcion, deletedAt: null },
     create: { nombre: rol.nombre, descripcion: rol.descripcion },
 });
+
+// Función para insertar/actualizar usuarios desde el JSON
+const upsertUsuario = async (usuario) => {
+    // Si tu JSON usa usuario.password o usuario.contrasenia, lo tomamos aquí:
+    const plainPassword = usuario.password || usuario.contrasenia;
+    const hashedPassword = encriptarContrasena(plainPassword);
+
+    return prisma.usuario.upsert({
+        where: { email: usuario.email },
+        update: {
+            nombre: usuario.nombre,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+            deletedAt: null,
+        },
+        create: {
+            nombre: usuario.nombre,
+            email: usuario.email,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+        },
+    });
+};
 
 async function sincronizarPermisosRol(rolId, permisosIds) {
     const ids = [...new Set(permisosIds)];
@@ -161,6 +181,14 @@ async function main() {
 
     const defaultUser = await crearUsuarioDefault();
 
+    // 2. CREACIÓN DE USUARIOS (Primero para que existan antes de asignar roles)
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            const usuario = await upsertUsuario(usuarioData);
+            console.log(`Usuario preparado: ${usuario.nombre} <${usuario.email}>`);
+        }
+    }
+
     const acciones = new Map();
     for (const accion of seedData.acciones) {
         acciones.set(accion.nombre, {
@@ -226,6 +254,23 @@ async function main() {
             }
         }
         console.log(`Rol: ${rol.nombre} (${permisos.length} permisos).`);
+    }
+
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            if (usuarioData.rolNombre) {
+                const usuario = await prisma.usuario.findUnique({ where: { email: usuarioData.email } });
+                const rol = await prisma.rol.findUnique({ where: { nombre: usuarioData.rolNombre } });
+                if (usuario && rol) {
+                    await prisma.usuarioRol.upsert({
+                        where: { usuarioId_rolId: { usuarioId: usuario.id, rolId: rol.id } },
+                        update: { deletedAt: null },
+                        create: { usuarioId: usuario.id, rolId: rol.id },
+                    });
+                    console.log(`Rol ${rol.nombre} asignado a ${usuario.nombre} <${usuario.email}>.`);
+                }
+            }
+        }
     }
 
     console.log('Seed completado correctamente.');

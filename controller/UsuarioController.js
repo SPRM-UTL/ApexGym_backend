@@ -39,9 +39,7 @@ export class UsuarioController extends BaseController {
                 res,
                 {
                     usuario,
-                    
-                    //se comento para evitar que lo guarde de nuevo en el localstorage
-                    //token: token.token
+                    token: token.token
                 },
                 "Credenciales válidas"
             );
