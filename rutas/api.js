@@ -102,6 +102,12 @@ usuarioRoutes.delete(
     usuarioController.eliminarUsuario.bind(usuarioController)
 );
 
+usuarioRoutes.post(
+    '/logout',
+    autenticarUsuario,
+    usuarioController.logout.bind(usuarioController)
+);
+
 // ── Rutas de secciones ───────────────────────────────────────────────────────
 seccionRoutes.get(
     '/mis-secciones',
