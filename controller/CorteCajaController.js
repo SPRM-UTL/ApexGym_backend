@@ -14,9 +14,16 @@ export class CorteCajaController extends BaseController {
      */
     crear = async (req, res) => {
         try {
-            const { aperturaCajaId, empleadoId, efectivoContado, observaciones } = req.body;
+            const {
+                aperturaCajaId,
+                empleadoId,
+                efectivoContado,
+                desgloseInicio,
+                desgloseFin,
+                observaciones,
+            } = req.body;
 
-            this.validar({ aperturaCajaId, empleadoId, efectivoContado });
+            this.validarCampos({ aperturaCajaId, empleadoId, efectivoContado });
 
             // Obtener la apertura con su monto inicial
             const apertura = await prisma.aperturaCaja.findUnique({
@@ -54,6 +61,15 @@ export class CorteCajaController extends BaseController {
                         totalEntradas,
                         totalSalidas,
                         diferencia,
+                        estado: 'PENDIENTE',
+                        desgloseInicio:
+                            typeof desgloseInicio === 'object'
+                                ? JSON.stringify(desgloseInicio)
+                                : (desgloseInicio || apertura.desgloseInicio || null),
+                        desgloseFin:
+                            typeof desgloseFin === 'object'
+                                ? JSON.stringify(desgloseFin)
+                                : (desgloseFin || null),
                         observaciones: observaciones ? observaciones.trim() : null,
                         fechaCorte: new Date(),
                     },
@@ -79,6 +95,37 @@ export class CorteCajaController extends BaseController {
         }
     };
 
+    /**
+     * PUT /:id/validar
+     * Valida que el corte de caja esté correcto y lo audita.
+     */
+    validar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) throw new Error('ID no válido');
+
+            const corte = await this.dao.getById(id);
+            if (!corte) return this.respuestaNoEncontrado(res, 'Corte de caja no encontrado');
+
+            const actualizado = await this.dao.update(id, {
+                estado: 'VALIDADO',
+                fechaValidacion: new Date(),
+            });
+
+            return this.respuestaExito(res, actualizado, 'Corte de caja validado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    actualizar = async (req, res) => {
+        return this.respuestaError(res, new Error('Un corte de caja no puede ser modificado'));
+    };
+
+    eliminar = async (req, res) => {
+        return this.respuestaError(res, new Error('Un corte de caja no puede ser eliminado'));
+    };
+
     obtenerPorApertura = async (req, res) => {
         try {
             const aperturaCajaId = Number(req.params.aperturaCajaId);
@@ -90,7 +137,7 @@ export class CorteCajaController extends BaseController {
         }
     };
 
-    validar({ aperturaCajaId, empleadoId, efectivoContado }) {
+    validarCampos({ aperturaCajaId, empleadoId, efectivoContado }) {
         if (!aperturaCajaId || isNaN(Number(aperturaCajaId)))
             throw new Error('La apertura de caja es requerida');
         if (!empleadoId || isNaN(Number(empleadoId))) throw new Error('El empleado es requerido');

@@ -1,3 +1,10 @@
+/**
+ * Sistema: ApexGym Backend
+ * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
+ * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
+ *              restricción de apertura única por caja, registro de desglose de billetes
+ *              en arqueo y endpoint de validación de corte de caja.
+ */
 import express from 'express';
 import { UsuarioController } from '../controller/UsuarioController.js';
 import { SeccionController } from '../controller/SeccionController.js';
@@ -418,6 +425,12 @@ movimientoCajaRoutes.get(
     movimientoCajaController.obtenerPorApertura.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.get(
+    '/apertura/:aperturaCajaId/resumen',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerResumenApertura.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.get(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Listar'),
@@ -460,6 +473,12 @@ corteCajaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Corte de Caja', 'Crear'),
     corteCajaController.crear.bind(corteCajaController)
+);
+corteCajaRoutes.put(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Editar'),
+    corteCajaController.validar.bind(corteCajaController)
 );
 
 router.use('/usuarios', usuarioRoutes);
