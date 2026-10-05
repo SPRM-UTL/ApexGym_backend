@@ -7,39 +7,27 @@ datasource db {
 }
 
 model Usuario {
-  id              Int              @id @default(autoincrement())
-  nombre          String           @db.VarChar(150)
-  email           String           @unique @db.VarChar(191)
-  contrasenia     String           @map("contrasenia") @db.VarChar(255)
-  fotoUrl         String?          @map("foto_url") @db.VarChar(500)
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  deletedAt       DateTime?        @map("deleted_at")
-  tokens          Token[]
-  usuarioRols     UsuarioRol[]
-  usuarioPermisos UsuarioPermiso[]
-  empleados       Empleado[]
+  id          Int       @id @default(autoincrement())
+  nombre      String    @db.VarChar(150)
+  email       String    @unique
+  contrasenia String    @map("contrasenia") @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   @@map("usuarios")
-}
-
-enum TipoToken {
-  TOKEN_SESION
-  RECUPERACION_CONTRASENIA
-  VERIFICACION_CORREO
 }
 
 model Token {
   id         Int       @id @default(autoincrement())
   usuarioId  Int       @map("usuario_id")
   tipoToken  TipoToken @map("tipo_token")
-  token      String    @unique @db.VarChar(191)
+  token      String    @unique
   tiempoVida Int       @map("tiempo_vida")
   createdAt  DateTime  @default(now()) @map("created_at")
   deletedAt  DateTime? @map("deleted_at")
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
+  @@index([usuarioId], map: "tokens_usuario_id_fkey")
   @@map("tokens")
 }
 
@@ -47,13 +35,11 @@ model Seccion {
   id             Int       @id @default(autoincrement())
   nombre         String    @unique @db.VarChar(100)
   descripcion    String?   @db.Text
-  imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
-  imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
-
-  modulos Modulo[]
+  imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
+  imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
 
   @@map("secciones")
 }
@@ -63,14 +49,11 @@ model Modulo {
   seccionId      Int       @map("seccion_id")
   nombre         String    @db.VarChar(100)
   descripcion    String?   @db.Text
-  imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
-  imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
-
-  seccion  Seccion   @relation(fields: [seccionId], references: [id], onDelete: Cascade)
-  permisos Permiso[]
+  imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
+  imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
 
   @@unique([seccionId, nombre], name: "modulo_seccion_unico")
   @@map("modulos")
@@ -85,87 +68,7 @@ model AreaTrabajo {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  tiposActividad TipoActividad[]
-  puestos        Puesto[]
-  empleados      Empleado[]
-
   @@map("areas_trabajos")
-}
-
-model Caja {
-  id        Int       @id @default(autoincrement())
-  nombre    String    @db.VarChar(100)
-  ubicacion String?   @db.VarChar(255)
-  estado    String    @db.VarChar(30)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  aperturasCaja AperturaCaja[]
-
-  @@map("cajas")
-}
-
-model Puesto {
-  id            Int       @id @default(autoincrement())
-  areaTrabajoId Int       @map("area_trabajo_id")
-  nombre        String    @db.VarChar(100)
-  descripcion   String?   @db.Text
-  salarioBase   Decimal   @map("salario_base") @db.Decimal(10, 2)
-  estado        String    @db.VarChar(30)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
-
-  areaTrabajo AreaTrabajo @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
-  empleados   Empleado[]
-
-  @@map("puestos")
-}
-
-model EstadoEmpleado {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @db.VarChar(100)
-  descripcion String?   @db.Text
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-
-  empleados Empleado[]
-
-  @@map("estados_empleados")
-}
-
-model Empleado {
-  id               Int       @id @default(autoincrement())
-  puestoId         Int       @map("puesto_id")
-  areaTrabajoId    Int       @map("area_trabajo_id")
-  estadoEmpleadoId Int       @map("estado_empleado_id")
-  usuarioId        Int?      @map("usuario_id")
-  nombre           String    @db.VarChar(100)
-  apellidoPaterno  String    @map("apellido_paterno") @db.VarChar(100)
-  apellidoMaterno  String?   @map("apellido_materno") @db.VarChar(100)
-  telefono         String    @db.VarChar(20)
-  correo           String?   @db.VarChar(191)
-  direccion        String?   @db.Text
-  fechaNacimiento  DateTime  @map("fecha_nacimiento")
-  fechaIngreso     DateTime  @map("fecha_ingreso")
-  imagenUrl        String?   @map("imagen_url") @db.LongText
-  imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-  deletedAt        DateTime? @map("deleted_at")
-
-  puesto         Puesto         @relation(fields: [puestoId], references: [id], onDelete: Cascade)
-  areaTrabajo    AreaTrabajo    @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
-  estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
-  usuario        Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  aperturasCaja   AperturaCaja[]
-  movimientosCaja MovimientoCaja[]
-  cortesCaja      CorteCaja[]
-
-  @@map("empleados")
 }
 
 model TipoActividad {
@@ -178,8 +81,7 @@ model TipoActividad {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
-  areaTrabajo AreaTrabajo? @relation(fields: [areaTrabajoId], references: [id], onDelete: SetNull)
-
+  @@index([areaTrabajoId], map: "tipos_actividades_area_trabajo_id_fkey")
   @@map("tipos_actividades")
 }
 
@@ -204,18 +106,7 @@ model Accion {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  permisos Permiso[]
-
   @@map("acciones")
-}
-
-enum MetodoHttp {
-  GET
-  POST
-  PUT
-  PATCH
-  DELETE
-  ALL
 }
 
 model Permiso {
@@ -228,13 +119,8 @@ model Permiso {
   updatedAt   DateTime   @updatedAt @map("updated_at")
   deletedAt   DateTime?  @map("deleted_at")
 
-  modulo Modulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
-  accion Accion @relation(fields: [accionId], references: [id], onDelete: Cascade)
-
-  roles    RolPermiso[]
-  usuarios UsuarioPermiso[]
-
   @@unique([moduloId, accionId, metodo], name: "permiso_unico")
+  @@index([accionId], map: "permisos_accion_id_fkey")
   @@map("permisos")
 }
 
@@ -246,9 +132,6 @@ model Rol {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  permisos RolPermiso[]
-  usuarios UsuarioRol[]
-
   @@map("roles")
 }
 
@@ -258,10 +141,8 @@ model RolPermiso {
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
 
-  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
-  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
-
   @@id([rolId, permisoId])
+  @@index([permisoId], map: "roles_permisos_permiso_id_fkey")
   @@map("roles_permisos")
 }
 
@@ -271,10 +152,8 @@ model UsuarioRol {
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
-
   @@id([usuarioId, rolId])
+  @@index([rolId], map: "usuarios_roles_rol_id_fkey")
   @@map("usuarios_roles")
 }
 
@@ -284,10 +163,8 @@ model UsuarioPermiso {
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
-
   @@id([usuarioId, permisoId])
+  @@index([permisoId], map: "usuarios_permisos_permiso_id_fkey")
   @@map("usuarios_permisos")
 }
 
@@ -378,63 +255,13 @@ model CategoriaProducto {
   @@map("categoria_productos")
 }
 
-model AperturaCaja {
-  id            Int       @id @default(autoincrement())
-  cajaId        Int       @map("caja_id")
-  empleadoId    Int       @map("empleado_id")
-  montoInicial  Decimal   @map("monto_inicial") @db.Decimal(10, 2)
-  fechaApertura DateTime  @map("fecha_apertura")
-  estado        String    @default("ABIERTA") @db.VarChar(20)
-  observaciones String?   @db.Text
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
-
-  caja     Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  movimientos MovimientoCaja[]
-  cortes      CorteCaja[]
-
-  @@map("aperturas_caja")
-}
-
-model MovimientoCaja {
-  id             Int       @id @default(autoincrement())
-  aperturaCajaId Int       @map("apertura_caja_id")
-  empleadoId     Int       @map("empleado_id")
-  tipo           String    @db.VarChar(20)
-  monto          Decimal   @db.Decimal(10, 2)
-  concepto       String    @db.VarChar(255)
-  observaciones  String?   @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
-
-  aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
-  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@map("movimientos_caja")
-}
-
-model CorteCaja {
-  id              Int       @id @default(autoincrement())
-  aperturaCajaId  Int       @map("apertura_caja_id")
-  empleadoId      Int       @map("empleado_id")
-  efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
-  totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
-  totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
-  diferencia      Decimal   @db.Decimal(10, 2)
-  observaciones   String?   @db.Text
-  fechaCorte      DateTime  @default(now()) @map("fecha_corte")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
-
-  aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
-  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@map("cortes_caja")
+enum MetodoHttp {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  ALL
 }
 
 model Producto {
