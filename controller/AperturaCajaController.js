@@ -9,9 +9,21 @@ export class AperturaCajaController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones } = req.body;
+            const { cajaId, empleadoId, montoInicial, fechaApertura, desgloseInicio, observaciones } = req.body;
 
             this.validar({ cajaId, empleadoId, montoInicial, fechaApertura });
+
+            // Verificar si la caja ya tiene una apertura activa (ABIERTA)
+            const aperturaExistente = await prisma.aperturaCaja.findFirst({
+                where: {
+                    cajaId: Number(cajaId),
+                    estado: 'ABIERTA',
+                    deletedAt: null,
+                },
+            });
+            if (aperturaExistente) {
+                throw new Error('Esta caja ya cuenta con una apertura activa. Realice el corte de caja antes de abrir un nuevo turno.');
+            }
 
             const registro = await this.dao.create({
                 cajaId: Number(cajaId),
@@ -19,6 +31,7 @@ export class AperturaCajaController extends BaseController {
                 montoInicial: Number(montoInicial),
                 fechaApertura: new Date(fechaApertura),
                 estado: 'ABIERTA',
+                desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || null),
                 observaciones: observaciones ? observaciones.trim() : null,
             });
 

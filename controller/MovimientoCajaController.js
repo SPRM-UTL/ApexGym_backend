@@ -23,10 +23,33 @@ export class MovimientoCajaController extends BaseController {
             if (apertura.estado !== 'ABIERTA')
                 throw new Error('No se pueden registrar movimientos en una apertura cerrada');
 
+            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja
+            const tipoNormalizado = tipo.trim().toUpperCase();
+            if (tipoNormalizado === 'SALIDA') {
+                const [sumaEntradas, sumaSalidas] = await Promise.all([
+                    prisma.movimientoCaja.aggregate({
+                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
+                        _sum: { monto: true },
+                    }),
+                    prisma.movimientoCaja.aggregate({
+                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
+                        _sum: { monto: true },
+                    }),
+                ]);
+
+                const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
+                const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
+                const saldoDisponible = Number(apertura.montoInicial) + totalEntradas - totalSalidas;
+
+                if (Number(monto) > saldoDisponible) {
+                    throw new Error(`Saldo insuficiente en caja. El saldo disponible es de $${saldoDisponible.toFixed(2)} y se intentó retirar $${Number(monto).toFixed(2)}`);
+                }
+            }
+
             const registro = await this.dao.create({
                 aperturaCajaId: Number(aperturaCajaId),
                 empleadoId: Number(empleadoId),
-                tipo: tipo.trim().toUpperCase(),
+                tipo: tipoNormalizado,
                 monto: Number(monto),
                 concepto: concepto.trim(),
                 observaciones: observaciones ? observaciones.trim() : null,
@@ -55,6 +78,51 @@ export class MovimientoCajaController extends BaseController {
             if (isNaN(aperturaCajaId)) throw new Error('ID de apertura no válido');
             const registros = await this.dao.getAllByApertura(aperturaCajaId);
             return this.respuestaExito(res, registros, 'Movimientos obtenidos exitosamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    obtenerResumenApertura = async (req, res) => {
+        try {
+            const aperturaCajaId = Number(req.params.aperturaCajaId);
+            if (isNaN(aperturaCajaId)) throw new Error('ID de apertura no válido');
+
+            const apertura = await prisma.aperturaCaja.findUnique({
+                where: { id: aperturaCajaId, deletedAt: null },
+                include: { caja: true, empleado: true },
+            });
+            if (!apertura) throw new Error('Apertura no encontrada');
+
+            const [sumaEntradas, sumaSalidas, movimientos] = await Promise.all([
+                prisma.movimientoCaja.aggregate({
+                    where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
+                    _sum: { monto: true },
+                }),
+                prisma.movimientoCaja.aggregate({
+                    where: { aperturaCajaId, tipo: 'SALIDA', deletedAt: null },
+                    _sum: { monto: true },
+                }),
+                this.dao.getAllByApertura(aperturaCajaId),
+            ]);
+
+            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
+            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
+            const montoInicial = Number(apertura.montoInicial);
+            const saldoDisponible = montoInicial + totalEntradas - totalSalidas;
+
+            return this.respuestaExito(
+                res,
+                {
+                    apertura,
+                    montoInicial,
+                    totalEntradas,
+                    totalSalidas,
+                    saldoDisponible,
+                    movimientos,
+                },
+                'Resumen de apertura obtenido correctamente'
+            );
         } catch (error) {
             return this.respuestaError(res, error);
         }
