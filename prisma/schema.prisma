@@ -366,13 +366,14 @@ model TipoVisita {
 }
 
 model CategoriaProducto {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique @db.VarChar(100)
-  descripcion String?   @db.Text
-  estado      String    @default("activo") @db.VarChar(30)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique @db.VarChar(100)
+  descripcion String?    @db.Text
+  estado      String     @default("activo") @db.VarChar(30)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+  productos   Producto[]
 
   @@map("categoria_productos")
 }
@@ -434,4 +435,24 @@ model CorteCaja {
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
   @@map("cortes_caja")
+}
+
+model Producto {
+  id                  Int               @id @default(autoincrement())
+  categoriaProductoId Int               @map("categoria_producto_id")
+  codigoBarras        String?           @unique @map("codigo_barras") @db.VarChar(100)
+  nombre              String            @db.VarChar(150)
+  descripcion         String?           @db.Text
+  precioVenta         Float             @map("precio_venta")
+  precioCompra        Float?            @map("precio_compra")
+  stockActual         Int               @default(0) @map("stock_actual")
+  stockMinimo         Int               @default(1) @map("stock_minimo")
+  estado              String            @default("activo") @db.VarChar(30)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  deletedAt           DateTime?         @map("deleted_at")
+  
+  categoria           CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
+
+  @@map("producto")
 }
