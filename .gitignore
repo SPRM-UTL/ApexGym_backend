@@ -23,3 +23,6 @@ repomix-output.xml
 # Directorios de imágenes y archivos subidos
 uploads/
 public/uploads/.vs/ 
+
+migrations/
+backend/migrations/
