@@ -9,7 +9,7 @@ export class PuestoController extends BaseController {
     crear = async (req, res) => {
         try {
             const { areaTrabajoId, nombre, descripcion, salarioBase, estado } = req.body;
-            this.validar({ areaTrabajoId, nombre, salarioBase, estado });
+            this.validar({ areaTrabajoId, nombre, descripcion, salarioBase, estado });
             const registro = await this.dao.create({
                 areaTrabajoId: Number(areaTrabajoId),
                 nombre: nombre.trim(),
@@ -28,7 +28,7 @@ export class PuestoController extends BaseController {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
             const { areaTrabajoId, nombre, descripcion, salarioBase, estado } = req.body;
-            this.validar({ areaTrabajoId, nombre, salarioBase, estado });
+            this.validar({ areaTrabajoId, nombre, descripcion, salarioBase, estado });
             const registro = await this.dao.update(id, {
                 areaTrabajoId: Number(areaTrabajoId),
                 nombre: nombre.trim(),
@@ -53,15 +53,21 @@ export class PuestoController extends BaseController {
         }
     };
 
-    validar({ areaTrabajoId, nombre, salarioBase, estado }) {
+    validar({ areaTrabajoId, nombre, descripcion, salarioBase, estado }) {
         if (!areaTrabajoId || isNaN(Number(areaTrabajoId))) {
             throw new Error('El área de trabajo es requerida y debe ser un ID válido');
         }
         if (!nombre?.trim()) throw new Error('El nombre del puesto es requerido');
+        if (nombre.trim().length > 100) throw new Error('El nombre del puesto no puede exceder 100 caracteres');
+        if (descripcion && descripcion.trim().length > 500) throw new Error('La descripción no puede exceder 500 caracteres');
         if (salarioBase === undefined || salarioBase === null || isNaN(Number(salarioBase)) || Number(salarioBase) < 0) {
             throw new Error('El salario base es requerido y debe ser un número mayor o igual a 0');
         }
+        if (Number(salarioBase) > 9999999.99) {
+            throw new Error('El salario base no puede exceder $9,999,999.99');
+        }
         if (!estado?.trim()) throw new Error('El estado del puesto es requerido');
+        if (estado.trim().length > 30) throw new Error('El estado no puede exceder 30 caracteres');
     }
 }
 

@@ -9,9 +9,21 @@ export class AperturaCajaController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones } = req.body;
+            const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones, desgloseInicio } = req.body;
 
-            this.validar({ cajaId, empleadoId, montoInicial, fechaApertura });
+            this.validar({ cajaId, empleadoId, montoInicial, fechaApertura, observaciones });
+
+            // Verificar que la caja no tenga ya una apertura ABIERTA
+            const aperturaAbierta = await prisma.aperturaCaja.findFirst({
+                where: {
+                    cajaId: Number(cajaId),
+                    estado: 'ABIERTA',
+                    deletedAt: null,
+                },
+            });
+            if (aperturaAbierta) {
+                throw new Error('La caja seleccionada ya tiene una sesión abierta activa');
+            }
 
             const registro = await this.dao.create({
                 cajaId: Number(cajaId),
@@ -19,6 +31,7 @@ export class AperturaCajaController extends BaseController {
                 montoInicial: Number(montoInicial),
                 fechaApertura: new Date(fechaApertura),
                 estado: 'ABIERTA',
+                desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || null),
                 observaciones: observaciones ? observaciones.trim() : null,
             });
 
@@ -36,7 +49,7 @@ export class AperturaCajaController extends BaseController {
             const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones } = req.body;
 
             // No se permite cambiar el estado directamente mediante este endpoint
-            this.validar({ cajaId, empleadoId, montoInicial, fechaApertura });
+            this.validar({ cajaId, empleadoId, montoInicial, fechaApertura, observaciones });
 
             const registro = await this.dao.update(id, {
                 cajaId: Number(cajaId),
@@ -89,14 +102,17 @@ export class AperturaCajaController extends BaseController {
         }
     };
 
-    validar({ cajaId, empleadoId, montoInicial, fechaApertura }) {
+    validar({ cajaId, empleadoId, montoInicial, fechaApertura, observaciones }) {
         if (!cajaId || isNaN(Number(cajaId))) throw new Error('La caja es requerida');
         if (!empleadoId || isNaN(Number(empleadoId))) throw new Error('El empleado es requerido');
         if (montoInicial === undefined || montoInicial === null || isNaN(Number(montoInicial)))
             throw new Error('El monto inicial es requerido');
         if (Number(montoInicial) < 0) throw new Error('El monto inicial debe ser mayor o igual a 0');
+        if (Number(montoInicial) > 9999999.99) throw new Error('El monto inicial no puede exceder $9,999,999.99');
         if (!fechaApertura || isNaN(Date.parse(fechaApertura)))
             throw new Error('La fecha de apertura es requerida y debe ser válida');
+        if (observaciones && observaciones.trim().length > 500)
+            throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
 }
 

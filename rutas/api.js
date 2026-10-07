@@ -470,6 +470,12 @@ movimientoCajaRoutes.get(
     movimientoCajaController.obtenerPorApertura.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.get(
+    '/apertura/:aperturaCajaId/resumen',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerResumenApertura.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.get(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Listar'),
@@ -480,6 +486,12 @@ movimientoCajaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Crear'),
     movimientoCajaController.crear.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Editar'),
+    movimientoCajaController.actualizar.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.delete(
     '/:id',
@@ -512,6 +524,24 @@ corteCajaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Corte de Caja', 'Crear'),
     corteCajaController.crear.bind(corteCajaController)
+);
+corteCajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Editar'),
+    corteCajaController.actualizar.bind(corteCajaController)
+);
+corteCajaRoutes.put(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Editar'),
+    corteCajaController.validar.bind(corteCajaController)
+);
+corteCajaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Eliminar'),
+    corteCajaController.eliminar.bind(corteCajaController)
 );
 
 

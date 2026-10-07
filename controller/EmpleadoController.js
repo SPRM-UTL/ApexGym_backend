@@ -32,7 +32,10 @@ export class EmpleadoController extends BaseController {
                 estadoEmpleadoId,
                 nombre,
                 apellidoPaterno,
+                apellidoMaterno,
                 telefono,
+                correo,
+                direccion,
                 fechaNacimiento,
                 fechaIngreso,
             });
@@ -91,7 +94,10 @@ export class EmpleadoController extends BaseController {
                 estadoEmpleadoId,
                 nombre,
                 apellidoPaterno,
+                apellidoMaterno,
                 telefono,
+                correo,
+                direccion,
                 fechaNacimiento,
                 fechaIngreso,
             });
@@ -139,7 +145,10 @@ export class EmpleadoController extends BaseController {
         estadoEmpleadoId,
         nombre,
         apellidoPaterno,
+        apellidoMaterno,
         telefono,
+        correo,
+        direccion,
         fechaNacimiento,
         fechaIngreso,
     }) {
@@ -147,9 +156,36 @@ export class EmpleadoController extends BaseController {
         if (!areaTrabajoId || isNaN(Number(areaTrabajoId))) throw new Error('El área de trabajo es requerida');
         if (!estadoEmpleadoId || isNaN(Number(estadoEmpleadoId))) throw new Error('El estado de empleado es requerido');
         if (!nombre?.trim()) throw new Error('El nombre del empleado es requerido');
+        if (nombre.trim().length > 100) throw new Error('El nombre no puede exceder 100 caracteres');
         if (!apellidoPaterno?.trim()) throw new Error('El apellido paterno es requerido');
+        if (apellidoPaterno.trim().length > 100) throw new Error('El apellido paterno no puede exceder 100 caracteres');
+        if (apellidoMaterno && apellidoMaterno.trim().length > 100) throw new Error('El apellido materno no puede exceder 100 caracteres');
+
         if (!telefono?.trim()) throw new Error('El teléfono es requerido');
+        const telLimpio = telefono.trim().replace(/\s+/g, '');
+        if (!/^\d{10}$/.test(telLimpio)) throw new Error('El teléfono debe tener exactamente 10 dígitos numéricos');
+
+        if (correo && correo.trim()) {
+            if (correo.trim().length > 191) throw new Error('El correo electrónico no puede exceder 191 caracteres');
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(correo.trim())) throw new Error('El formato del correo electrónico no es válido');
+        }
+
+        if (direccion && direccion.trim().length > 500) throw new Error('La dirección no puede exceder 500 caracteres');
+
         if (!fechaNacimiento || isNaN(Date.parse(fechaNacimiento))) throw new Error('La fecha de nacimiento es requerida y debe ser válida');
+
+        const fechaNac = new Date(fechaNacimiento);
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - fechaNac.getFullYear();
+        const m = hoy.getMonth() - fechaNac.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < fechaNac.getDate())) {
+            edad--;
+        }
+        if (edad < 18) {
+            throw new Error('El empleado debe ser mayor de edad (mínimo 18 años)');
+        }
+
         if (!fechaIngreso || isNaN(Date.parse(fechaIngreso))) throw new Error('La fecha de ingreso es requerida y debe ser válida');
     }
 }

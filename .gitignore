@@ -22,4 +22,10 @@ repomix-output.xml
 
 # Directorios de imágenes y archivos subidos
 uploads/
-public/uploads/.vs/ 
+public/uploads/
+
+# Visual Studio
+.vs/
+
+# Migraciones (ignorar para evitar conflictos de sincronizacion de BD entre compañeros)
+prisma/migrations/
