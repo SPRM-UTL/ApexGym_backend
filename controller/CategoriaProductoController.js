@@ -46,7 +46,8 @@ export class CategoriaProductoController extends BaseController {
     }
 
     eliminar = async (req, res) => {
-        const { id } = req.body;
+        const id = Number(req.params.id || req.body.id);
+    
         try {
             const categoriaEliminada = await categoriaProductoDao.delete(id);
             return this.respuestaExito(res, categoriaEliminada, "Categoría eliminada exitosamente");
