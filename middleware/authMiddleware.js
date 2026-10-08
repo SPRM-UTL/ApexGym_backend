@@ -1,26 +1,31 @@
 import { tokenDao } from "../dao/TokenDao.js";
 import { permisoDao } from "../dao/PermisoDao.js";
 import { ResponseModel } from "../modelos/ResponseModel.js";
+const COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+};
 
 // ── Autenticación ────────────────────────────────────────────────────────────
 /**
- * Verifica que el request tenga un Bearer token válido y no expirado.
+ * Verifica que el request tenga un token válido (vía cookie o header Authorization: Bearer).
  * Inyecta req.usuario y req.token para uso posterior.
  */
 export const autenticarUsuario = async (req, res, next) => {
 
     try {
 
-        const authHeader = req.headers.authorization;
+        let token = req.cookies?.token;
 
-        if (!authHeader) {
-            const response = new ResponseModel(null, 1, "Token no proporcionado", 401);
-            return res.status(401).json(response);
+        if (!token && req.headers.authorization) {
+            const partes = req.headers.authorization.split(" ");
+            if (partes.length === 2 && partes[0] === "Bearer") {
+                token = partes[1];
+            }
         }
 
-        const [tipo, token] = authHeader.split(" ");
-
-        if (tipo !== "Bearer" || !token) {
+        if (!token || typeof token !== "string" || token === "undefined" || token === "null" || token.trim() === "") {
             const response = new ResponseModel(null, 1, "Formato de token inválido", 401);
             return res.status(401).json(response);
         }
@@ -42,13 +47,21 @@ export const autenticarUsuario = async (req, res, next) => {
                     mensaje = "Token inválido";
                     break;
             }
-
+            
+            //limpiamos en caso de algun error
+            res.clearCookie('token', COOKIE_OPTIOMS)
+            
             const response = new ResponseModel(null, 1, mensaje, 401);
             return res.status(401).json(response);
         }
 
+        
+
         req.usuario = resultado.token.usuario;
-        req.token = resultado.token;
+        /**Se comento para evitar que le mande al frontend el token y sea vulnerable
+         * lo maneja por cookies siendo controlado solo por el backend
+        **/
+        /**req.token = resultado.token; */
 
         next();
 

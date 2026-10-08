@@ -19,3 +19,17 @@ yarn-error.log*
 
 # Repomix
 repomix-output.xml
+
+# Directorios de imágenes y archivos subidos
+uploads/
+public/uploads/
+
+# Visual Studio
+.vs/
+
+# Migraciones (ignorar para evitar conflictos de sincronizacion de BD entre compañeros)
+prisma/migrations/
+public/uploads/.vs/ 
+
+migrations/
+backend/migrations/

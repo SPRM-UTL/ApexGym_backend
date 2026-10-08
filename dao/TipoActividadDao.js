@@ -17,6 +17,17 @@ export class TipoActividadDao extends BaseDao {
         });
     }
 
+    async getById(id) {
+        return this.prisma.tipoActividad.findUnique({
+            where: { id, deletedAt: null },
+            include: {
+                areaTrabajo: {
+                    select: { id: true, nombre: true },
+                },
+            },
+        });
+    }
+
     async create(data) {
         return this.prisma.tipoActividad.create({
             data: {

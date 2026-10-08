@@ -9,7 +9,7 @@ export class UsuarioController extends BaseController {
     }
 
     verificarCredenciales = async (req, res) => {
-        const { email, contrasenia } = req.body;
+        const { email, contrasenia, checkbox } = req.body;
 
         try {
             const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
@@ -19,7 +19,23 @@ export class UsuarioController extends BaseController {
 
             const token = await tokenDao.crearTokenSesion(usuario.id);
 
+            //librerias instaladas cookie-parser y helmet
+            //usamos las cookies httpOnly esto hace que no sea accesible desde ningun codigo de cliente evitando que el frontend vea el token
+            //de esta manera evitamos que nuestro tokeen codificado con Base64 lo pueda ver cualquier persona a pesar de estar codificado
+            const opcionesCookies = {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'strict',
+                    
+                    /**Perdon ya vi por que se quitaba tan repido la session es por que aqui cuenta por milisegundos ya lo cambie Perdon   😅*/
+                }
+
+            if(checkbox == true){
+                    opcionesCookies.maxAge = token.tiempoVida * 1000;
+            }
+            res.cookie('token', token.token, opcionesCookies)
             return this.respuestaExito(
+                
                 res,
                 {
                     usuario,
@@ -32,6 +48,24 @@ export class UsuarioController extends BaseController {
         }
     }
 
+    logout = async (req, res )=>{
+        const {usuarioId}  = req.body;
+        try{
+            const tokenStr = req.cookies.token;
+            if(tokenStr){
+                await tokenDao.revocarOtrosTokensSesion(usuarioId, tokenStr)
+            }
+            res.clearCookie('token',{
+                httpOnly: true,
+                secure: process.env.NODE_ENV,
+                sameSite: 'strict'
+            })
+            return this.respuestaExito(res,null,"Sesion cerrada correctamente")
+            
+        }catch(error){
+            return this.respuestaError(res,error)
+        }
+    }
     registrarUsuario = async (req, res) => {
         const { nombre, email, contrasenia, rolId } = req.body;
         const fotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : null;
