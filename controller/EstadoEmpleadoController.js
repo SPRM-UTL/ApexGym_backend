@@ -9,7 +9,7 @@ export class EstadoEmpleadoController extends BaseController {
     crear = async (req, res) => {
         try {
             const { nombre, descripcion } = req.body;
-            this.validar({ nombre });
+            this.validar({ nombre, descripcion });
             const registro = await this.dao.create({
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
@@ -25,7 +25,7 @@ export class EstadoEmpleadoController extends BaseController {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
             const { nombre, descripcion } = req.body;
-            this.validar({ nombre });
+            this.validar({ nombre, descripcion });
             const registro = await this.dao.update(id, {
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
@@ -47,8 +47,10 @@ export class EstadoEmpleadoController extends BaseController {
         }
     };
 
-    validar({ nombre }) {
+    validar({ nombre, descripcion }) {
         if (!nombre?.trim()) throw new Error('El nombre del estado de empleado es requerido');
+        if (nombre.trim().length > 100) throw new Error('El nombre del estado de empleado no puede exceder 100 caracteres');
+        if (descripcion && descripcion.trim().length > 500) throw new Error('La descripción no puede exceder 500 caracteres');
     }
 }
 
