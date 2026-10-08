@@ -461,3 +461,16 @@ model Producto {
 
   @@map("producto")
 }
+
+model MetodoPago {
+  id                  Int                @id @default(autoincrement())
+  nombre              String             @unique @db.VarChar(30)
+  descripcion         String?            @db.VarChar(200)
+  estado              String             @default("activo") @db.VarChar(50)
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  deletedAt           DateTime?          @map("deleted_at")
+
+  @@map("metodo_pago")
+}
+
