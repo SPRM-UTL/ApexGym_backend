@@ -20,7 +20,7 @@ import { ClienteController } from '../controller/ClienteController.js';
 import { EstadoMembresiaController } from '../controller/EstadoMembresiaController.js';
 import { TipoMembresiaController } from '../controller/TipoMembresiaController.js';
 import { TipoVisitaController } from '../controller/TipoVisitaController.js';
-
+import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
 
@@ -38,6 +38,7 @@ const clienteController = new ClienteController();
 const estadoMembresiaController = new EstadoMembresiaController();
 const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
+const metodoPagoController = new MetodoPagoController();
 
 const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
@@ -67,6 +68,7 @@ const empleadoRoutes = express.Router();
 const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
+const metodoPagoRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -646,6 +648,35 @@ tipoVisitaRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Tipos de Visita', 'Eliminar'),
 );
+//---Rutas Médodos de Pago-------------------------
+
+metodoPagoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago','Listar'),
+    metodoPagoController.obtenerTodos.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Crear'),
+    metodoPagoController.crear.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Editar'),
+    metodoPagoController.actualizar.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Eliminar'),
+    metodoPagoController.eliminar.bind(metodoPagoController)
+);
 
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
@@ -668,5 +699,6 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
+router.use('/metodos-pago',metodoPagoRoutes);
 
 export { router as api };
