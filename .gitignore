@@ -5,16 +5,16 @@ node_modules/
 .env
 
 # Directorios de herramientas de IA y editores
-.agents
-.claude
-.cursor
-.devin
+.agents/
+.claude/
+.cursor/
+.devin/
 
 # Archivos de logs y temporales
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 .DS_Store
 
 # Repomix
@@ -27,26 +27,16 @@ public/uploads/
 # Visual Studio
 .vs/
 
-# Migraciones (ignorar para evitar conflictos de sincronizacion de BD entre compañeros)
-prisma/migrations/
-
+# Migraciones locales/copias; mantener prisma/migrations versionado
 public/uploads/.vs/ 
+/migrations/
+/backend/migrations/
+/prisma/migrations-copy/
+/migrations-copy/
+/backend/migrations-copy/
+/prisma/migrations/
 
-migrations/
-backend/migrations/
-
-migrations-copy/
-backend/migrations-copy/
-
-public/imagenes/
-imagenes/
-
-uploads/usuarios/
-usuarios/
-uploads/usuarios/
-
-public/uploads/.vs/ 
-public/imagenes/empleados/
-
-prisma/migrations-copy/
-migrations-copy/
+# Directorios de imágenes
+/public/imagenes/
+/imagenes/
+/usuarios/
