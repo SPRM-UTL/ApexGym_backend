@@ -380,14 +380,14 @@ CategoriaProductoRoutes.post(
 );
 
 CategoriaProductoRoutes.put(
-    '/',
+    '/:id',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Editar'),
     categoriaProductoController.actualizar.bind(categoriaProductoController)
 );
 
 CategoriaProductoRoutes.delete(
-    '/',
+    '/:id',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Eliminar'),
     categoriaProductoController.eliminar.bind(categoriaProductoController)
