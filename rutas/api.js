@@ -397,6 +397,7 @@ productoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Listar'),
+    productoController.obtenerTodos.bind(productoController)
 );
 
 productoRoutes.post(
