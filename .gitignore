@@ -43,3 +43,10 @@ imagenes/
 
 uploads/usuarios/
 usuarios/
+uploads/usuarios/
+
+public/uploads/.vs/ 
+public/imagenes/empleados/
+
+prisma/migrations-copy/
+migrations-copy/
