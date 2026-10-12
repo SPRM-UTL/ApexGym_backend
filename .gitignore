@@ -29,7 +29,17 @@ public/uploads/
 
 # Migraciones (ignorar para evitar conflictos de sincronizacion de BD entre compañeros)
 prisma/migrations/
+
 public/uploads/.vs/ 
 
 migrations/
 backend/migrations/
+
+migrations-copy/
+backend/migrations-copy/
+
+public/imagenes/
+imagenes/
+
+uploads/usuarios/
+usuarios/
