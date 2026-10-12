@@ -323,8 +323,28 @@ model Cliente {
   deletedAt                  DateTime?     @map("deleted_at")
 
   estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
+  membresias    ClienteMembresia[]
 
   @@map("clientes")
+}
+
+model ClienteMembresia {
+  id                   Int       @id @default(autoincrement())
+  clienteId            Int       @map("cliente_id")
+  tipoMembresiaId      Int       @map("tipo_membresia_id")
+  estadoMembresiaId    Int       @map("estado_membresia_id")
+  fechaInicio          DateTime  @map("fecha_inicio") @db.Date
+  fechaFin             DateTime  @map("fecha_fin") @db.Date
+  renovacionAutomatica Boolean   @default(false) @map("renovacion_automatica")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
+  estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
+
+  @@map("clientes_membresias")
 }
 
 model EstadoMembresia {
@@ -334,6 +354,8 @@ model EstadoMembresia {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
+
+  clientesMembresias ClienteMembresia[]
 
   @@map("estados_membresias")
 }
@@ -348,6 +370,8 @@ model TipoMembresia {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
+
+  clientesMembresias ClienteMembresia[]
 
   @@map("tipos_membresias")
 }
