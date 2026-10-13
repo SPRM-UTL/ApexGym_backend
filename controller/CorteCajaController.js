@@ -14,16 +14,9 @@ export class CorteCajaController extends BaseController {
      */
     crear = async (req, res) => {
         try {
-            const {
-                aperturaCajaId,
-                empleadoId,
-                efectivoContado,
-                desgloseInicio,
-                desgloseFin,
-                observaciones,
-            } = req.body;
+            const { aperturaCajaId, empleadoId, efectivoContado, observaciones, desgloseInicio, desgloseFin } = req.body;
 
-            this.validarCampos({ aperturaCajaId, empleadoId, efectivoContado });
+            this.validarCampos({ aperturaCajaId, empleadoId, efectivoContado, observaciones });
 
             // Obtener la apertura con su monto inicial
             const apertura = await prisma.aperturaCaja.findUnique({
@@ -62,14 +55,8 @@ export class CorteCajaController extends BaseController {
                         totalSalidas,
                         diferencia,
                         estado: 'PENDIENTE',
-                        desgloseInicio:
-                            typeof desgloseInicio === 'object'
-                                ? JSON.stringify(desgloseInicio)
-                                : (desgloseInicio || apertura.desgloseInicio || null),
-                        desgloseFin:
-                            typeof desgloseFin === 'object'
-                                ? JSON.stringify(desgloseFin)
-                                : (desgloseFin || null),
+                        desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || apertura.desgloseInicio || null),
+                        desgloseFin: typeof desgloseFin === 'object' ? JSON.stringify(desgloseFin) : (desgloseFin || null),
                         observaciones: observaciones ? observaciones.trim() : null,
                         fechaCorte: new Date(),
                     },
@@ -95,35 +82,61 @@ export class CorteCajaController extends BaseController {
         }
     };
 
-    /**
-     * PUT /:id/validar
-     * Valida que el corte de caja esté correcto y lo audita.
-     */
-    validar = async (req, res) => {
+    actualizar = async (req, res) => {
         try {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
 
-            const corte = await this.dao.getById(id);
-            if (!corte) return this.respuestaNoEncontrado(res, 'Corte de caja no encontrado');
+            const { observaciones, desgloseFin, efectivoContado } = req.body;
+            if (observaciones && observaciones.trim().length > 500) {
+                throw new Error('Las observaciones no pueden exceder 500 caracteres');
+            }
 
-            const actualizado = await this.dao.update(id, {
-                estado: 'VALIDADO',
-                fechaValidacion: new Date(),
-            });
+            const data = {};
+            if (observaciones !== undefined) data.observaciones = observaciones ? observaciones.trim() : null;
+            if (desgloseFin !== undefined) data.desgloseFin = typeof desgloseFin === 'object' ? JSON.stringify(desgloseFin) : (desgloseFin || null);
+            if (efectivoContado !== undefined) {
+                if (isNaN(Number(efectivoContado)) || Number(efectivoContado) < 0 || Number(efectivoContado) > 99999999.99) {
+                    throw new Error('El monto de efectivo contado no es válido');
+                }
+                data.efectivoContado = Number(efectivoContado);
+            }
 
-            return this.respuestaExito(res, actualizado, 'Corte de caja validado correctamente');
+            const registro = await this.dao.update(id, data);
+            return this.respuestaExito(res, registro, 'Corte de caja actualizado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
     };
 
-    actualizar = async (req, res) => {
-        return this.respuestaError(res, new Error('Un corte de caja no puede ser modificado'));
+    eliminar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) throw new Error('ID no válido');
+            const registro = await this.dao.delete(id);
+            return this.respuestaExito(res, registro, 'Corte de caja eliminado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
     };
 
-    eliminar = async (req, res) => {
-        return this.respuestaError(res, new Error('Un corte de caja no puede ser eliminado'));
+    validar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) throw new Error('ID de corte no válido');
+
+            const corte = await this.dao.getById(id);
+            if (!corte) return this.respuestaNoEncontrado(res, 'Corte de caja no encontrado');
+
+            const registro = await this.dao.update(id, {
+                estado: 'VALIDADO',
+                fechaValidacion: new Date(),
+            });
+
+            return this.respuestaExito(res, registro, 'Corte de caja validado exitosamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
     };
 
     obtenerPorApertura = async (req, res) => {
@@ -137,7 +150,7 @@ export class CorteCajaController extends BaseController {
         }
     };
 
-    validarCampos({ aperturaCajaId, empleadoId, efectivoContado }) {
+    validarCampos({ aperturaCajaId, empleadoId, efectivoContado, observaciones }) {
         if (!aperturaCajaId || isNaN(Number(aperturaCajaId)))
             throw new Error('La apertura de caja es requerida');
         if (!empleadoId || isNaN(Number(empleadoId))) throw new Error('El empleado es requerido');
@@ -145,6 +158,10 @@ export class CorteCajaController extends BaseController {
             throw new Error('El efectivo contado es requerido');
         if (Number(efectivoContado) < 0)
             throw new Error('El efectivo contado debe ser mayor o igual a 0');
+        if (Number(efectivoContado) > 99999999.99)
+            throw new Error('El efectivo contado no puede exceder $99,999,999.99');
+        if (observaciones && observaciones.trim().length > 500)
+            throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
 }
 
