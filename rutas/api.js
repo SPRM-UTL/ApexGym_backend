@@ -1,3 +1,10 @@
+/**
+ * Sistema: ApexGym Backend
+ * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
+ * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
+ *              restricción de apertura única por caja, registro de desglose de billetes
+ *              en arqueo y endpoint de validación de corte de caja.
+ */
 import express from 'express';
 import { UsuarioController } from '../controller/UsuarioController.js';
 import { SeccionController } from '../controller/SeccionController.js';
@@ -20,6 +27,7 @@ import { ClienteController } from '../controller/ClienteController.js';
 import { EstadoMembresiaController } from '../controller/EstadoMembresiaController.js';
 import { TipoMembresiaController } from '../controller/TipoMembresiaController.js';
 import { TipoVisitaController } from '../controller/TipoVisitaController.js';
+import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
@@ -38,6 +46,7 @@ const clienteController = new ClienteController();
 const estadoMembresiaController = new EstadoMembresiaController();
 const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
+const clienteMembresiaController = new ClienteMembresiaController();
 const metodoPagoController = new MetodoPagoController();
 
 const productoRoutes = express.Router();
@@ -55,6 +64,7 @@ const clienteRoutes = express.Router();
 const estadoMembresiaRoutes = express.Router();
 const tipoMembresiaRoutes = express.Router();
 const tipoVisitaRoutes = express.Router();
+const clienteMembresiaRoutes = express.Router();
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
 const rolRoutes = express.Router();
@@ -678,6 +688,63 @@ tipoVisitaRoutes.delete(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Tipos de Visita', 'Eliminar'),
+    tipoVisitaController.eliminar.bind(tipoVisitaController)
+);
+
+// ── Rutas de Clientes Membresías ─────────────────────────────────────────────
+clienteMembresiaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerTodos.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/cliente/:clienteId',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerHistorialPorCliente.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/cliente/:clienteId/activa',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerActivaPorCliente.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerPorId.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Crear'),
+    clienteMembresiaController.asignar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.put(
+    '/:id/renovar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Editar'),
+    clienteMembresiaController.renovar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.post(
+    '/:id/renovar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Crear'),
+    clienteMembresiaController.renovar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.put(
+    '/:id/cancelar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Editar'),
+    clienteMembresiaController.cancelar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Eliminar'),
+    clienteMembresiaController.eliminar.bind(clienteMembresiaController)
 );
 //---Rutas Médodos de Pago-------------------------
 
@@ -713,6 +780,7 @@ router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
 router.use('/clientes', clienteRoutes);
+router.use('/clientes-membresias', clienteMembresiaRoutes);
 router.use('/estados-membresia', estadoMembresiaRoutes);
 router.use('/tipos-membresia', tipoMembresiaRoutes);
 router.use('/tipos-visita', tipoVisitaRoutes);
