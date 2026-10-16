@@ -26,6 +26,18 @@ export class CorteCajaController extends BaseController {
             if (apertura.estado !== 'ABIERTA')
                 throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
 
+            // Verificar que no existan movimientos pendientes de validar
+            const movimientosPendientes = await prisma.movimientoCaja.count({
+                where: {
+                    aperturaCajaId: Number(aperturaCajaId),
+                    estado: { not: 'VALIDADO' },
+                    deletedAt: null,
+                },
+            });
+            if (movimientosPendientes > 0) {
+                throw new Error(`No se puede realizar el corte de caja: existen ${movimientosPendientes} movimiento(s) pendientes de validar en este turno. Valide todos los movimientos antes de cerrar la caja.`);
+            }
+
             // Sumar movimientos ENTRADA y SALIDA de esta apertura
             const [sumaEntradas, sumaSalidas] = await Promise.all([
                 prisma.movimientoCaja.aggregate({
@@ -83,41 +95,11 @@ export class CorteCajaController extends BaseController {
     };
 
     actualizar = async (req, res) => {
-        try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-
-            const { observaciones, desgloseFin, efectivoContado } = req.body;
-            if (observaciones && observaciones.trim().length > 500) {
-                throw new Error('Las observaciones no pueden exceder 500 caracteres');
-            }
-
-            const data = {};
-            if (observaciones !== undefined) data.observaciones = observaciones ? observaciones.trim() : null;
-            if (desgloseFin !== undefined) data.desgloseFin = typeof desgloseFin === 'object' ? JSON.stringify(desgloseFin) : (desgloseFin || null);
-            if (efectivoContado !== undefined) {
-                if (isNaN(Number(efectivoContado)) || Number(efectivoContado) < 0 || Number(efectivoContado) > 99999999.99) {
-                    throw new Error('El monto de efectivo contado no es válido');
-                }
-                data.efectivoContado = Number(efectivoContado);
-            }
-
-            const registro = await this.dao.update(id, data);
-            return this.respuestaExito(res, registro, 'Corte de caja actualizado correctamente');
-        } catch (error) {
-            return this.respuestaError(res, error);
-        }
+        return this.respuestaError(res, new Error('Los cortes de caja no pueden ser modificados por políticas de control y auditoría contable'));
     };
 
     eliminar = async (req, res) => {
-        try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-            const registro = await this.dao.delete(id);
-            return this.respuestaExito(res, registro, 'Corte de caja eliminado correctamente');
-        } catch (error) {
-            return this.respuestaError(res, error);
-        }
+        return this.respuestaError(res, new Error('Los cortes de caja no pueden ser eliminados por políticas de control y auditoría contable'));
     };
 
     validar = async (req, res) => {
