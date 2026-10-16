@@ -495,6 +495,12 @@ movimientoCajaRoutes.put(
     verificarPermiso('Movimientos de Caja', 'Editar'),
     movimientoCajaController.actualizar.bind(movimientoCajaController)
 );
+movimientoCajaRoutes.put(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Editar'),
+    movimientoCajaController.validar.bind(movimientoCajaController)
+);
 movimientoCajaRoutes.delete(
     '/:id',
     autenticarUsuario,
