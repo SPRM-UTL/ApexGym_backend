@@ -16,6 +16,7 @@ export class UsuarioController extends BaseController {
             if (!usuario) {
                 throw new Error("Credenciales inválidas");
             }
+            
 
             const token = await tokenDao.crearTokenSesion(usuario.id);
 
@@ -31,15 +32,14 @@ export class UsuarioController extends BaseController {
                 }
 
             if(checkbox == true){
-                    opcionesCookies.maxAge = token.tiempoVida * 1000;
+                    opcionesCookies.maxAge = token.registro.tiempoVida * 1000;
             }
             res.cookie('token', token.token, opcionesCookies)
             return this.respuestaExito(
                 
                 res,
                 {
-                    usuario,
-                    token: token.token
+                    usuario
                 },
                 "Credenciales válidas"
             );
@@ -49,11 +49,12 @@ export class UsuarioController extends BaseController {
     }
 
     logout = async (req, res )=>{
-        const {usuarioId}  = req.body;
         try{
-            const tokenStr = req.cookies.token;
+            const tokenStr = req.cookies?.token;
+
             if(tokenStr){
-                await tokenDao.revocarOtrosTokensSesion(usuarioId, tokenStr)
+                await tokenDao.revocarToken(tokenStr);
+                //await tokenDao.revocarOtrosTokensSesion(usuarioId, tokenStr)
             }
             res.clearCookie('token',{
                 httpOnly: true,
