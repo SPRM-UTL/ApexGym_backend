@@ -1,3 +1,10 @@
+/**
+ * Sistema: ApexGym Backend
+ * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
+ * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
+ *              restricción de apertura única por caja, registro de desglose de billetes
+ *              en arqueo y endpoint de validación de corte de caja.
+ */
 import express from 'express';
 import { UsuarioController } from '../controller/UsuarioController.js';
 import { SeccionController } from '../controller/SeccionController.js';
@@ -20,7 +27,8 @@ import { ClienteController } from '../controller/ClienteController.js';
 import { EstadoMembresiaController } from '../controller/EstadoMembresiaController.js';
 import { TipoMembresiaController } from '../controller/TipoMembresiaController.js';
 import { TipoVisitaController } from '../controller/TipoVisitaController.js';
-
+import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
+import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
 
@@ -38,6 +46,8 @@ const clienteController = new ClienteController();
 const estadoMembresiaController = new EstadoMembresiaController();
 const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
+const clienteMembresiaController = new ClienteMembresiaController();
+const metodoPagoController = new MetodoPagoController();
 
 const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
@@ -54,6 +64,7 @@ const clienteRoutes = express.Router();
 const estadoMembresiaRoutes = express.Router();
 const tipoMembresiaRoutes = express.Router();
 const tipoVisitaRoutes = express.Router();
+const clienteMembresiaRoutes = express.Router();
 const usuarioRoutes = express.Router();
 const seccionRoutes = express.Router();
 const rolRoutes = express.Router();
@@ -67,6 +78,7 @@ const empleadoRoutes = express.Router();
 const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
+const metodoPagoRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -378,14 +390,14 @@ CategoriaProductoRoutes.post(
 );
 
 CategoriaProductoRoutes.put(
-    '/',
+    '/:id',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Editar'),
     categoriaProductoController.actualizar.bind(categoriaProductoController)
 );
 
 CategoriaProductoRoutes.delete(
-    '/',
+    '/:id',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Eliminar'),
     categoriaProductoController.eliminar.bind(categoriaProductoController)
@@ -395,6 +407,7 @@ productoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Listar'),
+    productoController.obtenerTodos.bind(productoController)
 );
 
 productoRoutes.post(
@@ -470,6 +483,12 @@ movimientoCajaRoutes.get(
     movimientoCajaController.obtenerPorApertura.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.get(
+    '/apertura/:aperturaCajaId/resumen',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Listar'),
+    movimientoCajaController.obtenerResumenApertura.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.get(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Listar'),
@@ -480,6 +499,18 @@ movimientoCajaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Crear'),
     movimientoCajaController.crear.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Editar'),
+    movimientoCajaController.actualizar.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.put(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Editar'),
+    movimientoCajaController.validar.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.delete(
     '/:id',
@@ -512,6 +543,24 @@ corteCajaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Corte de Caja', 'Crear'),
     corteCajaController.crear.bind(corteCajaController)
+);
+corteCajaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Editar'),
+    corteCajaController.actualizar.bind(corteCajaController)
+);
+corteCajaRoutes.put(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Editar'),
+    corteCajaController.validar.bind(corteCajaController)
+);
+corteCajaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Corte de Caja', 'Eliminar'),
+    corteCajaController.eliminar.bind(corteCajaController)
 );
 
 
@@ -645,12 +694,99 @@ tipoVisitaRoutes.delete(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Tipos de Visita', 'Eliminar'),
+    tipoVisitaController.eliminar.bind(tipoVisitaController)
+);
+
+// ── Rutas de Clientes Membresías ─────────────────────────────────────────────
+clienteMembresiaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerTodos.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/cliente/:clienteId',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerHistorialPorCliente.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/cliente/:clienteId/activa',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerActivaPorCliente.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteMembresiaController.obtenerPorId.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Crear'),
+    clienteMembresiaController.asignar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.put(
+    '/:id/renovar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Editar'),
+    clienteMembresiaController.renovar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.post(
+    '/:id/renovar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Crear'),
+    clienteMembresiaController.renovar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.put(
+    '/:id/cancelar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Editar'),
+    clienteMembresiaController.cancelar.bind(clienteMembresiaController)
+);
+clienteMembresiaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Eliminar'),
+    clienteMembresiaController.eliminar.bind(clienteMembresiaController)
+);
+//---Rutas Médodos de Pago-------------------------
+
+metodoPagoRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago','Listar'),
+    metodoPagoController.obtenerTodos.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Crear'),
+    metodoPagoController.crear.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Editar'),
+    metodoPagoController.actualizar.bind(metodoPagoController)
+);
+
+metodoPagoRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago', 'Eliminar'),
+    metodoPagoController.eliminar.bind(metodoPagoController)
 );
 
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
 router.use('/clientes', clienteRoutes);
+router.use('/clientes-membresias', clienteMembresiaRoutes);
 router.use('/estados-membresia', estadoMembresiaRoutes);
 router.use('/tipos-membresia', tipoMembresiaRoutes);
 router.use('/tipos-visita', tipoVisitaRoutes);
@@ -668,5 +804,6 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
+router.use('/metodos-pago',metodoPagoRoutes);
 
 export { router as api };
