@@ -49,7 +49,7 @@ export const autenticarUsuario = async (req, res, next) => {
             }
             
             //limpiamos en caso de algun error
-            res.clearCookie('token', COOKIE_OPTIOMS)
+            res.clearCookie('token', COOKIE_OPTIONS) //La cague 
             
             const response = new ResponseModel(null, 1, mensaje, 401);
             return res.status(401).json(response);
