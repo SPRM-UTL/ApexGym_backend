@@ -100,10 +100,20 @@ export class CorteCajaController extends BaseController {
         }
     };
 
+    /**
+     * PUT /cortes-caja/:id
+     * [CAJA-01] Bloqueo de modificación por auditoría contable y control fiscal.
+     * Los registros de corte de caja son inmutables una vez creados para proteger el histórico contable.
+     */
     actualizar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser modificados por políticas de control y auditoría contable'));
     };
 
+    /**
+     * DELETE /cortes-caja/:id
+     * [CAJA-01] Bloqueo de eliminación por auditoría contable y control fiscal.
+     * Prohíbe la eliminación física o lógica de cortes para garantizar la integridad contable.
+     */
     eliminar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser eliminados por políticas de control y auditoría contable'));
     };
