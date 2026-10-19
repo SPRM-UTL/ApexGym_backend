@@ -1,3 +1,9 @@
+/**
+ * Issue: Control Operativo de Caja, Auditoria Contable y Reporte de Corte en PDF #85
+ * Subtareas:
+ * - [CAJA-01] Backend: Bloqueo de modificacion y eliminacion de cortes de caja por auditoria contable
+ * - [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja
+ */
 import { corteCajaDao } from '../dao/CorteCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';

@@ -1,3 +1,8 @@
+/**
+ * Issue: Control Operativo de Caja, Auditoria Contable y Reporte de Corte en PDF #85
+ * Subtarea:
+ * - [CAJA-02] Backend: Ciclo de vida y endpoint de validacion de movimientos de caja
+ */
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
