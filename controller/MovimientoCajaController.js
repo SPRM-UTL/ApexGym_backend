@@ -1,6 +1,10 @@
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
+import {
+    calcularEfectivoEsperado,
+    obtenerTotalesApertura,
+} from '../utilidades/calculosCaja.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
@@ -25,22 +29,10 @@ export class MovimientoCajaController extends BaseController {
 
             const tipoNormalizado = tipo.trim().toUpperCase();
 
-            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja
+            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja (incluyendo ventas en efectivo)
             if (tipoNormalizado === 'SALIDA') {
-                const [sumaEntradas, sumaSalidas] = await Promise.all([
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                ]);
-
-                const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-                const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-                const saldoDisponible = Number(apertura.montoInicial) + totalEntradas - totalSalidas;
+                const totales = await obtenerTotalesApertura(aperturaCajaId);
+                const saldoDisponible = calcularEfectivoEsperado(apertura.montoInicial, totales);
 
                 if (Number(monto) > saldoDisponible) {
                     throw new Error(`Saldo insuficiente en caja. El saldo disponible es de $${saldoDisponible.toFixed(2)} y se intentó retirar $${Number(monto).toFixed(2)}`);
@@ -157,22 +149,13 @@ export class MovimientoCajaController extends BaseController {
             });
             if (!apertura) throw new Error('Apertura no encontrada');
 
-            const [sumaEntradas, sumaSalidas, movimientos] = await Promise.all([
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'SALIDA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
+            const [totales, movimientos] = await Promise.all([
+                obtenerTotalesApertura(aperturaCajaId),
                 this.dao.getAllByApertura(aperturaCajaId),
             ]);
 
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
             const montoInicial = Number(apertura.montoInicial);
-            const saldoDisponible = montoInicial + totalEntradas - totalSalidas;
+            const saldoDisponible = calcularEfectivoEsperado(montoInicial, totales);
             const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
             const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
 
@@ -181,12 +164,15 @@ export class MovimientoCajaController extends BaseController {
                 {
                     apertura,
                     montoInicial,
-                    totalEntradas,
-                    totalSalidas,
+                    totalEntradas: totales.totalEntradas,
+                    totalSalidas: totales.totalSalidas,
+                    totalVentas: totales.totalVentas,
+                    totalVentasEfectivo: totales.totalVentasEfectivo,
                     saldoDisponible,
                     movimientos,
                     movimientosPendientes,
                     movimientosValidados,
+                    totales,
                 },
                 'Resumen de apertura obtenido correctamente'
             );

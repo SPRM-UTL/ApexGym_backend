@@ -164,6 +164,7 @@ model Empleado {
   aperturasCaja   AperturaCaja[]
   movimientosCaja MovimientoCaja[]
   cortesCaja      CorteCaja[]
+  ventas          Venta[]
 
   @@map("empleados")
 }
@@ -324,6 +325,7 @@ model Cliente {
 
   estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
+  ventas        Venta[]
 
   @@map("clientes")
 }
@@ -420,6 +422,7 @@ model AperturaCaja {
 
   movimientos MovimientoCaja[]
   cortes      CorteCaja[]
+  ventas      Venta[]
 
   @@map("aperturas_caja")
 }
@@ -450,6 +453,8 @@ model CorteCaja {
   efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
   totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
   totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
+  totalVentas         Decimal   @default(0) @map("total_ventas") @db.Decimal(10, 2)
+  totalVentasEfectivo Decimal   @default(0) @map("total_ventas_efectivo") @db.Decimal(10, 2)
   diferencia      Decimal   @db.Decimal(10, 2)
   estado          String    @default("PENDIENTE") @db.VarChar(20)
   desgloseInicio  String?   @map("desglose_inicio") @db.Text
@@ -483,6 +488,7 @@ model Producto {
   deletedAt           DateTime?         @map("deleted_at")
   
   categoria           CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
+  detallesVenta       DetalleVenta[]
 
   @@map("producto")
 }
@@ -496,6 +502,57 @@ model MetodoPago {
   updatedAt           DateTime           @updatedAt @map("updated_at")
   deletedAt           DateTime?          @map("deleted_at")
 
+  ventas              Venta[]
+
   @@map("metodo_pago")
+}
+
+model Venta {
+  id                Int       @id @default(autoincrement())
+  folio             String    @unique @db.VarChar(30)
+  aperturaCajaId    Int       @map("apertura_caja_id")
+  empleadoId        Int       @map("empleado_id")
+  clienteId         Int?      @map("cliente_id")
+  metodoPagoId      Int       @map("metodo_pago_id")
+  subtotal          Decimal   @db.Decimal(10, 2)
+  total             Decimal   @db.Decimal(10, 2)
+  montoRecibido     Decimal   @map("monto_recibido") @db.Decimal(10, 2)
+  cambio            Decimal   @default(0) @db.Decimal(10, 2)
+  estado            String    @default("COMPLETADA") @db.VarChar(20)
+  fechaVenta        DateTime  @default(now()) @map("fecha_venta")
+  observaciones     String?   @db.Text
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.VarChar(255)
+  fechaCancelacion  DateTime? @map("fecha_cancelacion")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Restrict)
+  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  cliente      Cliente?     @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  metodoPago   MetodoPago   @relation(fields: [metodoPagoId], references: [id], onDelete: Restrict)
+
+  detalles DetalleVenta[]
+
+  @@index([fechaVenta])
+  @@index([estado])
+  @@map("ventas")
+}
+
+model DetalleVenta {
+  id             Int       @id @default(autoincrement())
+  ventaId        Int       @map("venta_id")
+  productoId     Int       @map("producto_id")
+  cantidad       Int
+  precioUnitario Decimal   @map("precio_unitario") @db.Decimal(10, 2)
+  subtotal       Decimal   @db.Decimal(10, 2)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  venta    Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
+
+  @@map("detalles_venta")
 }
 

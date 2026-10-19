@@ -141,6 +141,18 @@
           ]
         },
         {
+          "nombre": "Ventas",
+          "descripcion": "Registro de ventas, consulta de folios, comprobantes y cancelaciones",
+          "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
           "nombre":"Metodos de Pago",
           "descripcion": "Diferentes metodos de Pago",
           "imagenUrl":"https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",

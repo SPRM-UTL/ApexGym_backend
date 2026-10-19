@@ -1,6 +1,12 @@
 import { corteCajaDao } from '../dao/CorteCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
+import {
+    bloquearApertura,
+    calcularEfectivoEsperado,
+    obtenerTotalesApertura,
+    redondear,
+} from '../utilidades/calculosCaja.js';
 
 export class CorteCajaController extends BaseController {
     constructor() {
@@ -9,8 +15,11 @@ export class CorteCajaController extends BaseController {
 
     /**
      * POST /
-     * Crea el corte de caja calculando totales de movimientos automáticamente
+     * Crea el corte de caja calculando automáticamente los totales de movimientos
+     * y de ventas reales (solo las ventas en efectivo afectan el efectivo esperado)
      * y cambia el estado de la apertura a CERRADA.
+     *
+     * efectivoEsperado = montoInicial + entradas - salidas + ventasEnEfectivo
      */
     crear = async (req, res) => {
         try {
@@ -18,53 +27,45 @@ export class CorteCajaController extends BaseController {
 
             this.validarCampos({ aperturaCajaId, empleadoId, efectivoContado, observaciones });
 
-            // Obtener la apertura con su monto inicial
-            const apertura = await prisma.aperturaCaja.findUnique({
-                where: { id: Number(aperturaCajaId), deletedAt: null },
-            });
-            if (!apertura) throw new Error('La apertura de caja especificada no existe');
-            if (apertura.estado !== 'ABIERTA')
-                throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
+            const mensajePendientes = (n) =>
+                `No se puede realizar el corte de caja: existen ${n} movimiento(s) pendientes de validar en este turno. Valide todos los movimientos antes de cerrar la caja.`;
 
-            // Verificar que no existan movimientos pendientes de validar
-            const movimientosPendientes = await prisma.movimientoCaja.count({
-                where: {
-                    aperturaCajaId: Number(aperturaCajaId),
-                    estado: { not: 'VALIDADO' },
-                    deletedAt: null,
-                },
-            });
-            if (movimientosPendientes > 0) {
-                throw new Error(`No se puede realizar el corte de caja: existen ${movimientosPendientes} movimiento(s) pendientes de validar en este turno. Valide todos los movimientos antes de cerrar la caja.`);
-            }
-
-            // Sumar movimientos ENTRADA y SALIDA de esta apertura
-            const [sumaEntradas, sumaSalidas] = await Promise.all([
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-            ]);
-
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-            const montoInicial = Number(apertura.montoInicial);
-            const efectivoEsperado = montoInicial + totalEntradas - totalSalidas;
-            const diferencia = Number(efectivoContado) - efectivoEsperado;
-
-            // Crear el corte y cerrar la apertura en una transacción
+            // Crear el corte y cerrar la apertura en una transacción.
+            // La apertura se bloquea para que ninguna venta/cancelación cambie los totales mientras se calcula.
             const resultado = await prisma.$transaction(async (tx) => {
+                const estadoApertura = await bloquearApertura(tx, aperturaCajaId);
+                if (estadoApertura !== 'ABIERTA')
+                    throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
+
+                const apertura = await tx.aperturaCaja.findUnique({
+                    where: { id: Number(aperturaCajaId), deletedAt: null },
+                });
+                if (!apertura) throw new Error('La apertura de caja especificada no existe');
+
+                // Verificar que no existan movimientos pendientes de validar
+                const movimientosPendientes = await tx.movimientoCaja.count({
+                    where: {
+                        aperturaCajaId: Number(aperturaCajaId),
+                        estado: { not: 'VALIDADO' },
+                        deletedAt: null,
+                    },
+                });
+                if (movimientosPendientes > 0) throw new Error(mensajePendientes(movimientosPendientes));
+
+                // Movimientos manuales + ventas reales de esta apertura
+                const totales = await obtenerTotalesApertura(aperturaCajaId, tx);
+                const efectivoEsperado = calcularEfectivoEsperado(apertura.montoInicial, totales);
+                const diferencia = redondear(Number(efectivoContado) - efectivoEsperado);
+
                 const corte = await tx.corteCaja.create({
                     data: {
                         aperturaCajaId: Number(aperturaCajaId),
                         empleadoId: Number(empleadoId),
                         efectivoContado: Number(efectivoContado),
-                        totalEntradas,
-                        totalSalidas,
+                        totalEntradas: totales.totalEntradas,
+                        totalSalidas: totales.totalSalidas,
+                        totalVentas: totales.totalVentas,
+                        totalVentasEfectivo: totales.totalVentasEfectivo,
                         diferencia,
                         estado: 'PENDIENTE',
                         desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || apertura.desgloseInicio || null),
@@ -93,6 +94,7 @@ export class CorteCajaController extends BaseController {
             return this.respuestaError(res, error);
         }
     };
+
 
     actualizar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser modificados por políticas de control y auditoría contable'));
