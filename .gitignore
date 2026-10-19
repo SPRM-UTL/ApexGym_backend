@@ -5,16 +5,16 @@ node_modules/
 .env
 
 # Directorios de herramientas de IA y editores
-.agents
-.claude
-.cursor
-.devin
+.agents/
+.claude/
+.cursor/
+.devin/
 
 # Archivos de logs y temporales
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 .DS_Store
 
 # Repomix
@@ -22,4 +22,22 @@ repomix-output.xml
 
 # Directorios de imágenes y archivos subidos
 uploads/
+public/uploads/
+
+# Visual Studio
+.vs/
+
+# Migraciones locales/copias; mantener prisma/migrations versionado
+prisma/migrations/
 public/uploads/.vs/ 
+
+migrations/
+backend/migrations/
+/prisma/migrations-copy/
+/migrations-copy/
+/backend/migrations-copy/
+
+# Directorios de imágenes
+/public/imagenes/
+/imagenes/
+/usuarios/

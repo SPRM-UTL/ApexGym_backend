@@ -11,6 +11,7 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 import 'dotenv/config';
 import seedData from './seed-data.json' with { type: 'json' };
+import { encriptarContrasena } from '../utilidades/utilesSeguridad.js';
 
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
@@ -40,7 +41,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
 });
 
 const upsertModulo = async (seccionId, modulo) => {
-    // Buscar por nombre permite mover un módulo entre secciones sin duplicarlo.
     const existente = await prisma.modulo.findFirst({
         where: { nombre: modulo.nombre },
     });
@@ -90,6 +90,27 @@ const upsertRol = (rol) => prisma.rol.upsert({
     create: { nombre: rol.nombre, descripcion: rol.descripcion },
 });
 
+// Función para insertar/actualizar usuarios desde el JSON
+const upsertUsuario = async (usuario) => {
+    // Si tu JSON usa usuario.password o usuario.contrasenia, lo tomamos aquí:
+    const plainPassword = usuario.password || usuario.contrasenia;
+    const hashedPassword = encriptarContrasena(plainPassword);
+
+    return prisma.usuario.upsert({
+        where: { email: usuario.email },
+        update: {
+            nombre: usuario.nombre,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+            deletedAt: null,
+        },
+        create: {
+            nombre: usuario.nombre,
+            email: usuario.email,
+            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+        },
+    });
+};
+
 async function sincronizarPermisosRol(rolId, permisosIds) {
     const ids = [...new Set(permisosIds)];
     const existentes = await prisma.rolPermiso.findMany({ where: { rolId } });
@@ -133,8 +154,40 @@ async function asignarRolAlPrimerUsuario(rolId) {
     console.log(`Rol asignado a ${usuario.nombre} <${usuario.email}>.`);
 }
 
+async function crearUsuarioDefault() {
+    const email = 'apexgym@sprm.com.mx';
+    const contraseniaPlana = 'sprm-2026';
+    const contrasenia = encriptarContrasena(contraseniaPlana);
+
+    const usuario = await prisma.usuario.upsert({
+        where: { email },
+        update: {
+            contrasenia,
+            deletedAt: null,
+        },
+        create: {
+            nombre: 'Administrador ApexGym',
+            email,
+            contrasenia,
+        },
+    });
+
+    console.log(`Usuario por defecto creado/actualizado: ${usuario.nombre} <${usuario.email}>`);
+    return usuario;
+}
+
 async function main() {
     console.log('Iniciando seed declarativo...');
+
+    const defaultUser = await crearUsuarioDefault();
+
+    // 2. CREACIÓN DE USUARIOS (Primero para que existan antes de asignar roles)
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            const usuario = await upsertUsuario(usuarioData);
+            console.log(`Usuario preparado: ${usuario.nombre} <${usuario.email}>`);
+        }
+    }
 
     const acciones = new Map();
     for (const accion of seedData.acciones) {
@@ -189,8 +242,35 @@ async function main() {
             : rolData.permisos.flatMap((moduloNombre) => permisosPorModulo.get(moduloNombre) ?? []);
 
         await sincronizarPermisosRol(rol.id, permisos.map((permiso) => permiso.id));
-        if (rolData.asignarAlPrimerUsuario) await asignarRolAlPrimerUsuario(rol.id);
+        if (rolData.asignarAlPrimerUsuario) {
+            await asignarRolAlPrimerUsuario(rol.id);
+            if (defaultUser) {
+                await prisma.usuarioRol.upsert({
+                    where: { usuarioId_rolId: { usuarioId: defaultUser.id, rolId: rol.id } },
+                    update: { deletedAt: null },
+                    create: { usuarioId: defaultUser.id, rolId: rol.id },
+                });
+                console.log(`Rol ${rol.nombre} asignado a ${defaultUser.nombre} <${defaultUser.email}>.`);
+            }
+        }
         console.log(`Rol: ${rol.nombre} (${permisos.length} permisos).`);
+    }
+
+    if (seedData.usuarios && seedData.usuarios.length > 0) {
+        for (const usuarioData of seedData.usuarios) {
+            if (usuarioData.rolNombre) {
+                const usuario = await prisma.usuario.findUnique({ where: { email: usuarioData.email } });
+                const rol = await prisma.rol.findUnique({ where: { nombre: usuarioData.rolNombre } });
+                if (usuario && rol) {
+                    await prisma.usuarioRol.upsert({
+                        where: { usuarioId_rolId: { usuarioId: usuario.id, rolId: rol.id } },
+                        update: { deletedAt: null },
+                        create: { usuarioId: usuario.id, rolId: rol.id },
+                    });
+                    console.log(`Rol ${rol.nombre} asignado a ${usuario.nombre} <${usuario.email}>.`);
+                }
+            }
+        }
     }
 
     console.log('Seed completado correctamente.');

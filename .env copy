@@ -4,3 +4,5 @@ DB_USER=root
 DB_PASSWORD=""
 DB_NAME=nexus
 DATABASE_URL="mysql://root:@localhost:3306/bd"
+FRONTEND_URL="http://localhost:5173"
+NODE_ENV = true

@@ -1,6 +1,10 @@
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
+import {
+    calcularEfectivoEsperado,
+    obtenerTotalesApertura,
+} from '../utilidades/calculosCaja.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
@@ -13,7 +17,7 @@ export class MovimientoCajaController extends BaseController {
         try {
             const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
 
-            this.validar({ aperturaCajaId, empleadoId, tipo, monto, concepto });
+            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
 
             // Verificar que la apertura exista y esté ABIERTA
             const apertura = await prisma.aperturaCaja.findUnique({
@@ -23,23 +27,12 @@ export class MovimientoCajaController extends BaseController {
             if (apertura.estado !== 'ABIERTA')
                 throw new Error('No se pueden registrar movimientos en una apertura cerrada');
 
-            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja
             const tipoNormalizado = tipo.trim().toUpperCase();
-            if (tipoNormalizado === 'SALIDA') {
-                const [sumaEntradas, sumaSalidas] = await Promise.all([
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                ]);
 
-                const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-                const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-                const saldoDisponible = Number(apertura.montoInicial) + totalEntradas - totalSalidas;
+            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja (incluyendo ventas en efectivo)
+            if (tipoNormalizado === 'SALIDA') {
+                const totales = await obtenerTotalesApertura(aperturaCajaId);
+                const saldoDisponible = calcularEfectivoEsperado(apertura.montoInicial, totales);
 
                 if (Number(monto) > saldoDisponible) {
                     throw new Error(`Saldo insuficiente en caja. El saldo disponible es de $${saldoDisponible.toFixed(2)} y se intentó retirar $${Number(monto).toFixed(2)}`);
@@ -52,6 +45,7 @@ export class MovimientoCajaController extends BaseController {
                 tipo: tipoNormalizado,
                 monto: Number(monto),
                 concepto: concepto.trim(),
+                estado: 'PENDIENTE',
                 observaciones: observaciones ? observaciones.trim() : null,
             });
 
@@ -61,12 +55,73 @@ export class MovimientoCajaController extends BaseController {
         }
     };
 
+    actualizar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) throw new Error('ID no válido');
+
+            const movimientoExistente = await prisma.movimientoCaja.findUnique({
+                where: { id, deletedAt: null },
+            });
+            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
+            if (movimientoExistente.estado === 'VALIDADO') {
+                throw new Error('No se puede editar un movimiento de caja que ya ha sido validado');
+            }
+
+            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
+            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
+
+            const registro = await this.dao.update(id, {
+                aperturaCajaId: Number(aperturaCajaId),
+                empleadoId: Number(empleadoId),
+                tipo: tipo.trim().toUpperCase(),
+                monto: Number(monto),
+                concepto: concepto.trim(),
+                observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
+            });
+
+            return this.respuestaExito(res, registro, 'Movimiento de caja actualizado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     eliminar = async (req, res) => {
         try {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
+
+            const movimientoExistente = await prisma.movimientoCaja.findUnique({
+                where: { id, deletedAt: null },
+            });
+            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
+            if (movimientoExistente.estado === 'VALIDADO') {
+                throw new Error('No se puede eliminar un movimiento de caja que ya ha sido validado');
+            }
+
             const registro = await this.dao.delete(id);
             return this.respuestaExito(res, registro, 'Movimiento de caja eliminado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    validar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (isNaN(id)) throw new Error('ID no válido');
+
+            const movimientoExistente = await prisma.movimientoCaja.findUnique({
+                where: { id, deletedAt: null },
+            });
+            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
+
+            const registro = await prisma.movimientoCaja.update({
+                where: { id },
+                data: { estado: 'VALIDADO' },
+            });
+
+            return this.respuestaExito(res, registro, 'Movimiento de caja validado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -94,32 +149,30 @@ export class MovimientoCajaController extends BaseController {
             });
             if (!apertura) throw new Error('Apertura no encontrada');
 
-            const [sumaEntradas, sumaSalidas, movimientos] = await Promise.all([
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'SALIDA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
+            const [totales, movimientos] = await Promise.all([
+                obtenerTotalesApertura(aperturaCajaId),
                 this.dao.getAllByApertura(aperturaCajaId),
             ]);
 
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
             const montoInicial = Number(apertura.montoInicial);
-            const saldoDisponible = montoInicial + totalEntradas - totalSalidas;
+            const saldoDisponible = calcularEfectivoEsperado(montoInicial, totales);
+            const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
+            const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
 
             return this.respuestaExito(
                 res,
                 {
                     apertura,
                     montoInicial,
-                    totalEntradas,
-                    totalSalidas,
+                    totalEntradas: totales.totalEntradas,
+                    totalSalidas: totales.totalSalidas,
+                    totalVentas: totales.totalVentas,
+                    totalVentasEfectivo: totales.totalVentasEfectivo,
                     saldoDisponible,
                     movimientos,
+                    movimientosPendientes,
+                    movimientosValidados,
+                    totales,
                 },
                 'Resumen de apertura obtenido correctamente'
             );
@@ -128,7 +181,7 @@ export class MovimientoCajaController extends BaseController {
         }
     };
 
-    validar({ aperturaCajaId, empleadoId, tipo, monto, concepto }) {
+    validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones }) {
         if (!aperturaCajaId || isNaN(Number(aperturaCajaId)))
             throw new Error('La apertura de caja es requerida');
         if (!empleadoId || isNaN(Number(empleadoId))) throw new Error('El empleado es requerido');
@@ -138,7 +191,11 @@ export class MovimientoCajaController extends BaseController {
         if (monto === undefined || monto === null || isNaN(Number(monto)))
             throw new Error('El monto es requerido');
         if (Number(monto) <= 0) throw new Error('El monto debe ser mayor a 0');
+        if (Number(monto) > 9999999.99) throw new Error('El monto no puede exceder $9,999,999.99');
         if (!concepto?.trim()) throw new Error('El concepto del movimiento es requerido');
+        if (concepto.trim().length > 255) throw new Error('El concepto no puede exceder 255 caracteres');
+        if (observaciones && observaciones.trim().length > 500)
+            throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
 }
 
