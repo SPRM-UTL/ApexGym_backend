@@ -14,9 +14,12 @@ export class CorteCajaController extends BaseController {
     }
 
     /**
-     * POST /
-     * Crea el corte de caja calculando totales de movimientos automáticamente
-     * y cambia el estado de la apertura a CERRADA.
+     * POST /cortes-caja
+     * [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja #88
+     * - Consulta si existen movimientos en estado diferente a VALIDADO para la apertura activa.
+     * - Si existen movimientos pendientes, rechaza la creacion del corte con mensaje explicativo indicando la cantidad pendiente.
+     * - Asegura que el saldo final y la diferencia cuadren sobre movimientos 100% verificados.
+     * - Cambia el estado de la apertura a CERRADA una vez generado el corte.
      */
     crear = async (req, res) => {
         try {
