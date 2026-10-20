@@ -6,6 +6,7 @@
  * - Asignar estado PENDIENTE por defecto al registrar entradas o salidas de efectivo.
  * - Endpoint POST/PUT /api/movimientos-caja/:id/validar para marcar movimientos como VALIDADO.
  * - Bloquear actualizacion y eliminacion de movimientos que ya se encuentren en estado VALIDADO.
+ * - Bloquear validacion de movimientos si la caja de la apertura no se encuentra en estado ABIERTA.
  * - Calcular movimientosValidados y movimientosPendientes en el resumen de apertura.
  */
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
@@ -131,8 +132,13 @@ export class MovimientoCajaController extends BaseController {
 
             const movimientoExistente = await prisma.movimientoCaja.findUnique({
                 where: { id, deletedAt: null },
+                include: { aperturaCaja: true },
             });
             if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
+
+            if (movimientoExistente.aperturaCaja?.estado !== 'ABIERTA') {
+                throw new Error('No se puede validar este movimiento porque la caja ya no está abierta');
+            }
 
             const registro = await prisma.movimientoCaja.update({
                 where: { id },

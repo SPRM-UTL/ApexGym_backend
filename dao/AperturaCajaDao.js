@@ -29,7 +29,7 @@ export class AperturaCajaDao extends BaseDao {
             where: { deletedAt: null },
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: { fechaApertura: 'desc' },
+            orderBy: { fechaApertura: 'asc' },
         });
     }
 

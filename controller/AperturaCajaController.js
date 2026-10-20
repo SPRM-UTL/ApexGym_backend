@@ -46,6 +46,13 @@ export class AperturaCajaController extends BaseController {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
 
+            const aperturaExistente = await this.dao.getById(id);
+            if (!aperturaExistente) return this.respuestaNoEncontrado(res, 'Apertura de caja no encontrada');
+
+            if (aperturaExistente.estado === 'CERRADA') {
+                throw new Error('No es posible modificar una apertura de caja que ya ha sido cerrada');
+            }
+
             const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones } = req.body;
 
             // No se permite cambiar el estado directamente mediante este endpoint
@@ -69,8 +76,17 @@ export class AperturaCajaController extends BaseController {
         try {
             const id = Number(req.params.id);
             if (isNaN(id)) throw new Error('ID no válido');
+
+            const apertura = await this.dao.getById(id);
+            if (!apertura) return this.respuestaNoEncontrado(res, 'Apertura de caja no encontrada');
+
+            if (apertura.estado === 'CERRADA') {
+                throw new Error('No es posible eliminar una apertura de caja que ya ha sido cerrada');
+            }
+
+            // Para aperturas ABIERTAS: se cancela la sesión de caja liberándola
             const registro = await this.dao.delete(id);
-            return this.respuestaExito(res, registro, 'Apertura de caja eliminada correctamente');
+            return this.respuestaExito(res, registro, 'Apertura de caja cancelada correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -78,7 +94,7 @@ export class AperturaCajaController extends BaseController {
 
     /**
      * POST /:id/cerrar
-     * Cierra una apertura solo si tiene al menos un corte de caja registrado.
+     * Cierra una apertura solo si tiene al menos un corte de caja registrado y no quedan movimientos pendientes.
      */
     cerrar = async (req, res) => {
         try {
@@ -88,6 +104,18 @@ export class AperturaCajaController extends BaseController {
             const apertura = await this.dao.getById(id);
             if (!apertura) return this.respuestaNoEncontrado(res, 'Apertura de caja no encontrada');
             if (apertura.estado === 'CERRADA') throw new Error('La apertura de caja ya está cerrada');
+
+            // Verificar que no existan movimientos pendientes de validar antes de cerrar
+            const movimientosPendientes = await prisma.movimientoCaja.count({
+                where: {
+                    aperturaCajaId: id,
+                    estado: { not: 'VALIDADO' },
+                    deletedAt: null,
+                },
+            });
+            if (movimientosPendientes > 0) {
+                throw new Error(`No se puede cerrar la caja si aún quedan ${movimientosPendientes} movimiento(s) pendientes de validar.`);
+            }
 
             // Verificar que exista al menos un corte registrado para esta apertura
             const corte = await prisma.corteCaja.findFirst({

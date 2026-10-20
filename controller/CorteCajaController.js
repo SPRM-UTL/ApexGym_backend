@@ -65,6 +65,17 @@ export class CorteCajaController extends BaseController {
             const efectivoEsperado = montoInicial + totalEntradas - totalSalidas;
             const diferencia = Number(efectivoContado) - efectivoEsperado;
 
+            // Validar justificación obligatoria si existe faltante o sobrante
+            if (Math.abs(diferencia) > 0.01 && (!observaciones || !observaciones.trim())) {
+                const tipoDiff = diferencia < 0 ? 'faltante' : 'sobrante';
+                const montoDiff = Math.abs(diferencia).toFixed(2);
+                const contadoStr = Number(efectivoContado).toFixed(2);
+                const esperadoStr = efectivoEsperado.toFixed(2);
+                throw new Error(
+                    'Existe una diferencia de ' + tipoDiff + ' ($' + montoDiff + ') entre el efectivo contado ($' + contadoStr + ') y el saldo teórico esperado ($' + esperadoStr + '). Debe ingresar obligatoriamente la justificación en las observaciones.'
+                );
+            }
+
             // Crear el corte y cerrar la apertura en una transacción
             const resultado = await prisma.$transaction(async (tx) => {
                 const corte = await tx.corteCaja.create({
