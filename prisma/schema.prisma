@@ -15,7 +15,14 @@ model Usuario {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  cliente     Cliente?
   @@map("usuarios")
+}
+
+enum TipoToken {
+  TOKEN_SESION
+  RECUPERACION_CONTRASENIA
+  VERIFICACION_CORREO
 }
 
 model Token {
@@ -184,6 +191,7 @@ model EstadoCliente {
 model Cliente {
   id                         Int           @id @default(autoincrement())
   estadoClienteId            Int           @map("estado_cliente_id")
+  usuarioId                  Int?          @map("usuario_id")
   nombre                     String        @db.VarChar(150)
   apellidoPaterno            String        @map("apellido_paterno") @db.VarChar(150)
   apellidoMaterno            String?       @map("apellido_materno") @db.VarChar(150)
@@ -199,6 +207,7 @@ model Cliente {
   updatedAt                  DateTime      @updatedAt @map("updated_at")
   deletedAt                  DateTime?     @map("deleted_at")
 
+  usuario         Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
 
