@@ -1,22 +1,26 @@
 import crypto from "node:crypto";
 import { BaseDao } from "./BaseDao.js";
 
+function hashToken(token){
+    return crypto.createHash('sha256').update(token).digest('hex')
+}
 export class TokenDao extends BaseDao {
 
     constructor() {
         super("token");
     }
 
+
     async crearTokenSesion(usuarioId, tiempoVida = 86400) {
 
-        const token = crypto.randomUUID();
+        const token = crypto.randomBytes(32).toString('hex');
 
-        return this.model.create({
+        const registro =  await this.model.create({
             data: {
                 usuarioId,
                 tipoToken: "TOKEN_SESION",
-                token,
-                tiempoVida
+                token: hashToken(token),
+                tiempoVida 
             },
             include: {
                 usuario: {
@@ -29,12 +33,14 @@ export class TokenDao extends BaseDao {
                 },
             }
         });
+
+        return {registro, token}
     }
 
     async obtenerToken(token) {
         return this.model.findUnique({
             where: {
-                token
+                token: hashToken(token)
             },
             include: {
                 usuario: {
@@ -121,7 +127,7 @@ export class TokenDao extends BaseDao {
     async revocarToken(token) {
         return this.model.update({
             where: {
-                token
+                token : hashToken(token)
             },
             data: {
                 deletedAt: new Date()
@@ -134,7 +140,7 @@ export class TokenDao extends BaseDao {
             where: {
                 usuarioId,
                 tipoToken: "TOKEN_SESION",
-                deletedAt: null
+                deletedAt: null,
             },
             data: {
                 deletedAt: new Date()
@@ -148,9 +154,9 @@ export class TokenDao extends BaseDao {
                 usuarioId,
                 tipoToken: "TOKEN_SESION",
                 token: {
-                    not: tokenActual
+                    not: hashToken(tokenActual)
                 },
-                deletedAt: null
+                deletedAt: null,
             },
             data: {
                 deletedAt: new Date()
