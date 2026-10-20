@@ -221,7 +221,7 @@ export class MovimientoCajaController extends BaseController {
         if (monto === undefined || monto === null || isNaN(Number(monto)))
             throw new Error('El monto es requerido');
         if (Number(monto) <= 0) throw new Error('El monto debe ser mayor a 0');
-        if (Number(monto) > 9999999.99) throw new Error('El monto no puede exceder $9,999,999.99');
+        if (Number(monto) > 50000) throw new Error('El monto no puede exceder el límite de $50,000.00');
         if (!concepto?.trim()) throw new Error('El concepto del movimiento es requerido');
         if (concepto.trim().length > 255) throw new Error('El concepto no puede exceder 255 caracteres');
         if (observaciones && observaciones.trim().length > 500)

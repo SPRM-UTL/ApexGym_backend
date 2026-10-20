@@ -170,8 +170,8 @@ export class CorteCajaController extends BaseController {
             throw new Error('El efectivo contado es requerido');
         if (Number(efectivoContado) < 0)
             throw new Error('El efectivo contado debe ser mayor o igual a 0');
-        if (Number(efectivoContado) > 99999999.99)
-            throw new Error('El efectivo contado no puede exceder $99,999,999.99');
+        if (Number(efectivoContado) > 200000)
+            throw new Error('El efectivo contado físico no puede exceder el límite de $200,000.00');
         if (observaciones && observaciones.trim().length > 500)
             throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
