@@ -151,6 +151,18 @@
             "Editar",
             "Eliminar"
           ]
+        },
+        {
+          "nombre": "Servicios",
+          "descripcion": "Gestión de servicios del gimnasio",
+          "imagenUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
         }
       ]
     },
