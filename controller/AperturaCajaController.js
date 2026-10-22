@@ -2,6 +2,21 @@ import { aperturaCajaDao } from '../dao/AperturaCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 
+function procesarFechaApertura(fechaApertura) {
+    if (!fechaApertura) return new Date();
+    if (typeof fechaApertura === 'string') {
+        const trimmed = fechaApertura.trim();
+        // Si viene en formato YYYY-MM-DD sin hora, asignamos la hora local actual para evitar desfases UTC
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            const ahora = new Date();
+            const [y, m, d] = trimmed.split('-').map(Number);
+            return new Date(y, m - 1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+        }
+    }
+    const d = new Date(fechaApertura);
+    return !isNaN(d.getTime()) ? d : new Date();
+}
+
 export class AperturaCajaController extends BaseController {
     constructor() {
         super(aperturaCajaDao);
@@ -29,7 +44,7 @@ export class AperturaCajaController extends BaseController {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
-                fechaApertura: new Date(fechaApertura),
+                fechaApertura: procesarFechaApertura(fechaApertura),
                 estado: 'ABIERTA',
                 desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || null),
                 observaciones: observaciones ? observaciones.trim() : null,
@@ -62,7 +77,7 @@ export class AperturaCajaController extends BaseController {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
-                fechaApertura: new Date(fechaApertura),
+                fechaApertura: procesarFechaApertura(fechaApertura),
                 observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
             };
             if (desgloseInicio !== undefined) {
@@ -144,8 +159,8 @@ export class AperturaCajaController extends BaseController {
             throw new Error('El monto inicial es requerido');
         if (Number(montoInicial) < 0) throw new Error('El monto inicial debe ser mayor o igual a 0');
         if (Number(montoInicial) > 9999999.99) throw new Error('El monto inicial no puede exceder $9,999,999.99');
-        if (!fechaApertura || isNaN(Date.parse(fechaApertura)))
-            throw new Error('La fecha de apertura es requerida y debe ser válida');
+        if (fechaApertura && isNaN(Date.parse(fechaApertura)))
+            throw new Error('La fecha de apertura debe ser válida');
         if (observaciones && observaciones.trim().length > 500)
             throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
