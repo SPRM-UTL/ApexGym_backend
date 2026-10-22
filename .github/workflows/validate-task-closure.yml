@@ -1,0 +1,29 @@
+name: Validacion de Autorizacion para Finalizar Tareas
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  verificar-autorizacion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar actor de cierre
+        env:
+          ACTOR: ${{ github.actor }}
+          AUTHORIZED_USER: 'IDGS-803-23001488'
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$ACTOR" != "$AUTHORIZED_USER" ]; then
+            echo "Usuario no autorizado ($ACTOR) intento cerrar el issue #$ISSUE_NUMBER"
+            gh issue reopen "$ISSUE_NUMBER"
+            gh issue comment "$ISSUE_NUMBER" --body "Politica de revision de ApexGym: Solo el lider tecnico (@$AUTHORIZED_USER) esta autorizado para cerrar issues y pasar actividades a Finalizado. La tarea se ha reabierto automaticamente y debe permanecer En revision hasta contar con la aprobacion oficial."
+            exit 1
+          else
+            echo "Cierre autorizado por el lider tecnico ($AUTHORIZED_USER)."
+          fi
