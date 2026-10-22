@@ -53,18 +53,25 @@ export class AperturaCajaController extends BaseController {
                 throw new Error('No es posible modificar una apertura de caja que ya ha sido cerrada');
             }
 
-            const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones } = req.body;
+            const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones, desgloseInicio } = req.body;
 
             // No se permite cambiar el estado directamente mediante este endpoint
             this.validar({ cajaId, empleadoId, montoInicial, fechaApertura, observaciones });
 
-            const registro = await this.dao.update(id, {
+            const dataToUpdate = {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
                 fechaApertura: new Date(fechaApertura),
                 observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
-            });
+            };
+            if (desgloseInicio !== undefined) {
+                dataToUpdate.desgloseInicio = typeof desgloseInicio === 'object'
+                    ? JSON.stringify(desgloseInicio)
+                    : (desgloseInicio || null);
+            }
+
+            const registro = await this.dao.update(id, dataToUpdate);
 
             return this.respuestaExito(res, registro, 'Apertura de caja actualizada correctamente');
         } catch (error) {
