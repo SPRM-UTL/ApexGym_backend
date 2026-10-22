@@ -15,6 +15,36 @@ import { prisma } from '../dao/BaseDao.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
+
+function procesarDesgloseYObservaciones(observaciones, desglose) {
+    let obsClean = observaciones !== undefined && observaciones !== null ? String(observaciones).trim() : null;
+    let desgloseFinal = desglose;
+
+    if (obsClean && obsClean.includes('Desglose: {')) {
+        const parts = obsClean.split(/\|\s*Desglose:\s*|Desglose:\s*/i);
+        if (parts[1]) {
+            const match = parts[1].match(/^\{.*?\}/);
+            if (match && !desgloseFinal) {
+                try {
+                    desgloseFinal = JSON.parse(match[0]);
+                } catch (e) {
+                    desgloseFinal = match[0];
+                }
+            }
+        }
+        obsClean = (parts[0]?.trim()) || null;
+    }
+
+    const desgloseStr = desgloseFinal
+        ? (typeof desgloseFinal === 'object' ? JSON.stringify(desgloseFinal) : String(desgloseFinal))
+        : null;
+
+    return {
+        observaciones: obsClean || null,
+        desglose: desgloseStr,
+    };
+}
+
 export class MovimientoCajaController extends BaseController {
     constructor() {
         super(movimientoCajaDao);
@@ -22,9 +52,10 @@ export class MovimientoCajaController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
+            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones, desglose } = req.body;
+            const { observaciones: obsLimpia, desglose: desgloseStr } = procesarDesgloseYObservaciones(observaciones, desglose);
 
-            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
+            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones: obsLimpia });
 
             // Verificar que la apertura exista y esté ABIERTA
             const apertura = await prisma.aperturaCaja.findUnique({
@@ -65,7 +96,8 @@ export class MovimientoCajaController extends BaseController {
                 monto: Number(monto),
                 concepto: concepto.trim(),
                 estado: 'PENDIENTE',
-                observaciones: observaciones ? observaciones.trim() : null,
+                desglose: desgloseStr,
+                observaciones: obsLimpia,
             });
 
             return this.respuestaExito(res, registro, 'Movimiento de caja registrado correctamente');
@@ -87,17 +119,24 @@ export class MovimientoCajaController extends BaseController {
                 throw new Error('No se puede editar un movimiento de caja que ya ha sido validado');
             }
 
-            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
-            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
+            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones, desglose } = req.body;
+            const { observaciones: obsLimpia, desglose: desgloseStr } = procesarDesgloseYObservaciones(observaciones, desglose);
 
-            const registro = await this.dao.update(id, {
+            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones: obsLimpia });
+
+            const dataToUpdate = {
                 aperturaCajaId: Number(aperturaCajaId),
                 empleadoId: Number(empleadoId),
                 tipo: tipo.trim().toUpperCase(),
                 monto: Number(monto),
                 concepto: concepto.trim(),
-                observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
-            });
+                observaciones: obsLimpia,
+            };
+            if (desglose !== undefined || desgloseStr !== null) {
+                dataToUpdate.desglose = desgloseStr;
+            }
+
+            const registro = await this.dao.update(id, dataToUpdate);
 
             return this.respuestaExito(res, registro, 'Movimiento de caja actualizado correctamente');
         } catch (error) {

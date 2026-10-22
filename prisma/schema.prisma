@@ -432,6 +432,7 @@ model MovimientoCaja {
   monto          Decimal   @db.Decimal(10, 2)
   concepto       String    @db.VarChar(255)
   estado         String    @default("PENDIENTE") @db.VarChar(20)
+  desglose       String?   @db.Text
   observaciones  String?   @db.Text
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -450,6 +451,8 @@ model CorteCaja {
   efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
   totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
   totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
+  totalVentas     Decimal   @default(0) @map("total_ventas") @db.Decimal(10, 2)
+  totalVentasEfectivo Decimal @default(0) @map("total_ventas_efectivo") @db.Decimal(10, 2)
   diferencia      Decimal   @db.Decimal(10, 2)
   estado          String    @default("PENDIENTE") @db.VarChar(20)
   desgloseInicio  String?   @map("desglose_inicio") @db.Text
