@@ -108,37 +108,7 @@ export class MovimientoCajaController extends BaseController {
 
     actualizar = async (req, res) => {
         try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-
-            const movimientoExistente = await prisma.movimientoCaja.findUnique({
-                where: { id, deletedAt: null },
-            });
-            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
-            if (movimientoExistente.estado === 'VALIDADO') {
-                throw new Error('No se puede editar un movimiento de caja que ya ha sido validado');
-            }
-
-            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones, desglose } = req.body;
-            const { observaciones: obsLimpia, desglose: desgloseStr } = procesarDesgloseYObservaciones(observaciones, desglose);
-
-            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones: obsLimpia });
-
-            const dataToUpdate = {
-                aperturaCajaId: Number(aperturaCajaId),
-                empleadoId: Number(empleadoId),
-                tipo: tipo.trim().toUpperCase(),
-                monto: Number(monto),
-                concepto: concepto.trim(),
-                observaciones: obsLimpia,
-            };
-            if (desglose !== undefined || desgloseStr !== null) {
-                dataToUpdate.desglose = desgloseStr;
-            }
-
-            const registro = await this.dao.update(id, dataToUpdate);
-
-            return this.respuestaExito(res, registro, 'Movimiento de caja actualizado correctamente');
+            throw new Error('Los movimientos de caja no se pueden editar. Son registros contables inmutables de auditoría.');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -146,19 +116,7 @@ export class MovimientoCajaController extends BaseController {
 
     eliminar = async (req, res) => {
         try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-
-            const movimientoExistente = await prisma.movimientoCaja.findUnique({
-                where: { id, deletedAt: null },
-            });
-            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
-            if (movimientoExistente.estado === 'VALIDADO') {
-                throw new Error('No se puede eliminar un movimiento de caja que ya ha sido validado');
-            }
-
-            const registro = await this.dao.delete(id);
-            return this.respuestaExito(res, registro, 'Movimiento de caja eliminado correctamente');
+            throw new Error('Los movimientos de caja no se pueden eliminar. Son registros contables inmutables de auditoría.');
         } catch (error) {
             return this.respuestaError(res, error);
         }
