@@ -9,6 +9,7 @@ node_modules/
 .claude/
 .cursor/
 .devin/
+/apuntes/
 
 # Archivos de logs y temporales
 npm-debug.log*
@@ -41,3 +42,4 @@ backend/migrations/
 /public/imagenes/
 /imagenes/
 /usuarios/
+

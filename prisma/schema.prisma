@@ -108,7 +108,7 @@ model Caja {
 
 model Puesto {
   id            Int       @id @default(autoincrement())
-  areaTrabajoId Int       @map("area_trabajo_id")
+  areaTrabajoId Int       @map("area_tdrabajo_id")
   nombre        String    @db.VarChar(100)
   descripcion   String?   @db.Text
   salarioBase   Decimal   @map("salario_base") @db.Decimal(10, 2)
@@ -420,6 +420,7 @@ model AperturaCaja {
 
   movimientos MovimientoCaja[]
   cortes      CorteCaja[]
+  venta            Venta[]
 
   @@map("aperturas_caja")
 }
@@ -483,10 +484,42 @@ model Producto {
   deletedAt           DateTime?         @map("deleted_at")
   
   categoria           CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
-
+  detallesVenta       DetalleVenta[]
   @@map("producto")
 }
 
+/*Se añadio el modelado del punto de venta con apertura de caja por ahora se necesita revisar lo de carrito*/
+model Venta {
+  id                  Int               @id @default(autoincrement())
+  aperturaCajaId      Int?              @map("apertura_caja_id")
+  total               Float             
+  subtotal            Float             @default(0)
+  descuento           Float             @default(0)
+  metodoPago          String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
+  estado              String            @default("completado") @db.VarChar(30)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updateAt            DateTime          @updatedAt() @map("updated_at")
+  deletedAt           DateTime          @map("deleted_at")
+
+  aperturaCaja        AperturaCaja?     @relation(fields: [aperturaCajaId], references: [id])
+  detalleVenta       DetalleVenta[]
+
+  @@map("venta")
+}
+
+model DetalleVenta {
+  id                  Int                @id @default(autoincrement())
+  ventaId             Int                @map("venta_id")
+  productoId          Int                @map("producto_id")
+  cantidad            Int                
+  precioUnitario      Float              @map("precio_unitario")
+  subtotal            Float
+  
+  ventas              Venta              @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productos           Producto           @relation(fields: [productoId], references: [id])
+
+  @@map("detalle_venta")
+}
 model MetodoPago {
   id                  Int                @id @default(autoincrement())
   nombre              String             @unique @db.VarChar(30)

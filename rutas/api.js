@@ -79,6 +79,7 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
+const 
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -805,5 +806,7 @@ router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago',metodoPagoRoutes);
+
+router.use('/venta', )
 
 export { router as api };
