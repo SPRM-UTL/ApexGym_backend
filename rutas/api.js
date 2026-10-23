@@ -82,12 +82,9 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
-<<<<<<< HEAD
 const ventaRoutes = express.Router();
-=======
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
->>>>>>> aac5d9be618e8e453a3ac19c445f6e78f2652e79
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -878,12 +875,9 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
-<<<<<<< HEAD
 router.use('/metodos-pago',metodoPagoRoutes);
 router.use('/ventas', ventaRoutes)
-=======
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
->>>>>>> aac5d9be618e8e453a3ac19c445f6e78f2652e79
 
 export { router as api };
