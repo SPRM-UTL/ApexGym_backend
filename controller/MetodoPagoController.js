@@ -41,7 +41,7 @@ export class MetodoPagoController extends BaseController{
     }
 
     eliminar = async(req,res)=>{
-       const id = Number(req.params.id);
+        const id = Number(req.params.id);
         try{
             const metodoEliminado = await metodoPagoDao.delete(id);
             return this.respuestaExito(res,metodoEliminado,"El método de pago fue eliminado exitosamente.");

@@ -28,7 +28,7 @@ export class VentaDao extends BaseDao {
                     select : {
                         id : true,
                         estado: true,
-                        usuario: {
+                        empleado: {
                         select: { id : true, nombre: true }
                         },
                         caja : {
@@ -43,12 +43,12 @@ export class VentaDao extends BaseDao {
 
     async getById (id, client = this.prisma){
         const venta = await client.venta.findFirst({
-            where : {id, deletedAt: null},
+            where : {id , deleqAt : null},
             omit : this.omit,
             include: {
                 detalleVenta :{
                     include : {
-                    producto : {
+                    productos : {
                         select : {id : true, nombre : true}
                     }
                 }
@@ -57,7 +57,7 @@ export class VentaDao extends BaseDao {
                     select : {
                         id : true,
                         estado : true,
-                        usuario : {select: {id : true, nombre : true}},
+                        empleado : {select: {id : true, nombre : true}},
                     },
                 }
             }
@@ -68,10 +68,10 @@ export class VentaDao extends BaseDao {
         const {detalleVenta, ...v} = venta;
 
         return {
-            ...v, detalles : detalleVenta.map(({producto, ...d}) => ({
+            ...v, detalles : detalleVenta.map(({productos, ...d}) => ({
                 ...d,
-                productoId: producto.id,
-                productoNombre: producto.nombre
+                productoId: productos.id,
+                productoNombre: productos.nombre
             })
                 
             )
@@ -89,7 +89,13 @@ export class VentaDao extends BaseDao {
         if (data.metodoPago !== undefined) this.validarMetodoPago(restoDatos.metodoPago)
 
         return this.prisma.$transaction(async (tx) => {
-            const cajaAbierta = await tx.aperturaCaja.findFirst({where: {id: aperturaCajaId, usuarioId: usuarioId, estado: ESTADO_CAJA.ABIERTA, deletedAt: null }})
+            const empleado = await tx.empleado.findFirst({
+                where: { usuarioId, deletedAt: null },
+                select: { id: true },
+            });
+            if (!empleado) throw new Error("No hay un empleado asociado al usuario autenticado");
+
+            const cajaAbierta = await tx.aperturaCaja.findFirst({where: {id: aperturaCajaId, empleadoId: empleado.id, estado: ESTADO_CAJA.ABIERTA, deletedAt: null }})
 
             if(!cajaAbierta) throw new Error("La apertura de la caja es necesaria")
             
@@ -100,7 +106,7 @@ export class VentaDao extends BaseDao {
             const nuevaVenta = await tx.venta.create({
                 data: {
                     aperturaCajaId : cajaAbierta.id,
-                    metodoPago : metodoPago,
+                    metodoPago : restoDatos.metodoPago,
                     total : total,
                     subtotal : subtotal,
                     descuento : Number(descuento),
@@ -113,90 +119,83 @@ export class VentaDao extends BaseDao {
         });
     }
 
-    async update(id, data) {
-        
-        const ventaId = this.validarId(id, "la venta");
-        if (data.detalleVenta !== undefined) this.validarDetalles(data.detalleVenta)
-        if (data.descuento !== undefined) this.validarDescuento(data.descuento)
-        if (data.metodoPago !== undefined) this.validarMetodoPago(data.metodoPago)
+async update(id, data) {
+    const ventaId = this.validarId(id, "la venta");
+    if (data.detalleVenta !== undefined) this.validarDetalles(data.detalleVenta);
+    if (data.descuento !== undefined) this.validarDescuento(data.descuento);
+    if (data.metodoPago !== undefined) this.validarMetodoPago(data.metodoPago);
 
-
-        return this.prisma.$transaction(async (tx) => {
-
-            const venta = await tx.venta.findFirst({
-                where : {id : ventaId, deletedAt : null},
-                include : { detalleVenta : true }
-            });
-            if (!venta) throw new Error("La venta no existe")
-            if (venta.estado === ESTADO_VENTA.CANCELADA){
-                throw new Error("No se puede modificar una venta cancelada");
-            }
-            const caja = await tx.aperturaCaja.findFirst({
-                where: {id : data.aperturaCajaId, estado : ESTADO_CAJA.ABIERTA ,deletedAt : null}
-            })
-            if (!caja) throw new Error ('No se pudo actualizar: la caja en esta venta ya esta cerrada');
-
-            const items = data.detalleVenta ?? venta.detalleVenta.map((d) => ({productoId : d.productoId, cantidad : d.cantidad}));
-            const detalles = await this.prepararDetalles(tx, items, venta.detalleVenta);
-            const descuento =  data.descuento !== undefined ? Number(data.descuento) : Number(venta.descuento);
-            const {subtotal, total} = this.calcularTotal(detalles, descuento);
-
-            //Borramos antes de guardar una ves ya validado todo para evitar duplicados 
-            await tx.detalleVenta.deleteMany({where : {ventaId}})
-            await tx.venta.update({
-                where: {
-                    id: ventaId,
-                },
-                data: {
-                    aperturaCajaId : caja.id,
-                    total : total,
-                    subtotal : subtotal,
-                    descuento : descuento,
-                    metodoPago : data.metodoPago ?? venta.metodoPago,
-                    estado : data.estado ?? venta.estado,
-                    detallesVenta : {create : detalles}
-                },
-                omit: this.omit,
-                include : {
-                    aperturaCaja : {
-                        select : { id : true}
-                    },
-                },
-            });
-
-            //La funcion se encarga de ajustar el stock con los valores anteriores y los actualizados 
-            await this.ajustarStock(tx, venta.detalleVenta, detalles)
-            return this.getById(Number(id), tx);
+    return this.prisma.$transaction(async (tx) => {
+        const venta = await tx.venta.findFirst({
+            where: { id: ventaId, deletedAt: null },
+            include: { detalleVenta: true },
         });
-    }
-    
-    async delete(id) {
-        const ventaExistente = await this.getById(id);
-        
-        if (!ventaExistente) {
-            throw new Error("La venta no existe");
+        if (!venta) throw new Error("La venta no existe");
+        if (venta.estado === ESTADO_VENTA.CANCELADA) {
+            throw new Error("No se puede modificar una venta cancelada");
         }
-        
 
+        // La caja es la de la venta, no la que mande el frontend
+        const caja = await tx.aperturaCaja.findFirst({
+            where: { id: venta.aperturaCajaId, estado: ESTADO_CAJA.ABIERTA, deletedAt: null },
+        });
+        if (!caja) throw new Error("No se pudo actualizar: la caja de esta venta ya está cerrada");
 
+        const items = data.detalleVenta
+            ?? venta.detalleVenta.map((d) => ({ productoId: d.productoId, cantidad: d.cantidad }));
+        const detalles = await this.prepararDetalles(tx, items, venta.detalleVenta);
 
+        const descuento = data.descuento !== undefined ? Number(data.descuento) : Number(venta.descuento);
+        const { subtotal, total } = this.calcularTotal(detalles, descuento);
 
-
-        
-        return this.model.update({
-            where: {
-                id: id,
-            },
+        await tx.detalleVenta.deleteMany({ where: { ventaId } });
+        await tx.venta.update({
+            where: { id: ventaId },
             data: {
-                deletedAt: new Date(), estado : ESTADO_VENTA.CANCELADA,
+                subtotal,
+                descuento,
+                total,
+                metodoPago: data.metodoPago ?? venta.metodoPago,
+                detalleVenta: { create: detalles },
             },
         });
-    }
+
+        await this.ajustarStock(tx, venta.detalleVenta, detalles);
+
+        return this.getById(ventaId, tx);
+    });
+}
+
+async cancel(id) {
+    const ventaId = this.validarId(id, "la venta");
+
+    return this.prisma.$transaction(async (tx) => {
+        const venta = await tx.venta.findFirst({
+            where: { id: ventaId, deletedAt: null },
+            include: { detalleVenta: true },
+        });
+        if (!venta) throw new Error("La venta no existe");
+        if (venta.estado === ESTADO_VENTA.CANCELADA) throw new Error("La venta ya está cancelada");
+
+        const caja = await tx.aperturaCaja.findFirst({
+            where: { id: venta.aperturaCajaId, estado: ESTADO_CAJA.ABIERTA, deletedAt: null },
+        });
+        if (!caja) throw new Error("No se puede cancelar: la caja de esta venta está cerrada");
+
+        await this.ajustarStock(tx, venta.detalleVenta, []);   // devuelve todo el stock
+
+        return tx.venta.update({
+            where: { id: ventaId },
+            data: { deletedAt: new Date(), estado: ESTADO_VENTA.CANCELADA },
+            omit: this.omit,
+        });
+    });
+}
 
     //Se divide las distintas validaciones asi podemos utilizar en cada transaction dependiendo de sus necesidades
     validarId(id, modulo = 'indefinido') {
         const n = Number(id)
-        if (!id || Number.isInteger(id) || n <= 0) throw new Error(`Error en el identificador del modulo de ${modulo}`)
+        if (!id || !Number.isInteger(id) || n <= 0) throw new Error(`Error en el identificador del modulo de ${modulo}`)
         return n
     }
 
@@ -236,7 +235,7 @@ export class VentaDao extends BaseDao {
     async prepararDetalles (tx, items, detallesViejos = []){
         const detalles = [];
         //Traemos las ventas que ya tenia, indexando por producto
-        const viejos = new Map(detallesViejos.map((d) => [d.productoId , d]));
+        const DetallesViejos = new Map(detallesViejos.map((d) => [d.productoId , d]));
 
         //Creamos un ciclo que permite comparar y cambiar los valores de modificados
         for ( const item of items){
@@ -245,40 +244,40 @@ export class VentaDao extends BaseDao {
                 where : { id : item.productoId, deletedAt: null},
             });
             //En caso de no tener ningun producto modificado se le da un aviso
-            if (!producto) throw new Error(`El producto ${producto.id} no existe`);
-            
+            if (!producto) throw new Error(`El producto ${item.productoId} no existe`);
+            const Productoviejo = DetallesViejos.get(producto.id)
+            const cantidadPrevia = Productoviejo?.cantidad ?? 0;
 
-
-            const adicional = item.cantidad.subtract(cantidadPrevia);
+            const adicional = currency(item.cantidad).subtract(cantidadPrevia).value;
             //En caso de superar el stock actual informa del limite
             if (adicional > 0 && producto.stockActual < adicional){
                 throw new Error(`Stock insuficiente de ${producto.id} solo disponible ${producto.stockActual}`);
             }
             
             //En caso de que se actualizara calcula el precio previo
-            const precio = viejos.get(producto.id)?.precioUnitario ?? precioVenta.precioVenta;
+            const precio = DetallesViejos.get(producto.id)?.precioUnitario ?? producto.precioVenta;
 
             detalles.push({
                 productoId: producto.id,
                 cantidad: item.cantidad,
                 precioUnitario : precio,
-                subtotal: currency(precio).multiply(item.cantidad),
+                subtotal: currency(precio).multiply(item.cantidad).value,
             });
         }
         return detalles;
     }
 
-    async ajustarStock (tx, detallesViejos, detallesNuevos){
-        const viejos = new Map(detallesViejos.map((d) => [d.productoId, d.cantidad]));
+    async ajustarStock (tx, detallesDetallesViejos, detallesNuevos){
+        const DetallesViejos = new Map(detallesDetallesViejos.map((d) => [d.productoId, d.cantidad]));
         const nuevos = new Map(detallesNuevos.map((d) => [d.productoId , d.cantidad]));
 
         //justo todos los los productos de esta manera puedo manejar mis productos dentro del ciclo
-        const ids = new Set([...viejos.keys(), ...nuevos.keys()]);
+        const ids = new Set([...DetallesViejos.keys(), ...nuevos.keys()]);
 
         for (const productoId of ids){
 
             //Traemos los distintos valores  
-            const diferencia = (nuevos.get(productoId)?? 0) - ( viejos.get(productoId) ?? 0)
+            const diferencia = (nuevos.get(productoId)?? 0) - ( DetallesViejos.get(productoId) ?? 0)
             if (diferencia > 0){
                 const r = await tx.producto.updateMany({
                     where : { id : productoId,stockActual : {gte : diferencia},  deletedAt : null },
@@ -289,7 +288,7 @@ export class VentaDao extends BaseDao {
                 }
             }else if (diferencia < 0){
                 await tx.producto.update({
-                    where : { id : productoId, deletedAt : null },
+                    where : { id : productoId },
                     data : { stockActual : {increment : -diferencia} },
                 });
             }
@@ -300,8 +299,9 @@ export class VentaDao extends BaseDao {
         //lo que hace es acumular la suma uno por uno y lo va sumando con acc se guarda trayendo cada detalle
         const subtotal = detalles.reduce((acc, d) => acc.add(d.subtotal), currency(0));
         const total = subtotal.subtract(subtotal.multiply(descuento))
-        return {total, subtotal}
+        return {total : total.value, subtotal : subtotal.value}
     }
+    
 }
 
 export const ventaDao = new VentaDao();

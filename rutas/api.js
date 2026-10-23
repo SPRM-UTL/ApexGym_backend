@@ -30,6 +30,7 @@ import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+import { VentaController } from '../controller/ControllerVenta.js';
 
 
 const router = express.Router();
@@ -48,6 +49,7 @@ const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
 const clienteMembresiaController = new ClienteMembresiaController();
 const metodoPagoController = new MetodoPagoController();
+const ventaController = new VentaController();
 
 const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
@@ -79,7 +81,7 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
-const 
+const ventaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -783,6 +785,36 @@ metodoPagoRoutes.delete(
     metodoPagoController.eliminar.bind(metodoPagoController)
 );
 
+
+ventaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Ventas' , 'Listar'),
+    ventaController.obtenerTodos.bind(ventaController)
+)
+
+ventaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Venta' , 'Crear'),
+    ventaController.create.bind(ventaController)
+)
+
+ventaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Venta' , 'Editar'),
+    ventaController.update.bind(ventaController)
+)
+
+ventaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Venta' , 'Eliminar'),
+    ventaController.cancel.bind(ventaController)
+)
+
+
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
@@ -806,7 +838,6 @@ router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago',metodoPagoRoutes);
-
-router.use('/venta', )
+router.use('/ventas', ventaRoutes)
 
 export { router as api };
