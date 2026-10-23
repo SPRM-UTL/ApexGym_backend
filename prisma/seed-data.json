@@ -352,6 +352,12 @@
       "descripcion": "Acceso total a la administración del sistema",
       "permisos": "todos",
       "asignarAlPrimerUsuario": true
+    },
+    {
+      "nombre": "Cliente",
+      "descripcion": "Acceso para clientes del gimnasio",
+      "permisos": "todos",
+      "asignarAlPrimerUsuario": false
     }
   ]
 }

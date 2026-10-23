@@ -622,6 +622,11 @@ clienteRoutes.delete(
     clienteController.eliminar.bind(clienteController)
 );
 
+clienteRoutes.post(
+    '/registrar',
+    clienteController.registrar.bind(clienteController)
+);
+
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
 estadoMembresiaRoutes.get(
     '/',
