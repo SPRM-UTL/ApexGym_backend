@@ -26,7 +26,11 @@
     "cookie-parse": "^0.4.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+<<<<<<< HEAD
     "currency.js": "^2.0.4",
+=======
+    "dotenv": "^16.4.7",
+>>>>>>> aac5d9be618e8e453a3ac19c445f6e78f2652e79
     "express": "^5.2.1",
     "mariadb": "^3.5.4",
     "multer": "^2.4.0",

@@ -29,6 +29,7 @@ import { TipoMembresiaController } from '../controller/TipoMembresiaController.j
 import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
+import { ServicioController } from '../controller/ServicioController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 import { VentaController } from '../controller/ControllerVenta.js';
 
@@ -81,7 +82,12 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
+<<<<<<< HEAD
 const ventaRoutes = express.Router();
+=======
+const servicioController = new ServicioController();
+const servicioRoutes = express.Router();
+>>>>>>> aac5d9be618e8e453a3ac19c445f6e78f2652e79
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -814,6 +820,41 @@ ventaRoutes.delete(
     ventaController.cancel.bind(ventaController)
 )
 
+//---Rutas Servicios-------------------------
+servicioRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerTodos.bind(servicioController)
+);
+
+servicioRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerPorId.bind(servicioController)
+);
+
+servicioRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Crear'),
+    servicioController.crear.bind(servicioController)
+);
+
+servicioRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Editar'),
+    servicioController.actualizar.bind(servicioController)
+);
+
+servicioRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Eliminar'),
+    servicioController.eliminar.bind(servicioController)
+);
 
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
@@ -837,7 +878,12 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
+<<<<<<< HEAD
 router.use('/metodos-pago',metodoPagoRoutes);
 router.use('/ventas', ventaRoutes)
+=======
+router.use('/metodos-pago', metodoPagoRoutes);
+router.use('/servicios', servicioRoutes);
+>>>>>>> aac5d9be618e8e453a3ac19c445f6e78f2652e79
 
 export { router as api };
