@@ -20,7 +20,7 @@ export class MovimientoCajaDao extends BaseDao {
     constructor() {
         super('movimientoCaja', {
             omit: {
-                createdAt: true,
+                createdAt: false,
                 updatedAt: true,
                 deletedAt: true,
             },

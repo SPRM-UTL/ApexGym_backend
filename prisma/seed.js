@@ -19,6 +19,7 @@ const pool = mariadb.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    allowPublicKeyRetrieval: true,
 });
 
 const adapter = new PrismaMariaDb(pool);
@@ -272,6 +273,20 @@ async function main() {
             }
         }
     }
+
+    const configsDefault = [
+        { clave: 'mostrar_huella_digital_corte', valor: 'true', tipoDato: 'boolean', descripcion: 'Muestra u oculta la sección de huella digital y auditoría en el reporte PDF de corte de caja' },
+        { clave: 'logo_sistema', valor: '/favicon.svg', tipoDato: 'string', descripcion: 'URL o ruta del logotipo del sistema para reportes' },
+        { clave: 'nombre_sistema', valor: 'ApexGym', tipoDato: 'string', descripcion: 'Nombre comercial del gimnasio' },
+    ];
+    for (const configItem of configsDefault) {
+        await prisma.configuracionSistema.upsert({
+            where: { clave: configItem.clave },
+            update: { tipoDato: configItem.tipoDato, descripcion: configItem.descripcion, deletedAt: null },
+            create: configItem,
+        });
+    }
+    console.log('Configuraciones del sistema sincronizadas.');
 
     console.log('Seed completado correctamente.');
 }

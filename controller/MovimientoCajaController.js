@@ -1,8 +1,49 @@
+/**
+ * Issue: [CAJA-02] Backend: Ciclo de vida y endpoint de validacion de movimientos de caja #87
+ * Parent: Control Operativo de Caja, Auditoria Contable y Reporte de Corte en PDF #85
+ *
+ * Tareas:
+ * - Asignar estado PENDIENTE por defecto al registrar entradas o salidas de efectivo.
+ * - Endpoint POST/PUT /api/movimientos-caja/:id/validar para marcar movimientos como VALIDADO.
+ * - Bloquear actualizacion y eliminacion de movimientos que ya se encuentren en estado VALIDADO.
+ * - Bloquear validacion de movimientos si la caja de la apertura no se encuentra en estado ABIERTA.
+ * - Calcular movimientosValidados y movimientosPendientes en el resumen de apertura.
+ */
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
+
+
+function procesarDesgloseYObservaciones(observaciones, desglose) {
+    let obsClean = observaciones !== undefined && observaciones !== null ? String(observaciones).trim() : null;
+    let desgloseFinal = desglose;
+
+    if (obsClean && obsClean.includes('Desglose: {')) {
+        const parts = obsClean.split(/\|\s*Desglose:\s*|Desglose:\s*/i);
+        if (parts[1]) {
+            const match = parts[1].match(/^\{.*?\}/);
+            if (match && !desgloseFinal) {
+                try {
+                    desgloseFinal = JSON.parse(match[0]);
+                } catch (e) {
+                    desgloseFinal = match[0];
+                }
+            }
+        }
+        obsClean = (parts[0]?.trim()) || null;
+    }
+
+    const desgloseStr = desgloseFinal
+        ? (typeof desgloseFinal === 'object' ? JSON.stringify(desgloseFinal) : String(desgloseFinal))
+        : null;
+
+    return {
+        observaciones: obsClean || null,
+        desglose: desgloseStr,
+    };
+}
 
 export class MovimientoCajaController extends BaseController {
     constructor() {
@@ -11,9 +52,10 @@ export class MovimientoCajaController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
+            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones, desglose } = req.body;
+            const { observaciones: obsLimpia, desglose: desgloseStr } = procesarDesgloseYObservaciones(observaciones, desglose);
 
-            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
+            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones: obsLimpia });
 
             // Verificar que la apertura exista y esté ABIERTA
             const apertura = await prisma.aperturaCaja.findUnique({
@@ -54,7 +96,8 @@ export class MovimientoCajaController extends BaseController {
                 monto: Number(monto),
                 concepto: concepto.trim(),
                 estado: 'PENDIENTE',
-                observaciones: observaciones ? observaciones.trim() : null,
+                desglose: desgloseStr,
+                observaciones: obsLimpia,
             });
 
             return this.respuestaExito(res, registro, 'Movimiento de caja registrado correctamente');
@@ -65,30 +108,7 @@ export class MovimientoCajaController extends BaseController {
 
     actualizar = async (req, res) => {
         try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-
-            const movimientoExistente = await prisma.movimientoCaja.findUnique({
-                where: { id, deletedAt: null },
-            });
-            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
-            if (movimientoExistente.estado === 'VALIDADO') {
-                throw new Error('No se puede editar un movimiento de caja que ya ha sido validado');
-            }
-
-            const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
-            this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
-
-            const registro = await this.dao.update(id, {
-                aperturaCajaId: Number(aperturaCajaId),
-                empleadoId: Number(empleadoId),
-                tipo: tipo.trim().toUpperCase(),
-                monto: Number(monto),
-                concepto: concepto.trim(),
-                observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
-            });
-
-            return this.respuestaExito(res, registro, 'Movimiento de caja actualizado correctamente');
+            throw new Error('Los movimientos de caja no se pueden editar. Son registros contables inmutables de auditoría.');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -96,19 +116,7 @@ export class MovimientoCajaController extends BaseController {
 
     eliminar = async (req, res) => {
         try {
-            const id = Number(req.params.id);
-            if (isNaN(id)) throw new Error('ID no válido');
-
-            const movimientoExistente = await prisma.movimientoCaja.findUnique({
-                where: { id, deletedAt: null },
-            });
-            if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
-            if (movimientoExistente.estado === 'VALIDADO') {
-                throw new Error('No se puede eliminar un movimiento de caja que ya ha sido validado');
-            }
-
-            const registro = await this.dao.delete(id);
-            return this.respuestaExito(res, registro, 'Movimiento de caja eliminado correctamente');
+            throw new Error('Los movimientos de caja no se pueden eliminar. Son registros contables inmutables de auditoría.');
         } catch (error) {
             return this.respuestaError(res, error);
         }
@@ -121,8 +129,13 @@ export class MovimientoCajaController extends BaseController {
 
             const movimientoExistente = await prisma.movimientoCaja.findUnique({
                 where: { id, deletedAt: null },
+                include: { aperturaCaja: true },
             });
             if (!movimientoExistente) throw new Error('Movimiento de caja no encontrado');
+
+            if (movimientoExistente.aperturaCaja?.estado !== 'ABIERTA') {
+                throw new Error('No se puede validar este movimiento porque la caja ya no está abierta');
+            }
 
             const registro = await prisma.movimientoCaja.update({
                 where: { id },
@@ -205,7 +218,7 @@ export class MovimientoCajaController extends BaseController {
         if (monto === undefined || monto === null || isNaN(Number(monto)))
             throw new Error('El monto es requerido');
         if (Number(monto) <= 0) throw new Error('El monto debe ser mayor a 0');
-        if (Number(monto) > 9999999.99) throw new Error('El monto no puede exceder $9,999,999.99');
+        if (Number(monto) > 50000) throw new Error('El monto no puede exceder el límite de $50,000.00');
         if (!concepto?.trim()) throw new Error('El concepto del movimiento es requerido');
         if (concepto.trim().length > 255) throw new Error('El concepto no puede exceder 255 caracteres');
         if (observaciones && observaciones.trim().length > 500)
