@@ -29,6 +29,7 @@ import { TipoMembresiaController } from '../controller/TipoMembresiaController.j
 import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
+import { ServicioController } from '../controller/ServicioController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
 
@@ -79,6 +80,8 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
+const servicioController = new ServicioController();
+const servicioRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -788,6 +791,42 @@ metodoPagoRoutes.delete(
     metodoPagoController.eliminar.bind(metodoPagoController)
 );
 
+//---Rutas Servicios-------------------------
+servicioRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerTodos.bind(servicioController)
+);
+
+servicioRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerPorId.bind(servicioController)
+);
+
+servicioRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Crear'),
+    servicioController.crear.bind(servicioController)
+);
+
+servicioRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Editar'),
+    servicioController.actualizar.bind(servicioController)
+);
+
+servicioRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Eliminar'),
+    servicioController.eliminar.bind(servicioController)
+);
+
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
@@ -810,6 +849,7 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
-router.use('/metodos-pago',metodoPagoRoutes);
+router.use('/metodos-pago', metodoPagoRoutes);
+router.use('/servicios', servicioRoutes);
 
 export { router as api };

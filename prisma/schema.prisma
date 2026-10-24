@@ -502,3 +502,16 @@ model MetodoPago {
   @@map("metodo_pago")
 }
 
+model Servicio {
+  id                  Int                @id @default(autoincrement())
+  nombre              String             @unique @db.VarChar(100)
+  descripcion         String?            @db.VarChar(200)
+  precio              Decimal            @default(0) @db.Decimal(10, 2)
+  estado              String             @default("activo") @db.VarChar(50)
+
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  deletedAt           DateTime?          @map("deleted_at")
+
+  @@map("servicios")
+}
