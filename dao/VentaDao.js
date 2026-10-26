@@ -24,6 +24,12 @@ export class VentaDao extends BaseDao {
             where : { deletedAt : null },
             omit : this.omit,
             include : {
+                cliente: {
+                    select: {
+                        id: true,
+                        nombre: true,
+                    },
+                },
                 aperturaCaja : {
                     select : {
                         id : true,
@@ -43,9 +49,15 @@ export class VentaDao extends BaseDao {
 
     async getById (id, client = this.prisma){
         const venta = await client.venta.findFirst({
-            where : {id , deleqAt : null},
+            where : {id , deletedAt : null},
             omit : this.omit,
             include: {
+                cliente: {
+                    select: {
+                        id: true,
+                        nombre: true,
+                    },
+                },
                 detalleVenta :{
                     include : {
                     productos : {
@@ -80,10 +92,11 @@ export class VentaDao extends BaseDao {
 
     async create(data) {
 
-        const { detalleVenta, descuento = 0, ...restoDatos } = data;
+        const { detalleVenta, descuento = 0, clienteId,...restoDatos } = data;
         const aperturaCajaId = this.validarId(data.aperturaCajaId, "la apertura de caja");
         const usuarioId = this.validarId(data.usuarioId, "el usuario");
-        
+        const idCliente = this.validarId(clienteId, "el cliente");
+
         this.validarDetalles(detalleVenta)
         this.validarDescuento(descuento)
         if (data.metodoPago !== undefined) this.validarMetodoPago(restoDatos.metodoPago)
@@ -93,6 +106,17 @@ export class VentaDao extends BaseDao {
                 where: { usuarioId, deletedAt: null },
                 select: { id: true },
             });
+            const cliente = await tx.cliente.findFirst({
+                where: {
+                    id: idCliente,
+                    deletedAt: null,
+                },
+                select: {
+                    id: true,
+                },
+            });
+            if (!cliente) throw new Error("El cliente no existe");
+        
             if (!empleado) throw new Error("No hay un empleado asociado al usuario autenticado");
 
             const cajaAbierta = await tx.aperturaCaja.findFirst({where: {id: aperturaCajaId, empleadoId: empleado.id, estado: ESTADO_CAJA.ABIERTA, deletedAt: null }})
@@ -106,6 +130,7 @@ export class VentaDao extends BaseDao {
             const nuevaVenta = await tx.venta.create({
                 data: {
                     aperturaCajaId : cajaAbierta.id,
+                    clientId: cliente.id,
                     metodoPago : restoDatos.metodoPago,
                     total : total,
                     subtotal : subtotal,
@@ -192,12 +217,23 @@ async cancel(id) {
     });
 }
 
-    //Se divide las distintas validaciones asi podemos utilizar en cada transaction dependiendo de sus necesidades
-    validarId(id, modulo = 'indefinido') {
-        const n = Number(id)
-        if (!id || !Number.isInteger(id) || n <= 0) throw new Error(`Error en el identificador del modulo de ${modulo}`)
-        return n
+    validarId(id, modulo = "indefinido") {
+    const n = Number(id);
+
+    if (
+        id === undefined ||
+        id === null ||
+        id === "" ||
+        !Number.isInteger(n) ||
+        n <= 0
+    ) {
+        throw new Error(
+            `Error en el identificador del modulo de ${modulo}`
+        );
     }
+
+    return n;
+}
 
     validarDetalles (detalleVenta){
 

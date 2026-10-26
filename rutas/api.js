@@ -31,7 +31,7 @@ import { ClienteMembresiaController } from '../controller/ClienteMembresiaContro
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
-import { VentaController } from '../controller/ControllerVenta.js';
+import { VentaController } from '../controller/VentaController.js';
 
 
 const router = express.Router();
@@ -792,28 +792,28 @@ metodoPagoRoutes.delete(
 ventaRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Ventas' , 'Listar'),
+    verificarPermiso('Registro de ventas' , 'Listar'),
     ventaController.obtenerTodos.bind(ventaController)
 )
 
 ventaRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Venta' , 'Crear'),
+    verificarPermiso('Registro de ventas' , 'Crear'),
     ventaController.create.bind(ventaController)
 )
 
 ventaRoutes.put(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Venta' , 'Editar'),
+    verificarPermiso('Registro de ventas' , 'Editar'),
     ventaController.update.bind(ventaController)
 )
 
 ventaRoutes.delete(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Venta' , 'Eliminar'),
+    verificarPermiso('Registro de ventas' , 'Eliminar'),
     ventaController.cancel.bind(ventaController)
 )
 

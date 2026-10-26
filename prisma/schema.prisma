@@ -324,7 +324,7 @@ model Cliente {
 
   estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
-
+  ventas        Venta[]
   @@map("clientes")
 }
 
@@ -491,6 +491,7 @@ model Producto {
 /*Se añadio el modelado del punto de venta con apertura de caja por ahora se necesita revisar lo de carrito*/
 model Venta {
   id                  Int               @id @default(autoincrement())
+  clientId            Int               @map("cliente_id")
   aperturaCajaId      Int?              @map("apertura_caja_id")
   total               Float             
   subtotal            Float             @default(0)
@@ -498,10 +499,11 @@ model Venta {
   metodoPago          String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
   estado              String            @default("completado") @db.VarChar(30)
   createdAt           DateTime          @default(now()) @map("created_at")
-  updateAt            DateTime          @updatedAt() @map("updated_at")
+  updatedAt           DateTime          @updatedAt() @map("updated_at")
   deletedAt           DateTime?         @map("deleted_at")
 
   aperturaCaja        AperturaCaja?     @relation(fields: [aperturaCajaId], references: [id])
+  cliente             Cliente           @relation(fields: [clientId], references: [id])
   detalleVenta       DetalleVenta[]
 
   @@map("venta")

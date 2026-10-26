@@ -12,10 +12,12 @@ export class VentaController extends BaseController{
         try {
 
             const {aperturaCajaId, metodoPago, descuento, detalleVenta} = req.body;
+            const clienteId = req.body.clienteId ?? req.body.clientId;
             this.validar(aperturaCajaId,detalleVenta);
             const registro = await this.dao.create({
                 usuarioId : req.usuario.id, 
                 aperturaCajaId : Number(aperturaCajaId),
+                clienteId : Number(clienteId),
                 metodoPago : metodoPago ? metodoPago.trim().toLowerCase() : undefined, 
                 descuento : Number(descuento ?? 0),
                 detalleVenta : this.normalizarDetalles(detalleVenta)});
