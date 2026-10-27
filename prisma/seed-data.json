@@ -231,7 +231,7 @@
         {
           "nombre": "Categorías de Productos",
           "descripcion": "Administración de categorías de productos",
-          "imagenUrl": null,
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
             "Listar",
@@ -243,7 +243,7 @@
         {
           "nombre": "Productos",
           "descripcion": "Administración de productos",
-          "imagenUrl": null,
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
             "Listar",
