@@ -141,11 +141,23 @@
           ]
         },
         {
-          "nombre":"Metodos de Pago",
+          "nombre": "Metodos de Pago",
           "descripcion": "Diferentes metodos de Pago",
-          "imagenUrl":"https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
-          "imagenPublicId":null,
-          "acciones":[
+          "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Servicios",
+          "descripcion": "Gestión de servicios del gimnasio",
+          "imagenUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
             "Listar",
             "Crear",
             "Editar",
@@ -213,13 +225,13 @@
     {
       "nombre": "Inventario",
       "descripcion": "Gestión de productos y categorías",
-      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
-      "imagenPublicId": null,  
+      "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+      "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Categorías de Productos",
           "descripcion": "Administración de categorías de productos",
-          "imagenUrl": null,
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
             "Listar",
@@ -231,7 +243,7 @@
         {
           "nombre": "Productos",
           "descripcion": "Administración de productos",
-          "imagenUrl": null,
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
             "Listar",
@@ -318,7 +330,7 @@
       "password": "Password123!",
       "rolNombre": "Administrador"
     }
-  ] ,
+  ],
   "roles": [
     {
       "nombre": "Administrador",
