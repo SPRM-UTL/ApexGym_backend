@@ -123,6 +123,20 @@ export class ClienteController extends BaseController {
             return this.respuestaError(res, error);
         }
     }
+
+    verificarCorreo = async (req, res) => {
+        try {
+            const { usuario } = await clienteService.verificarCorreo(req.body);
+            return this.respuestaExito(
+                res,
+                {
+                    usuario
+                }
+            );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
 }
 
 export const clienteController = new ClienteController();

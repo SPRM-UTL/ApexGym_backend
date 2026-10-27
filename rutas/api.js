@@ -628,6 +628,11 @@ clienteRoutes.post(
 );
 
 clienteRoutes.post(
+    '/verificarCorreo',
+    clienteController.verificarCorreo.bind(clienteController)
+);
+
+clienteRoutes.post(
     '/verificarCredenciales',
     clienteController.verificarCredenciales.bind(clienteController)
 );

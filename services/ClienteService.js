@@ -30,6 +30,12 @@ export class ClienteService {
             };
         };
 
+    verificarCorreo = async (data) => {
+            const { correo } = data;
+            const usuario = await usuarioDao.getByEmail(correo);
+            return {usuario};
+        };
+
     crear = async (datos) => {
         const {
             usuarioId, estadoClienteId, nombre, apellidoPaterno,
