@@ -89,6 +89,34 @@ export class ClienteController extends BaseController {
                 {
                     nuevoUsuario
                 },
+                "Registro Exitoso"
+            );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+
+    verificarCredenciales = async (req, res) => {
+        try {
+            const { usuario, token } = await clienteService.verificarCredenciales(req.body);
+            if (!usuario) {
+                throw new Error("Credenciales inválidas");
+            }
+
+            const opcionesCookies = {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: token.registro.tiempoVida * 1000
+            }
+
+            res.cookie('token', token.token, opcionesCookies)
+            return this.respuestaExito(
+
+                res,
+                {
+                    usuario
+                },
                 "Credenciales válidas"
             );
         } catch (error) {

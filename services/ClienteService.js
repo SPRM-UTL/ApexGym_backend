@@ -1,10 +1,34 @@
 import { clienteDao } from '../dao/ClienteDao.js';
+import { usuarioDao } from '../dao/UsuarioDao.js';
 
 export class ClienteService {
 
     constructor() {
         this.dao = clienteDao;
     }
+
+    verificarCredenciales = async (data) => {
+            const { email, contrasenia } = data;
+    
+            const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
+
+            if (!usuario) {
+                throw new Error("Usuario Inexistente");
+            }
+
+            const cliente = await this.dao.getByUser(usuario.id);
+    
+            if (!cliente) {
+                throw new Error("Credenciales inválidas");
+            }
+    
+            const token = await tokenDao.crearTokenSesion(usuario.id);
+    
+            return {
+                usuario,
+                token
+            };
+        };
 
     crear = async (datos) => {
         const {

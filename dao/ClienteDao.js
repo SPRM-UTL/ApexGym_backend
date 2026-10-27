@@ -30,6 +30,19 @@ export class ClienteDao extends BaseDao {
             omit: this.omit
         });
     }
+    
+    async getByUser(id) {
+        return this.model.findUnique({
+            where: {
+                usuarioId: id,
+                deletedAt: null,
+            },
+            include: {
+                estadoCliente: true
+            },
+            omit: this.omit
+        });
+    }
 }
 
 export const clienteDao = new ClienteDao();

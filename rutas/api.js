@@ -627,6 +627,11 @@ clienteRoutes.post(
     clienteController.registrar.bind(clienteController)
 );
 
+clienteRoutes.post(
+    '/verificarCredenciales',
+    clienteController.verificarCredenciales.bind(clienteController)
+);
+
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
 estadoMembresiaRoutes.get(
     '/',
