@@ -32,7 +32,7 @@ export class MovimientoCajaDao extends BaseDao {
             where: { deletedAt: null },
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: { createdAt: 'desc' },
+            orderBy: [{ id: 'desc' }, { createdAt: 'desc' }],
         });
     }
 
