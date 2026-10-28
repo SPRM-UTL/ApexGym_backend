@@ -343,7 +343,7 @@ model ClienteMembresia {
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
   estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
-
+  detallesVenta   DetalleVenta[]
   @@map("clientes_membresias")
 }
 
@@ -372,7 +372,7 @@ model TipoMembresia {
   deletedAt    DateTime? @map("deleted_at")
 
   clientesMembresias ClienteMembresia[]
-
+  detallesVenta DetalleVenta[]
   @@map("tipos_membresias")
 }
 
@@ -510,15 +510,26 @@ model Venta {
 }
 
 model DetalleVenta {
-  id                  Int                @id @default(autoincrement())
-  ventaId             Int                @map("venta_id")
-  productoId          Int                @map("producto_id")
-  cantidad            Int                
-  precioUnitario      Float              @map("precio_unitario")
-  subtotal            Float
-  
-  ventas              Venta              @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  productos           Producto           @relation(fields: [productoId], references: [id])
+  id               Int            @id @default(autoincrement())
+  ventaId          Int            @map("venta_id")
+  tipoItem         TipoItem       @default(PRODUCTO) @map("tipo_item")
+
+  productoId       Int?           @map("producto_id")
+  servicioId       Int?           @map("servicio_id")
+  tipoMembresiaId  Int?           @map("tipo_membresia_id")
+
+  clienteMembresiaId Int?         @unique @map("cliente_membresia_id")
+
+  descripcion      String?        @db.VarChar(200) 
+  cantidad         Int            @default(1)
+  precioUnitario   Float          @map("precio_unitario")
+  subtotal         Float
+
+  venta            Venta              @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto         Producto?          @relation(fields: [productoId], references: [id])
+  servicio         Servicio?          @relation(fields: [servicioId], references: [id])
+  tipoMembresia    TipoMembresia?     @relation(fields: [tipoMembresiaId], references: [id])
+  clienteMembresia ClienteMembresia?  @relation(fields: [clienteMembresiaId], references: [id])
 
   @@map("detalle_venta")
 }
@@ -545,5 +556,12 @@ model Servicio {
   updatedAt           DateTime           @updatedAt @map("updated_at")
   deletedAt           DateTime?          @map("deleted_at")
 
+  detallesVenta       DetalleVenta[]
   @@map("servicios")
+}
+
+enum TipoItem {
+  PRODUCTO
+  SERVICIO
+  MEMBRESIA
 }

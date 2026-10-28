@@ -3,7 +3,6 @@ import { BaseDao } from "./BaseDao.js";
 import currency from "currency.js";
 
 const ESTADO_CAJA = { ABIERTA: "ABIERTA", CERRADA: "CERRADA" };
-const METODOS_PAGO = ["efectivo", "tarjeta", "transferencia"];
 const ESTADO_VENTA = { COMPLETADA : "completada" , CANCELADA : "cancelada"}
 export class VentaDao extends BaseDao {
     constructor() {
@@ -19,204 +18,342 @@ export class VentaDao extends BaseDao {
         );
     }
 
-    async getAll() {
-        return this.prisma.venta.findMany({
-            where : { deletedAt : null },
-            omit : this.omit,
-            include : {
-                cliente: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                    },
-                },
-                aperturaCaja : {
-                    select : {
-                        id : true,
-                        estado: true,
-                        empleado: {
-                        select: { id : true, nombre: true }
-                        },
-                        caja : {
-                            select: {id : true, nombre : true}
-                        }
-                    }
-                }
-            },
-            orderBy : {id: "desc"}
-        });
-    }
-
-    async getById (id, client = this.prisma){
-        const venta = await client.venta.findFirst({
-            where : {id , deletedAt : null},
-            omit : this.omit,
-            include: {
-                cliente: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                    },
-                },
-                detalleVenta :{
-                    include : {
-                    productos : {
-                        select : {id : true, nombre : true}
-                    }
-                }
-                },
-                aperturaCaja: {
-                    select : {
-                        id : true,
-                        estado : true,
-                        empleado : {select: {id : true, nombre : true}},
-                    },
-                }
-            }
-        });
-
-        if (!venta) return null
-
-        const {detalleVenta, ...v} = venta;
-
-        return {
-            ...v, detalles : detalleVenta.map(({productos, ...d}) => ({
-                ...d,
-                productoId: productos.id,
-                productoNombre: productos.nombre
-            })
-                
-            )
-        }
-    }
-
-    async create(data) {
-
-        const { detalleVenta, descuento = 0, clienteId,...restoDatos } = data;
-        const aperturaCajaId = this.validarId(data.aperturaCajaId, "la apertura de caja");
-        const usuarioId = this.validarId(data.usuarioId, "el usuario");
-        const idCliente = this.validarId(clienteId, "el cliente");
-
-        this.validarDetalles(detalleVenta)
-        this.validarDescuento(descuento)
-        if (data.metodoPago !== undefined) this.validarMetodoPago(restoDatos.metodoPago)
-
-        return this.prisma.$transaction(async (tx) => {
-            const empleado = await tx.empleado.findFirst({
-                where: { usuarioId, deletedAt: null },
-                select: { id: true },
-            });
-            const cliente = await tx.cliente.findFirst({
-                where: {
-                    id: idCliente,
-                    deletedAt: null,
-                },
+async getAll() {
+    return this.prisma.venta.findMany({
+        where: { deletedAt: null },
+        omit: this.omit,
+        include: {
+            cliente: {
                 select: {
                     id: true,
+                    nombre: true,
                 },
-            });
-            if (!cliente) throw new Error("El cliente no existe");
-        
-            if (!empleado) throw new Error("No hay un empleado asociado al usuario autenticado");
-
-            const cajaAbierta = await tx.aperturaCaja.findFirst({where: {id: aperturaCajaId, empleadoId: empleado.id, estado: ESTADO_CAJA.ABIERTA, deletedAt: null }})
-
-            if(!cajaAbierta) throw new Error("La apertura de la caja es necesaria")
-            
-            const detalles = await this.prepararDetalles(tx, detalleVenta, [])
-            
-            const {subtotal, total} =  this.calcularTotal(detalles,Number(descuento));
-            //Suma de subtotales de esta manera sumamos todo en un recorrido de nuestra matriz detalles
-            const nuevaVenta = await tx.venta.create({
-                data: {
-                    aperturaCajaId : cajaAbierta.id,
-                    clientId: cliente.id,
-                    metodoPago : restoDatos.metodoPago,
-                    total : total,
-                    subtotal : subtotal,
-                    descuento : Number(descuento),
-                    detalleVenta : {create : detalles},
+            },
+            aperturaCaja: {
+                select: {
+                    id: true,
+                    estado: true,
+                    empleado: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                    caja: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
                 },
-            });
+            },
+        },
+        orderBy: { id: 'desc' },
+    });
+}
 
-            await this.ajustarStock(tx,[],detalles)
-            return this.getById(nuevaVenta.id, tx);
+async getById(id, client = this.prisma) {
+    const venta = await client.venta.findFirst({
+        where: {
+            id: Number(id),
+            deletedAt: null,
+        },
+        omit: this.omit,
+        include: {
+            cliente: {
+                select: {
+                    id: true,
+                    nombre: true,
+                },
+            },
+            aperturaCaja: {
+                select: {
+                    id: true,
+                    estado: true,
+                    empleado: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                    caja: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                },
+            },
+            detalleVenta: {
+                include: {
+                    producto: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                    servicio: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                    tipoMembresia: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!venta) return null;
+
+    return {
+        ...venta,
+        detalleVenta: venta.detalleVenta.map((detalle) => ({
+            ...detalle,
+            articuloNombre:
+                detalle.producto?.nombre ??
+                detalle.servicio?.nombre ??
+                detalle.tipoMembresia?.nombre ??
+                detalle.descripcion,
+        })),
+    };
+}
+
+async create(data) {
+    const {
+        detalleVenta,
+        clienteId,
+        subtotal : subtotalEnviado,
+        total : totalEnviado,
+        ...restoDatos
+    } = data;
+
+    const aperturaCajaId = this.validarId(
+        data.aperturaCajaId,
+        'la apertura de caja'
+    );
+
+    const usuarioId = this.validarId(data.usuarioId, 'el usuario');
+    const idCliente = this.validarId(clienteId, 'el cliente');
+
+    this.validarDetalles(detalleVenta);
+
+    return this.prisma.$transaction(async (tx) => {
+        const empleado = await tx.empleado.findFirst({
+            where: {
+                usuarioId,
+                deletedAt: null,
+            },
+            select: { id: true },
         });
-    }
+
+        if (!empleado) {
+            throw new Error(
+                'No hay un empleado asociado al usuario autenticado'
+            );
+        }
+
+        const cliente = await tx.cliente.findFirst({
+            where: {
+                id: idCliente,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+
+        if (!cliente) {
+            throw new Error('El cliente no existe');
+        }
+
+        await this.validarMetodoPago(tx, restoDatos.metodoPago);
+
+        const cajaAbierta = await tx.aperturaCaja.findFirst({
+            where: {
+                id: aperturaCajaId,
+                empleadoId: empleado.id,
+                estado: ESTADO_CAJA.ABIERTA,
+                deletedAt: null,
+            },
+        });
+
+        if (!cajaAbierta) {
+            throw new Error('La apertura de caja no está disponible');
+        }
+
+        const detalles = await this.prepararDetalles(
+            tx,
+            detalleVenta
+        );
+
+        const { subtotal, total } = this.calcularTotal(detalles);
+
+        this.validarMontos(
+            { subtotal, total },
+            { subtotal: subtotalEnviado, total: totalEnviado }
+        );
+
+        const nuevaVenta = await tx.venta.create({
+            data: {
+                aperturaCaja: { connect: { id: cajaAbierta.id } },
+                cliente: { connect: { id: cliente.id } },
+                metodoPago: restoDatos.metodoPago,
+                subtotal,
+                total,
+                detalleVenta: {
+                    create: detalles,
+                },
+            },
+        });
+
+        await this.ajustarStock(tx, [], detalles);
+
+        return this.getById(nuevaVenta.id, tx);
+    });
+}
 
 async update(id, data) {
-    const ventaId = this.validarId(id, "la venta");
-    if (data.detalleVenta !== undefined) this.validarDetalles(data.detalleVenta);
-    if (data.descuento !== undefined) this.validarDescuento(data.descuento);
-    if (data.metodoPago !== undefined) this.validarMetodoPago(data.metodoPago);
+    const ventaId = this.validarId(id, 'la venta');
+
+    if (data.detalleVenta !== undefined) {
+        this.validarDetalles(data.detalleVenta);
+    }
+
+   if (data.metodoPago !== undefined) {
+        await this.validarMetodoPago(tx, data.metodoPago);
+    }
 
     return this.prisma.$transaction(async (tx) => {
         const venta = await tx.venta.findFirst({
-            where: { id: ventaId, deletedAt: null },
-            include: { detalleVenta: true },
+            where: {
+                id: ventaId,
+                deletedAt: null,
+            },
+            include: {
+                detalleVenta: true,
+            },
         });
-        if (!venta) throw new Error("La venta no existe");
-        if (venta.estado === ESTADO_VENTA.CANCELADA) {
-            throw new Error("No se puede modificar una venta cancelada");
+
+        if (!venta) {
+            throw new Error('La venta no existe');
         }
 
-        // La caja es la de la venta, no la que mande el frontend
-        const caja = await tx.aperturaCaja.findFirst({
-            where: { id: venta.aperturaCajaId, estado: ESTADO_CAJA.ABIERTA, deletedAt: null },
-        });
-        if (!caja) throw new Error("No se pudo actualizar: la caja de esta venta ya está cerrada");
+        if (venta.estado === ESTADO_VENTA.CANCELADA) {
+            throw new Error('No se puede modificar una venta cancelada');
+        }
 
-        const items = data.detalleVenta
-            ?? venta.detalleVenta.map((d) => ({ productoId: d.productoId, cantidad: d.cantidad }));
+        const caja = await tx.aperturaCaja.findFirst({
+            where: {
+                id: venta.aperturaCajaId,
+                estado: ESTADO_CAJA.ABIERTA,
+                deletedAt: null,
+            },
+        });
+
+        if (!caja) {
+            throw new Error(
+                'La caja de esta venta está cerrada'
+            );
+        }
+
+        const items = data.detalleVenta ??
+            venta.detalleVenta.map((d) => ({
+                tipoItem: d.tipoItem,
+                productoId: d.productoId,
+                servicioId: d.servicioId,
+                tipoMembresiaId: d.tipoMembresiaId,
+                cantidad: d.cantidad,
+                descripcion: d.descripcion,
+            }));
+
         const detalles = await this.prepararDetalles(tx, items, venta.detalleVenta);
 
-        const descuento = data.descuento !== undefined ? Number(data.descuento) : Number(venta.descuento);
-        const { subtotal, total } = this.calcularTotal(detalles, descuento);
+        const { subtotal, total } = this.calcularTotal(
+            detalles,
+        );
 
-        await tx.detalleVenta.deleteMany({ where: { ventaId } });
+        this.validarMontos(
+            { subtotal, total },
+            { subtotal: subtotalEnviado, total: totalEnviado }
+        );
+
+        await tx.detalleVenta.deleteMany({
+            where: { ventaId },
+        });
+
         await tx.venta.update({
             where: { id: ventaId },
             data: {
                 subtotal,
-                descuento,
                 total,
                 metodoPago: data.metodoPago ?? venta.metodoPago,
-                detalleVenta: { create: detalles },
+                detalleVenta: {
+                    create: detalles,
+                },
             },
         });
 
-        await this.ajustarStock(tx, venta.detalleVenta, detalles);
+        await this.ajustarStock(
+            tx,
+            venta.detalleVenta,
+            detalles
+        );
 
         return this.getById(ventaId, tx);
     });
 }
-
 async cancel(id) {
-    const ventaId = this.validarId(id, "la venta");
+    const ventaId = this.validarId(id, 'la venta');
 
     return this.prisma.$transaction(async (tx) => {
         const venta = await tx.venta.findFirst({
-            where: { id: ventaId, deletedAt: null },
-            include: { detalleVenta: true },
+            where: {
+                id: ventaId,
+                deletedAt: null,
+            },
+            include: {
+                detalleVenta: true,
+            },
         });
-        if (!venta) throw new Error("La venta no existe");
-        if (venta.estado === ESTADO_VENTA.CANCELADA) throw new Error("La venta ya está cancelada");
+
+        if (!venta) {
+            throw new Error('La venta no existe');
+        }
+
+        if (venta.estado === ESTADO_VENTA.CANCELADA) {
+            throw new Error('La venta ya está cancelada');
+        }
 
         const caja = await tx.aperturaCaja.findFirst({
-            where: { id: venta.aperturaCajaId, estado: ESTADO_CAJA.ABIERTA, deletedAt: null },
+            where: {
+                id: venta.aperturaCajaId,
+                estado: ESTADO_CAJA.ABIERTA,
+                deletedAt: null,
+            },
         });
-        if (!caja) throw new Error("No se puede cancelar: la caja de esta venta está cerrada");
 
-        await this.ajustarStock(tx, venta.detalleVenta, []);   // devuelve todo el stock
+        if (!caja) {
+            throw new Error(
+                'No se puede cancelar: la caja está cerrada'
+            );
+        }
+
+        await this.ajustarStock(tx, venta.detalleVenta, []);
 
         return tx.venta.update({
             where: { id: ventaId },
-            data: { deletedAt: new Date(), estado: ESTADO_VENTA.CANCELADA },
+            data: {
+                deletedAt: new Date(),
+                estado: ESTADO_VENTA.CANCELADA,
+            },
             omit: this.omit,
         });
     });
 }
-
     validarId(id, modulo = "indefinido") {
     const n = Number(id);
 
@@ -235,107 +372,287 @@ async cancel(id) {
     return n;
 }
 
-    validarDetalles (detalleVenta){
+validarDetalles(detalleVenta) {
+    if (!Array.isArray(detalleVenta) || detalleVenta.length === 0) {
+        throw new Error('La venta debe tener al menos un artículo');
+    }
 
-        if (!Array.isArray(detalleVenta) || detalleVenta.length === 0 ) throw new Error("La venta deve de tener por lo menos un producto")
+    const vistos = new Set();
 
-        const vistos = new Set();
-        for (const item of detalleVenta){
-            if (!Number.isInteger(item.productoId)) {
-            throw new TypeError("Cada detalle necesita un producto válido");
-        }
+    for (const item of detalleVenta) {
         if (!Number.isInteger(item.cantidad) || item.cantidad <= 0) {
-            throw new Error("La cantidad debe ser un entero mayor a 0");
+            throw new Error('La cantidad debe ser un entero mayor a 0');
         }
-        if (vistos.has(item.productoId)) {
-            throw new Error(`El producto ${item.productoId} está repetido en la venta`);
+
+        let id;
+
+        switch (item.tipoItem) {
+            case 'PRODUCTO':
+                id = item.productoId;
+                break;
+
+            case 'SERVICIO':
+                id = item.servicioId;
+                break;
+
+            case 'MEMBRESIA':
+                id = item.tipoMembresiaId;
+                break;
+
+            default:
+                throw new Error('El tipo de artículo no es válido');
         }
-        vistos.add(item.productoId);
+
+        if (!Number.isInteger(id) || id <= 0) {
+            throw new Error(
+                `El identificador del artículo ${item.tipoItem} no es válido`
+            );
         }
+
+        const clave = `${item.tipoItem}-${id}`;
+
+        if (vistos.has(clave)) {
+            throw new Error('El artículo está repetido en la venta');
+        }
+
+        vistos.add(clave);
+    }
+}
+
+    async validarMetodoPago(tx, metodoPago){
+        if (!metodoPago) {
+            throw new Error("El método de pago es requerido");
+        }
+
+        const metodo = await tx.metodoPago.findFirst({
+            where: {
+                nombre: metodoPago,
+                estado: "activo",
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        if (!metodo) {
+            throw new Error("Método de pago no válido");
+        }
+
+        return metodo;
     }
 
-    validarDescuento (descuento){
-        const d = Number(descuento);
-        if ( d < 0|| d > 1 || Number.isNaN(d) ) throw new Error("Coloque un valor coherente para el descuento")
-    }
 
-    validarMetodoPago(metodoPago){
-        if(!METODOS_PAGO.includes(metodoPago)){
-            throw new Error("Metodo de pago no valido");
+async prepararDetalles(tx, items, detallesViejos = []) {
+    const detalles = [];
+
+    const detallesAnteriores = new Map(
+        detallesViejos
+            .filter((d) => d.tipoItem === "PRODUCTO")
+            .map((d) => [d.productoId, d])
+    );
+
+    for (const item of items) {
+        const tipoItem = String(item.tipoItem ?? "")
+            .trim()
+            .toUpperCase();
+
+        const cantidad = Number(item.cantidad);
+
+        if (!Number.isInteger(cantidad) || cantidad <= 0) {
+            throw new Error("La cantidad debe ser un entero mayor que cero");
         }
-    }
 
-    // prepararDetalles ( transaction, detallesModificados, detalles viejos) 
+        let registro;
+        let productoId = null;
+        let servicioId = null;
+        let tipoMembresiaId = null;
+        let precio;
 
-    /**Esta funcion se encarga de comparar los cambios anteriores y actuales de nuestro stock para compararlos y solo modificar los capos necesarios para cada productro */
-    async prepararDetalles (tx, items, detallesViejos = []){
-        const detalles = [];
-        //Traemos las ventas que ya tenia, indexando por producto
-        const DetallesViejos = new Map(detallesViejos.map((d) => [d.productoId , d]));
+        switch (tipoItem) {
+            case "PRODUCTO": {
+                productoId = this.validarId(
+                    item.productoId,
+                    "el producto"
+                );
 
-        //Creamos un ciclo que permite comparar y cambiar los valores de modificados
-        for ( const item of items){
-            //Traemos los productos modificados indexando por el identificador del producto
-            const producto = await tx.producto.findFirst({
-                where : { id : item.productoId, deletedAt: null},
-            });
-            //En caso de no tener ningun producto modificado se le da un aviso
-            if (!producto) throw new Error(`El producto ${item.productoId} no existe`);
-            const Productoviejo = DetallesViejos.get(producto.id)
-            const cantidadPrevia = Productoviejo?.cantidad ?? 0;
-
-            const adicional = currency(item.cantidad).subtract(cantidadPrevia).value;
-            //En caso de superar el stock actual informa del limite
-            if (adicional > 0 && producto.stockActual < adicional){
-                throw new Error(`Stock insuficiente de ${producto.id} solo disponible ${producto.stockActual}`);
-            }
-            
-            //En caso de que se actualizara calcula el precio previo
-            const precio = DetallesViejos.get(producto.id)?.precioUnitario ?? producto.precioVenta;
-
-            detalles.push({
-                productoId: producto.id,
-                cantidad: item.cantidad,
-                precioUnitario : precio,
-                subtotal: currency(precio).multiply(item.cantidad).value,
-            });
-        }
-        return detalles;
-    }
-
-    async ajustarStock (tx, detallesDetallesViejos, detallesNuevos){
-        const DetallesViejos = new Map(detallesDetallesViejos.map((d) => [d.productoId, d.cantidad]));
-        const nuevos = new Map(detallesNuevos.map((d) => [d.productoId , d.cantidad]));
-
-        //justo todos los los productos de esta manera puedo manejar mis productos dentro del ciclo
-        const ids = new Set([...DetallesViejos.keys(), ...nuevos.keys()]);
-
-        for (const productoId of ids){
-
-            //Traemos los distintos valores  
-            const diferencia = (nuevos.get(productoId)?? 0) - ( DetallesViejos.get(productoId) ?? 0)
-            if (diferencia > 0){
-                const r = await tx.producto.updateMany({
-                    where : { id : productoId,stockActual : {gte : diferencia},  deletedAt : null },
-                    data : { stockActual : {decrement : diferencia} },
+                registro = await tx.producto.findFirst({
+                    where: {
+                        id: productoId,
+                        deletedAt: null
+                    }
                 });
-                if (r.count === 0){
-                    throw new Error(`Stock insuficiente para el producto ${productoId}`)
+
+                if (!registro) {
+                    throw new Error(
+                        `El producto ${productoId} no existe o está eliminado`
+                    );
                 }
-            }else if (diferencia < 0){
-                await tx.producto.update({
-                    where : { id : productoId },
-                    data : { stockActual : {increment : -diferencia} },
+
+                const anterior = detallesAnteriores.get(productoId);
+
+                precio =
+                    anterior?.precioUnitario ??
+                    registro.precioVenta;
+
+                break;
+            }
+
+            case "SERVICIO": {
+                servicioId = this.validarId(
+                    item.servicioId,
+                    "el servicio"
+                );
+
+                registro = await tx.servicio.findUnique({
+                    where: { id: servicioId }
                 });
+
+                if (!registro) {
+                    throw new Error(
+                        `El servicio ${servicioId} no existe`
+                    );
+                }
+
+                precio = registro.precioVenta ?? registro.precio;
+
+                break;
+            }
+
+            case "MEMBRESIA": {
+                tipoMembresiaId = this.validarId(
+                    item.tipoMembresiaId,
+                    "el tipo de membresía"
+                );
+
+                registro = await tx.tipoMembresia.findUnique({
+                    where: { id: tipoMembresiaId }
+                });
+
+                if (!registro) {
+                    throw new Error(
+                        `El tipo de membresía ${tipoMembresiaId} no existe`
+                    );
+                }
+
+                precio = registro.precioVenta ?? registro.precio;
+
+                break;
+            }
+
+            default:
+                throw new Error(
+                    `El tipo de artículo "${tipoItem}" no es válido`
+                );
+        }
+
+        precio = Number(precio);
+
+        if (!Number.isFinite(precio) || precio < 0) {
+            throw new Error(
+                `El precio del artículo "${tipoItem}" no es válido`
+            );
+        }
+
+        const subtotalLinea = currency(precio).multiply(cantidad).value
+        const nombre = registro.nombre ?? tipoItem
+
+        if (item.precioUnitario = undefined){
+            if(currency(item.precioUnitario.intValue !== currency(precio).intValue)){
+                throw new Error(`Precio es de ${nombre} no coincide el precio actual ${precio}, enviado : ${item.precioUnitario}`)
+            }
+            if (currency(item.subtotal).intValue !== currency(subtotalLinea).intValue) {
+            throw new Error(
+                `El subtotal de "${nombre}" no coincide con ${cantidad} x ${precio} = ${subtotalLinea}`
+            );  
             }
         }
+
+        detalles.push({
+            tipoItem,
+            productoId,
+            servicioId,
+            tipoMembresiaId,
+            clienteMembresiaId: null,
+            descripcion: item.descripcion ?? registro.nombre ?? null,
+            cantidad,
+            precioUnitario: precio,
+            subtotal: subtotalLinea
+        });
     }
+
+    return detalles;
+}
+
+
+async ajustarStock(tx, detallesViejos, detallesNuevos) {
+    const filtrarProductos = (detalles) =>
+        detalles.filter((d) => d.tipoItem === 'PRODUCTO');
+
+    const anteriores = filtrarProductos(detallesViejos);
+    const nuevos = filtrarProductos(detallesNuevos);
+
+    const stockAnterior = new Map(
+        anteriores.map((d) => [d.productoId, d.cantidad])
+    );
+
+    const stockNuevo = new Map(
+        nuevos.map((d) => [d.productoId, d.cantidad])
+    );
+
+    const ids = new Set([
+        ...stockAnterior.keys(),
+        ...stockNuevo.keys(),
+    ]);
+
+    for (const productoId of ids) {
+        const diferencia =
+            (stockNuevo.get(productoId) ?? 0) -
+            (stockAnterior.get(productoId) ?? 0);
+
+        if (diferencia > 0) {
+            const resultado = await tx.producto.updateMany({
+                where: {
+                    id: productoId,
+                    stockActual: { gte: diferencia },
+                    deletedAt: null,
+                },
+                data: {
+                    stockActual: { decrement: diferencia },
+                },
+            });
+
+            if (resultado.count === 0) {
+                throw new Error(
+                    `Stock insuficiente para el producto ${productoId}`
+                );
+            }
+        } else if (diferencia < 0) {
+            await tx.producto.update({
+                where: { id: productoId },
+                data: {
+                    stockActual: { increment: -diferencia },
+                },
+            });
+        }
+    }
+}
     //Permite hacer el calculo total de la venta
-    calcularTotal (detalles, descuento) {
-        //lo que hace es acumular la suma uno por uno y lo va sumando con acc se guarda trayendo cada detalle
+    calcularTotal(detalles) {
         const subtotal = detalles.reduce((acc, d) => acc.add(d.subtotal), currency(0));
-        const total = subtotal.subtract(subtotal.multiply(descuento))
-        return {total : total.value, subtotal : subtotal.value}
+        const iva = subtotal.multiply(0.16);
+        const total = subtotal.add(iva);
+        return { subtotal: subtotal.value, total: total.value };
+    }
+    
+    validarMontos(calculados, enviados) {
+        const coincide = (a, b) => currency(a).intValue === currency(b).intValue;
+
+        if (
+            !coincide(calculados.subtotal, enviados.subtotal) ||
+            !coincide(calculados.total, enviados.total)
+        ) {
+            throw new Error(
+                `Los montos no coinciden. Subtotal: ${calculados.subtotal}, total: ${calculados.total}`
+            );
+        }
     }
     
 }
