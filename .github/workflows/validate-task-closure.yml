@@ -15,7 +15,7 @@ jobs:
       - name: Validar actor de cierre
         env:
           ACTOR: ${{ github.actor }}
-          AUTHORIZED_USER: 'IDGS-803-23001488'
+          AUTHORIZED_USER: "IDGS-803-23001488"
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -27,3 +27,11 @@ jobs:
           else
             echo "Cierre autorizado por el lider tecnico ($AUTHORIZED_USER)."
           fi
+      - name: Cierre de issue
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue close "$ISSUE_NUMBER" --reason "Finalizado"
+          gh issue comment "$ISSUE_NUMBER" --body "Politica de revision de ApexGym: Se ha cerrado el issue #$ISSUE_NUMBER. La tarea se ha reabierto automaticamente y debe permanecer En revision hasta contar con la aprobacion oficial."
+          echo "Cierre exitoso."
+          exit 0
