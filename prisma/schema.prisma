@@ -19,6 +19,7 @@ model Usuario {
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
+  cliente         Cliente?
 
   @@map("usuarios")
 }
@@ -323,7 +324,9 @@ model Cliente {
   updatedAt                  DateTime  @updatedAt @map("updated_at")
   deletedAt                  DateTime? @map("deleted_at")
 
-  estadoCliente EstadoCliente      @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
+  usuarioId                  Int?          @unique @map("usuario_id")
+  usuario       Usuario?      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
 
   @@map("clientes")
