@@ -628,6 +628,21 @@ clienteRoutes.delete(
     clienteController.eliminar.bind(clienteController)
 );
 
+clienteRoutes.post(
+    '/registrar',
+    clienteController.registrar.bind(clienteController)
+);
+
+clienteRoutes.post(
+    '/verificarCorreo',
+    clienteController.verificarCorreo.bind(clienteController)
+);
+
+clienteRoutes.post(
+    '/verificarCredenciales',
+    clienteController.verificarCredenciales.bind(clienteController)
+);
+
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
 estadoMembresiaRoutes.get(
     '/',
