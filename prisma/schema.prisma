@@ -19,10 +19,7 @@ model Usuario {
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
-<<<<<<< HEAD
-=======
   cliente         Cliente?
->>>>>>> 12253ded9d1787821376db93ff520072bb318dac
 
   @@map("usuarios")
 }
@@ -112,11 +109,7 @@ model Caja {
 
 model Puesto {
   id            Int       @id @default(autoincrement())
-<<<<<<< HEAD
-  areaTrabajoId Int       @map("area_tdrabajo_id")
-=======
   areaTrabajoId Int       @map("area_trabajo_id")
->>>>>>> 12253ded9d1787821376db93ff520072bb318dac
   nombre        String    @db.VarChar(100)
   descripcion   String?   @db.Text
   salarioBase   Decimal   @map("salario_base") @db.Decimal(10, 2)
