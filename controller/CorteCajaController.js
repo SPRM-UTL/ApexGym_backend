@@ -1,3 +1,9 @@
+/**
+ * Issue: Control Operativo de Caja, Auditoria Contable y Reporte de Corte en PDF #85
+ * Subtareas:
+ * - [CAJA-01] Backend: Bloqueo de modificacion y eliminacion de cortes de caja por auditoria contable
+ * - [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja
+ */
 import { corteCajaDao } from '../dao/CorteCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
@@ -8,9 +14,12 @@ export class CorteCajaController extends BaseController {
     }
 
     /**
-     * POST /
-     * Crea el corte de caja calculando totales de movimientos automáticamente
-     * y cambia el estado de la apertura a CERRADA.
+     * POST /cortes-caja
+     * [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja #88
+     * - Consulta si existen movimientos en estado diferente a VALIDADO para la apertura activa.
+     * - Si existen movimientos pendientes, rechaza la creacion del corte con mensaje explicativo indicando la cantidad pendiente.
+     * - Asegura que el saldo final y la diferencia cuadren sobre movimientos 100% verificados.
+     * - Cambia el estado de la apertura a CERRADA una vez generado el corte.
      */
     crear = async (req, res) => {
         try {
@@ -56,6 +65,17 @@ export class CorteCajaController extends BaseController {
             const efectivoEsperado = montoInicial + totalEntradas - totalSalidas;
             const diferencia = Number(efectivoContado) - efectivoEsperado;
 
+            // Validar justificación obligatoria si existe faltante o sobrante
+            if (Math.abs(diferencia) > 0.01 && (!observaciones || !observaciones.trim())) {
+                const tipoDiff = diferencia < 0 ? 'faltante' : 'sobrante';
+                const montoDiff = Math.abs(diferencia).toFixed(2);
+                const contadoStr = Number(efectivoContado).toFixed(2);
+                const esperadoStr = efectivoEsperado.toFixed(2);
+                throw new Error(
+                    'Existe una diferencia de ' + tipoDiff + ' ($' + montoDiff + ') entre el efectivo contado ($' + contadoStr + ') y el saldo teórico esperado ($' + esperadoStr + '). Debe ingresar obligatoriamente la justificación en las observaciones.'
+                );
+            }
+
             // Crear el corte y cerrar la apertura en una transacción
             const resultado = await prisma.$transaction(async (tx) => {
                 const corte = await tx.corteCaja.create({
@@ -94,10 +114,20 @@ export class CorteCajaController extends BaseController {
         }
     };
 
+    /**
+     * PUT /cortes-caja/:id
+     * [CAJA-01] Bloqueo de modificación por auditoría contable y control fiscal.
+     * Los registros de corte de caja son inmutables una vez creados para proteger el histórico contable.
+     */
     actualizar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser modificados por políticas de control y auditoría contable'));
     };
 
+    /**
+     * DELETE /cortes-caja/:id
+     * [CAJA-01] Bloqueo de eliminación por auditoría contable y control fiscal.
+     * Prohíbe la eliminación física o lógica de cortes para garantizar la integridad contable.
+     */
     eliminar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser eliminados por políticas de control y auditoría contable'));
     };
@@ -140,8 +170,8 @@ export class CorteCajaController extends BaseController {
             throw new Error('El efectivo contado es requerido');
         if (Number(efectivoContado) < 0)
             throw new Error('El efectivo contado debe ser mayor o igual a 0');
-        if (Number(efectivoContado) > 99999999.99)
-            throw new Error('El efectivo contado no puede exceder $99,999,999.99');
+        if (Number(efectivoContado) > 200000)
+            throw new Error('El efectivo contado físico no puede exceder el límite de $200,000.00');
         if (observaciones && observaciones.trim().length > 500)
             throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }
