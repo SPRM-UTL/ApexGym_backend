@@ -13,6 +13,7 @@ export class VentaDao extends BaseDao {
                     createdAt : true,
                     updatedAt : true,
                     deletedAt : true,
+                    metodoPagoLegacy: true,
                 }
             }
         );
@@ -21,13 +22,18 @@ export class VentaDao extends BaseDao {
 async getAll() {
     return this.prisma.venta.findMany({
         where: { deletedAt: null },
-        omit: this.omit,
+        omit: {...this.omit, createdAt: false},
         include: {
             cliente: {
                 select: {
                     id: true,
                     nombre: true,
                 },
+            },
+            folioVenta : {
+                select : {
+                    id : true
+                }
             },
             aperturaCaja: {
                 select: {
@@ -45,6 +51,12 @@ async getAll() {
                             nombre: true,
                         },
                     },
+                },
+            },
+            metodoPago: {
+                select: {
+                    id: true,
+                    nombre: true,
                 },
             },
         },
@@ -82,6 +94,12 @@ async getById(id, client = this.prisma) {
                             nombre: true,
                         },
                     },
+                },
+            },
+            metodoPago: {
+                select: {
+                    id: true,
+                    nombre: true,
                 },
             },
             detalleVenta: {
@@ -170,7 +188,10 @@ async create(data) {
             throw new Error('El cliente no existe');
         }
 
-        await this.validarMetodoPago(tx, restoDatos.metodoPago);
+        const metodoPago = await this.validarMetodoPago(
+            tx,
+            restoDatos.metodoPagoId
+        );
 
         const cajaAbierta = await tx.aperturaCaja.findFirst({
             where: {
@@ -201,13 +222,15 @@ async create(data) {
             data: {
                 aperturaCaja: { connect: { id: cajaAbierta.id } },
                 cliente: { connect: { id: cliente.id } },
-                metodoPago: restoDatos.metodoPago,
+                metodoPago: { connect: { id: metodoPago.id } },
                 subtotal,
                 total,
                 detalleVenta: {
                     create: detalles,
                 },
+                folioVenta : { create : {} }
             },
+            include : {folioVenta : true}
         });
 
         await this.ajustarStock(tx, [], detalles);
@@ -219,12 +242,15 @@ async create(data) {
 async update(id, data) {
     const ventaId = this.validarId(id, 'la venta');
 
-    if (data.detalleVenta !== undefined) {
-        this.validarDetalles(data.detalleVenta);
+    if (
+        data.metodoPagoId === undefined &&
+        data.detalleVenta === undefined
+    ) {
+        throw new Error('No hay campos para actualizar');
     }
 
-   if (data.metodoPago !== undefined) {
-        await this.validarMetodoPago(tx, data.metodoPago);
+    if (data.detalleVenta !== undefined) {
+        this.validarDetalles(data.detalleVenta);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -260,6 +286,21 @@ async update(id, data) {
             );
         }
 
+        const metodoPago = data.metodoPagoId === undefined
+            ? undefined
+            : await this.validarMetodoPago(tx, data.metodoPagoId);
+
+        if (data.detalleVenta === undefined) {
+            await tx.venta.update({
+                where: { id: ventaId },
+                data: metodoPago
+                    ? { metodoPago: { connect: { id: metodoPago.id } } }
+                    : {},
+            });
+
+            return this.getById(ventaId, tx);
+        }
+
         const items = data.detalleVenta ??
             venta.detalleVenta.map((d) => ({
                 tipoItem: d.tipoItem,
@@ -278,7 +319,10 @@ async update(id, data) {
 
         this.validarMontos(
             { subtotal, total },
-            { subtotal: subtotalEnviado, total: totalEnviado }
+            {
+                subtotal: data.subtotal ?? subtotal,
+                total: data.total ?? total,
+            }
         );
 
         await tx.detalleVenta.deleteMany({
@@ -290,7 +334,9 @@ async update(id, data) {
             data: {
                 subtotal,
                 total,
-                metodoPago: data.metodoPago ?? venta.metodoPago,
+                ...(metodoPago
+                    ? { metodoPago: { connect: { id: metodoPago.id } } }
+                    : {}),
                 detalleVenta: {
                     create: detalles,
                 },
@@ -419,14 +465,20 @@ validarDetalles(detalleVenta) {
     }
 }
 
-    async validarMetodoPago(tx, metodoPago){
-        if (!metodoPago) {
+    async validarMetodoPago(tx, metodoPagoId) {
+        const id = Number(metodoPagoId);
+
+        if (metodoPagoId === undefined || metodoPagoId === null || metodoPagoId === '') {
             throw new Error("El método de pago es requerido");
+        }
+
+        if (!Number.isInteger(id) || id <= 0) {
+            throw new Error("El ID del método de pago no es válido");
         }
 
         const metodo = await tx.metodoPago.findFirst({
             where: {
-                nombre: metodoPago,
+                id,
                 estado: "activo",
                 deletedAt: null,
             },

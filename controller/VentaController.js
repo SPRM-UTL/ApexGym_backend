@@ -11,7 +11,7 @@ export class VentaController extends BaseController {
         try {
             const {
                 aperturaCajaId,
-                metodoPago,
+                metodoPagoId,
                 detalleVenta,
                 subtotal,
                 total,
@@ -25,11 +25,9 @@ export class VentaController extends BaseController {
                 usuarioId: req.usuario.id,
                 aperturaCajaId: Number(aperturaCajaId),
                 clienteId: Number(clienteId),
+                metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),
                 subtotal: this.leerMonto(subtotal, 'subtotal'),
                 total: this.leerMonto(total, 'total'),
-                metodoPago: metodoPago
-                    ? metodoPago.trim().toLowerCase()
-                    : undefined,
                 detalleVenta: this.normalizarDetalles(detalleVenta),
             });
 
@@ -46,16 +44,36 @@ export class VentaController extends BaseController {
     update = async (req, res) => {
         try {
             const id = this.leerId(req.params.id);
-            const { metodoPago, descuento, detalleVenta } = req.body;
+            const { metodoPagoId, detalleVenta, subtotal, total } = req.body;
 
             const datos = {};
 
-            if (metodoPago !== undefined) {
-                datos.metodoPago = this.limpiarTexto(metodoPago);
+            if (metodoPagoId !== undefined) {
+                datos.metodoPagoId = this.leerId(
+                    metodoPagoId,
+                    'método de pago'
+                );
             }
-            
+
             if (detalleVenta !== undefined) {
                 datos.detalleVenta = this.normalizarDetalles(detalleVenta);
+            }
+
+            if (subtotal !== undefined) {
+                datos.subtotal = this.leerMonto(subtotal, 'subtotal');
+            }
+
+            if (total !== undefined) {
+                datos.total = this.leerMonto(total, 'total');
+            }
+
+            if (
+                detalleVenta === undefined &&
+                (subtotal !== undefined || total !== undefined)
+            ) {
+                throw new Error(
+                    'El subtotal y el total solo se pueden actualizar junto con el detalle de la venta'
+                );
             }
 
             if (Object.keys(datos).length === 0) {
@@ -89,13 +107,6 @@ export class VentaController extends BaseController {
         }
     };
 
-    limpiarTexto(valor) {
-        if (valor === undefined || valor === null) {
-            return undefined;
-        }
-
-        return String(valor).trim().toLowerCase();
-    }
 normalizarDetalles(detalleVenta) {
     if (!Array.isArray(detalleVenta)) {
         throw new Error("El detalle de la venta no es válido");
@@ -197,12 +208,12 @@ normalizarDetalles(detalleVenta) {
         }
     }
 
-    leerId = (valor) => {
+    leerId = (valor, entidad = 'venta') => {
         const id = Number(valor);
 
         if (!Number.isInteger(id) || id <= 0) {
             const error = new Error(
-                'El identificador de la venta no es válido'
+                `El identificador del ${entidad} no es válido`
             );
             error.status = 400;
             throw error;

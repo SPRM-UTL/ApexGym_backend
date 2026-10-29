@@ -811,6 +811,13 @@ ventaRoutes.get(
     ventaController.obtenerTodos.bind(ventaController)
 )
 
+ventaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Registro de ventas', 'Listar'),
+    ventaController.obtenerPorId.bind(ventaController)
+)
+
 ventaRoutes.post(
     '/',
     autenticarUsuario,

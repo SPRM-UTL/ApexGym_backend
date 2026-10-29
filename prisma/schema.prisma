@@ -493,24 +493,35 @@ model Producto {
   @@map("producto")
 }
 
+model FolioVenta {
+  id                  Int             @id @default(autoincrement())
+  venta               Venta?
+}
 /*Se añadio el modelado del punto de venta con apertura de caja por ahora se necesita revisar lo de carrito*/
 model Venta {
   id                  Int               @id @default(autoincrement())
   clientId            Int               @map("cliente_id")
+  folioVentaId        Int               @unique @map("folio_venta_id")
   aperturaCajaId      Int?              @map("apertura_caja_id")
+  metodoPagoId        Int?              @map("metodo_pago_id")
   total               Float             
   subtotal            Float             @default(0)
   descuento           Float             @default(0)
-  metodoPago          String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
+  metodoPagoLegacy    String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
   estado              String            @default("completado") @db.VarChar(30)
+  
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt() @map("updated_at")
   deletedAt           DateTime?         @map("deleted_at")
 
   aperturaCaja        AperturaCaja?     @relation(fields: [aperturaCajaId], references: [id])
   cliente             Cliente           @relation(fields: [clientId], references: [id])
-  detalleVenta       DetalleVenta[]
+  metodoPago          MetodoPago?       @relation(fields: [metodoPagoId], references: [id], onDelete: Restrict)
+  folioVenta          FolioVenta        @relation(fields: [folioVentaId], references: [id])
+  detalleVenta        DetalleVenta[]
 
+  @@index([metodoPagoId])
+  @@index([clientId])
   @@map("venta")
 }
 
@@ -546,6 +557,8 @@ model MetodoPago {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
+
+  ventas      Venta[]
 
   @@map("metodo_pago")
 }
