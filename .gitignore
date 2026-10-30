@@ -3,13 +3,26 @@ node_modules/
 
 # Variables de entorno y secretos
 .env
+.env.*
+!.env.example
 
-# Directorios de herramientas de IA y editores
+# Directorios de herramientas de IA, agentes y editores
 .agents/
+agents/
+.agent/
+agent/
 .claude/
 .cursor/
 .devin/
+<<<<<<< HEAD
 /apuntes/
+=======
+.copilot/
+.gemini/
+.antigravity/
+.system_generated/
+.brain/
+>>>>>>> c3c08c9aee440ce1dc836111d4fe91e1546a7859
 
 # Archivos de logs y temporales
 npm-debug.log*
@@ -24,9 +37,27 @@ repomix-output.xml
 # Directorios de imágenes y archivos subidos
 uploads/
 public/uploads/
+public/imagenes/
+/public/imagenes/
+imagenes/
+/imagenes/
+usuarios/
+/usuarios/
 
-# Visual Studio
+# Archivos de imágenes subidas, capturas y multimedia
+.user_uploaded/
+media_*
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# Visual Studio y Editores
 .vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
 
 # Migraciones locales/copias; mantener prisma/migrations versionado
 prisma/migrations/
@@ -37,9 +68,12 @@ backend/migrations/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/
+<<<<<<< HEAD
 
 # Directorios de imágenes
 /public/imagenes/
 /imagenes/
 /usuarios/
 
+=======
+>>>>>>> c3c08c9aee440ce1dc836111d4fe91e1546a7859

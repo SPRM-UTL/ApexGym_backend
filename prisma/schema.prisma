@@ -48,6 +48,7 @@ model Seccion {
   id             Int       @id @default(autoincrement())
   nombre         String    @unique @db.VarChar(100)
   descripcion    String?   @db.Text
+  orden          Int       @default(0)
   imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
   imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -64,6 +65,7 @@ model Modulo {
   seccionId      Int       @map("seccion_id")
   nombre         String    @db.VarChar(100)
   descripcion    String?   @db.Text
+  orden          Int       @default(0)
   imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
   imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -438,6 +440,7 @@ model MovimientoCaja {
   monto          Decimal   @db.Decimal(10, 2)
   concepto       String    @db.VarChar(255)
   estado         String    @default("PENDIENTE") @db.VarChar(20)
+  desglose       String?   @db.Text
   observaciones  String?   @db.Text
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -456,6 +459,8 @@ model CorteCaja {
   efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
   totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
   totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
+  totalVentas     Decimal   @default(0) @map("total_ventas") @db.Decimal(10, 2)
+  totalVentasEfectivo Decimal @default(0) @map("total_ventas_efectivo") @db.Decimal(10, 2)
   diferencia      Decimal   @db.Decimal(10, 2)
   estado          String    @default("PENDIENTE") @db.VarChar(20)
   desgloseInicio  String?   @map("desglose_inicio") @db.Text
@@ -474,21 +479,22 @@ model CorteCaja {
 }
 
 model Producto {
-  id                  Int               @id @default(autoincrement())
-  categoriaProductoId Int               @map("categoria_producto_id")
-  codigoBarras        String?           @unique @map("codigo_barras") @db.VarChar(100)
-  nombre              String            @db.VarChar(150)
-  descripcion         String?           @db.Text
-  precioVenta         Float             @map("precio_venta")
-  precioCompra        Float?            @map("precio_compra")
-  stockActual         Int               @default(0) @map("stock_actual")
-  stockMinimo         Int               @default(1) @map("stock_minimo")
-  estado              String            @default("activo") @db.VarChar(30)
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
-  deletedAt           DateTime?         @map("deleted_at")
-  
-  categoria           CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
+  id                  Int       @id @default(autoincrement())
+  categoriaProductoId Int       @map("categoria_producto_id")
+  codigoBarras        String?   @unique @map("codigo_barras") @db.VarChar(100)
+  nombre              String    @db.VarChar(150)
+  descripcion         String?   @db.Text
+  precioVenta         Float     @map("precio_venta")
+  precioCompra        Float?    @map("precio_compra")
+  stockActual         Int       @default(0) @map("stock_actual")
+  stockMinimo         Int       @default(1) @map("stock_minimo")
+  estado              String    @default("activo") @db.VarChar(30)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+  disponibleCompra Boolean   @default(false) @map("disponible_compra")
+
+  categoria CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
   detallesVenta       DetalleVenta[]
   @@map("producto")
 }
@@ -569,6 +575,7 @@ model Servicio {
   descripcion String? @db.VarChar(200)
   precio      Decimal @default(0) @db.Decimal(10, 2)
   estado      String  @default("activo") @db.VarChar(50)
+  disponibleCompra Boolean   @default(false) @map("disponible_compra")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
