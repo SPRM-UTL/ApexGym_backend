@@ -10,6 +10,7 @@ export class VentaController extends BaseController {
     create = async (req, res) => {
         try {
             const {
+                empleadoId,
                 aperturaCajaId,
                 metodoPagoId,
                 detalleVenta,
@@ -22,7 +23,8 @@ export class VentaController extends BaseController {
             this.validar(aperturaCajaId, clienteId, detalleVenta);
 
             const registro = await this.dao.create({
-                usuarioId: req.usuario.id,
+                empleadoId: this.leerId(empleadoId, 'empleado'),
+                usuarioId: this.leerId(req.usuario.id, 'usuario'),
                 aperturaCajaId: Number(aperturaCajaId),
                 clienteId: Number(clienteId),
                 metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),

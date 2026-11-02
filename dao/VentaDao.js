@@ -30,6 +30,13 @@ async getAll() {
                     nombre: true,
                 },
             },
+            empleado: {
+                select: {
+                    id: true,
+                    nombre: true,
+                    apellidoPaterno: true,
+                },
+            },
             folioVenta : {
                 select : {
                     id : true
@@ -76,6 +83,13 @@ async getById(id, client = this.prisma) {
                 select: {
                     id: true,
                     nombre: true,
+                },
+            },
+            empleado: {
+                select: {
+                    id: true,
+                    nombre: true,
+                    apellidoPaterno: true,
                 },
             },
             aperturaCaja: {
@@ -145,6 +159,8 @@ async getById(id, client = this.prisma) {
 async create(data) {
     const {
         detalleVenta,
+        empleadoId,
+        usuarioId,
         clienteId,
         subtotal : subtotalEnviado,
         total : totalEnviado,
@@ -156,7 +172,8 @@ async create(data) {
         'la apertura de caja'
     );
 
-    const usuarioId = this.validarId(data.usuarioId, 'el usuario');
+    const idEmpleado = this.validarId(empleadoId, 'el empleado');
+    const idUsuario = this.validarId(usuarioId, 'el usuario');
     const idCliente = this.validarId(clienteId, 'el cliente');
 
     this.validarDetalles(detalleVenta);
@@ -164,7 +181,8 @@ async create(data) {
     return this.prisma.$transaction(async (tx) => {
         const empleado = await tx.empleado.findFirst({
             where: {
-                usuarioId,
+                id: idEmpleado,
+                usuarioId: idUsuario,
                 deletedAt: null,
             },
             select: { id: true },
@@ -172,7 +190,7 @@ async create(data) {
 
         if (!empleado) {
             throw new Error(
-                'No hay un empleado asociado al usuario autenticado'
+                'El empleado no existe o no está asociado al usuario autenticado'
             );
         }
 
@@ -221,6 +239,7 @@ async create(data) {
         const nuevaVenta = await tx.venta.create({
             data: {
                 aperturaCaja: { connect: { id: cajaAbierta.id } },
+                empleado: { connect: { id: empleado.id } },
                 cliente: { connect: { id: cliente.id } },
                 metodoPago: { connect: { id: metodoPago.id } },
                 subtotal,

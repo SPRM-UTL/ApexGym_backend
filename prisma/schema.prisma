@@ -167,6 +167,7 @@ model Empleado {
   aperturasCaja   AperturaCaja[]
   movimientosCaja MovimientoCaja[]
   cortesCaja      CorteCaja[]
+  ventas          Venta[]
 
   @@map("empleados")
 }
@@ -506,6 +507,7 @@ model FolioVenta {
 /*Se añadio el modelado del punto de venta con apertura de caja por ahora se necesita revisar lo de carrito*/
 model Venta {
   id                  Int               @id @default(autoincrement())
+  empleadoId          Int               @map("empleado_id")
   clientId            Int               @map("cliente_id")
   folioVentaId        Int               @unique @map("folio_venta_id")
   aperturaCajaId      Int?              @map("apertura_caja_id")
@@ -521,11 +523,13 @@ model Venta {
   deletedAt           DateTime?         @map("deleted_at")
 
   aperturaCaja        AperturaCaja?     @relation(fields: [aperturaCajaId], references: [id])
+  empleado            Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
   cliente             Cliente           @relation(fields: [clientId], references: [id])
   metodoPago          MetodoPago?       @relation(fields: [metodoPagoId], references: [id], onDelete: Restrict)
   folioVenta          FolioVenta        @relation(fields: [folioVentaId], references: [id])
   detalleVenta        DetalleVenta[]
 
+  @@index([empleadoId])
   @@index([metodoPagoId])
   @@index([clientId])
   @@map("venta")
