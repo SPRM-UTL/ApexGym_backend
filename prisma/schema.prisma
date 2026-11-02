@@ -491,6 +491,7 @@ model Producto {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
+  disponibleCompra Boolean   @default(false) @map("disponible_compra")
 
   categoria CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
 
@@ -515,6 +516,7 @@ model Servicio {
   descripcion String? @db.VarChar(200)
   precio      Decimal @default(0) @db.Decimal(10, 2)
   estado      String  @default("activo") @db.VarChar(50)
+  disponibleCompra Boolean   @default(false) @map("disponible_compra")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

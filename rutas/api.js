@@ -434,6 +434,11 @@ productoRoutes.delete(
     productoController.eliminar.bind(productoController)
 );
 
+productoRoutes.get(
+    '/productosClientes/traer',
+    productoController.getProductosCliente.bind(productoController)
+);
+
 // ── Rutas de Apertura de Caja ────────────────────────────────────────────────
 aperturaCajaRoutes.get(
     '/',
@@ -840,6 +845,11 @@ servicioRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Servicios', 'Eliminar'),
     servicioController.eliminar.bind(servicioController)
+);
+
+servicioRoutes.get(
+    '/serviciosClientes/traer',
+    servicioController.getServiciosCliente.bind(servicioController)
 );
 
 router.use('/productos', productoRoutes);
