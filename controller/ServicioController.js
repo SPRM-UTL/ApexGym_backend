@@ -8,7 +8,7 @@ export class ServicioController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { nombre, descripcion, precio, estado } = req.body;
+            const { nombre, descripcion, precio, estado, disponibleCompra } = req.body;
             this.validar({ nombre, precio, estado });
 
             const servicioAgregado = await this.dao.create({
@@ -16,6 +16,7 @@ export class ServicioController extends BaseController {
                 descripcion: descripcion ? descripcion.trim() : null,
                 precio: Number(precio),
                 estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
+                disponibleCompra: disponibleCompra
             });
 
             return this.respuestaExito(res, servicioAgregado, "Servicio añadido correctamente.");
@@ -30,7 +31,7 @@ export class ServicioController extends BaseController {
             if (isNaN(id)) {
                 throw new Error("ID no válido");
             }
-            const { nombre, descripcion, precio, estado } = req.body;
+            const { nombre, descripcion, precio, estado, disponibleCompra } = req.body;
             this.validar({ nombre, precio, estado });
 
             const servicioActualizado = await this.dao.update(id, {
@@ -38,6 +39,7 @@ export class ServicioController extends BaseController {
                 descripcion: descripcion ? descripcion.trim() : null,
                 precio: Number(precio),
                 estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
+                disponibleCompra: disponibleCompra ? disponibleCompra : false
             });
 
             return this.respuestaExito(res, servicioActualizado, "Servicio actualizado correctamente.");
@@ -66,6 +68,15 @@ export class ServicioController extends BaseController {
         }
         if (!estado?.trim()) throw new Error('El estado es requerido');
     }
+
+    getServiciosCliente = async(req,res)=>{
+            try{
+                const servicios = await servicioDao.getAll({disponibleCompra: true})
+                return this.respuestaExito(res,servicios,"Servicios cargados con exito")
+            }catch(error){
+                return this.respuestaError(res,error);
+            }
+        }
 }
 
 export const servicioController = new ServicioController();

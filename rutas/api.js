@@ -434,6 +434,11 @@ productoRoutes.delete(
     productoController.eliminar.bind(productoController)
 );
 
+productoRoutes.get(
+    '/productosClientes/traer',
+    productoController.getProductosCliente.bind(productoController)
+);
+
 // ── Rutas de Apertura de Caja ────────────────────────────────────────────────
 aperturaCajaRoutes.get(
     '/',
@@ -508,6 +513,12 @@ movimientoCajaRoutes.put(
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Editar'),
     movimientoCajaController.actualizar.bind(movimientoCajaController)
+);
+movimientoCajaRoutes.post(
+    '/:id/validar',
+    autenticarUsuario,
+    verificarPermiso('Movimientos de Caja', 'Editar'),
+    movimientoCajaController.validar.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.put(
     '/:id/validar',
@@ -620,6 +631,21 @@ clienteRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Clientes', 'Eliminar'),
     clienteController.eliminar.bind(clienteController)
+);
+
+clienteRoutes.post(
+    '/registrar',
+    clienteController.registrar.bind(clienteController)
+);
+
+clienteRoutes.post(
+    '/verificarCorreo',
+    clienteController.verificarCorreo.bind(clienteController)
+);
+
+clienteRoutes.post(
+    '/verificarCredenciales',
+    clienteController.verificarCredenciales.bind(clienteController)
 );
 
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
@@ -819,6 +845,11 @@ servicioRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Servicios', 'Eliminar'),
     servicioController.eliminar.bind(servicioController)
+);
+
+servicioRoutes.get(
+    '/serviciosClientes/traer',
+    servicioController.getServiciosCliente.bind(servicioController)
 );
 
 router.use('/productos', productoRoutes);
