@@ -29,6 +29,7 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
     where: { nombre: seccion.nombre },
     update: {
         descripcion: seccion.descripcion,
+        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
         deletedAt: null,
@@ -36,6 +37,7 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
     create: {
         nombre: seccion.nombre,
         descripcion: seccion.descripcion,
+        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
     },
@@ -52,6 +54,7 @@ const upsertModulo = async (seccionId, modulo) => {
             data: {
                 seccionId,
                 descripcion: modulo.descripcion,
+                orden: modulo.orden ?? 0,
                 imagenUrl: modulo.imagenUrl,
                 imagenPublicId: modulo.imagenPublicId,
                 deletedAt: null,
@@ -64,6 +67,7 @@ const upsertModulo = async (seccionId, modulo) => {
             seccionId,
             nombre: modulo.nombre,
             descripcion: modulo.descripcion,
+            orden: modulo.orden ?? 0,
             imagenUrl: modulo.imagenUrl,
             imagenPublicId: modulo.imagenPublicId,
         },
@@ -273,6 +277,20 @@ async function main() {
             }
         }
     }
+
+    const configsDefault = [
+        { clave: 'mostrar_huella_digital_corte', valor: 'true', tipoDato: 'boolean', descripcion: 'Muestra u oculta la sección de huella digital y auditoría en el reporte PDF de corte de caja' },
+        { clave: 'logo_sistema', valor: '', tipoDato: 'string', descripcion: 'URL o ruta del logotipo del sistema para reportes' },
+        { clave: 'nombre_sistema', valor: 'ApexGym', tipoDato: 'string', descripcion: 'Nombre comercial del gimnasio' },
+    ];
+    for (const configItem of configsDefault) {
+        await prisma.configuracionSistema.upsert({
+            where: { clave: configItem.clave },
+            update: { tipoDato: configItem.tipoDato, descripcion: configItem.descripcion, deletedAt: null },
+            create: configItem,
+        });
+    }
+    console.log('Configuraciones del sistema sincronizadas.');
 
     console.log('Seed completado correctamente.');
 }
