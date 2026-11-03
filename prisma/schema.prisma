@@ -349,8 +349,8 @@ model ClienteMembresia {
 
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
-  estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
   asistencias     Asistencia[] // Relación bidireccional agregada
+  estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id])
 
   @@map("clientes_membresias")
 }
@@ -364,7 +364,7 @@ model EstadoMembresia {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  clientesMembresias ClienteMembresia[]
+  clientesMembresias  ClienteMembresia[]
 
   @@map("estados_membresias")
 }
@@ -381,6 +381,7 @@ model TipoMembresia {
   deletedAt    DateTime? @map("deleted_at")
 
   clientesMembresias ClienteMembresia[]
+  beneficios         BeneficioMembresia[]
 
   @@map("tipos_membresias")
 }
@@ -559,4 +560,19 @@ model Visita {
   tipoVisita TipoVisita @relation(fields: [tipoVisitaId], references: [id], onDelete: Restrict)
 
   @@map("visitas")
+}
+
+model BeneficioMembresia {
+  id              Int       @id @default(autoincrement())
+  tipoMembresiaId Int       @map("tipo_membresia_id")
+  titulo          String    @db.VarChar(100)
+  descripcion     String?   @db.VarChar(255)
+  icono           String?   @db.VarChar(50)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tipoMembresia   TipoMembresia @relation(fields: [tipoMembresiaId], references: [id], onDelete: Cascade)
+
+  @@map("beneficios_membresias")
 }

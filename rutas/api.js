@@ -30,6 +30,7 @@ import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
+import { appMembresiaController } from '../controller/AppMembresiaController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 import { asistenciaController } from '../controller/AsistenciaController.js';
 
@@ -84,6 +85,7 @@ const metodoPagoRoutes = express.Router();
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
 const asistenciaRoutes = express.Router();
+const appMembresiaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -909,6 +911,25 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+// ── Rutas App Móvil Membresías y Saldo ─────────────────────────────────────
+appMembresiaRoutes.get(
+    '/mi-membresia',
+    autenticarUsuario,
+    appMembresiaController.obtenerMiMembresia.bind(appMembresiaController)
+);
+
+appMembresiaRoutes.get(
+    '/mi-saldo',
+    autenticarUsuario,
+    appMembresiaController.obtenerMiSaldo.bind(appMembresiaController)
+);
+
+appMembresiaRoutes.get(
+    '/planes',
+    appMembresiaController.obtenerPlanes.bind(appMembresiaController)
+);
+
 router.use('/asistencias', asistenciaRoutes);
+router.use('/app/membresia', appMembresiaRoutes);
 
 export { router as api };
