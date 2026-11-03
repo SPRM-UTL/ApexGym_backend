@@ -31,6 +31,7 @@ import { ClienteMembresiaController } from '../controller/ClienteMembresiaContro
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+import { asistenciaController } from '../controller/AsistenciaController.js';
 
 
 const router = express.Router();
@@ -82,6 +83,7 @@ const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
+const asistenciaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -852,6 +854,37 @@ servicioRoutes.get(
     servicioController.getServiciosCliente.bind(servicioController)
 );
 
+// ── Rutas de Control de Accesos y Asistencias ──────────────────────────────
+asistenciaRoutes.post(
+    '/validar-acceso',
+    autenticarUsuario,
+    asistenciaController.validarAcceso.bind(asistenciaController)
+);
+
+asistenciaRoutes.post(
+    '/visitas',
+    autenticarUsuario,
+    asistenciaController.registrarVisita.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/aforo',
+    autenticarUsuario,
+    asistenciaController.obtenerAforo.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/historial',
+    autenticarUsuario,
+    asistenciaController.obtenerHistorial.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/visitas',
+    autenticarUsuario,
+    asistenciaController.obtenerVisitas.bind(asistenciaController)
+);
+
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
@@ -876,5 +909,6 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+router.use('/asistencias', asistenciaRoutes);
 
 export { router as api };
