@@ -66,6 +66,19 @@
             "Eliminar"
           ],
           "orden": 3
+        },
+        {
+          "nombre": "Empresa",
+          "descripcion": "Configuración general e identidad corporativa de la empresa",
+          "imagenUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ],
+          "orden": 4
         }
       ],
       "orden": 1

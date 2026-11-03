@@ -30,6 +30,7 @@ import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
+import { EmpresaController } from '../controller/EmpresaController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
 
@@ -82,6 +83,8 @@ const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
+const empresaController = new EmpresaController();
+const empresaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -852,6 +855,44 @@ servicioRoutes.get(
     servicioController.getServiciosCliente.bind(servicioController)
 );
 
+// ── Rutas de Empresa ─────────────────────────────────────────────────────────
+empresaRoutes.get(
+    '/actual',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerActual.bind(empresaController)
+);
+
+empresaRoutes.put(
+    '/actual',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Editar'),
+    empresaController.actualizarActual.bind(empresaController)
+);
+
+empresaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerTodos.bind(empresaController)
+);
+
+empresaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerPorId.bind(empresaController)
+);
+
+empresaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Editar'),
+    empresaController.actualizarActual.bind(empresaController)
+);
+
+router.use('/empresa', empresaRoutes);
+router.use('/empresas', empresaRoutes);
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);

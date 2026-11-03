@@ -9,9 +9,31 @@ export class BaseController {
         this.dao = dao;
     }
 
+    /**
+     * Obtiene el empresaId del usuario autenticado con fallback seguro a 1
+     * para garantizar retrocompatibilidad total cuando no se envía en body/query.
+     */
+    obtenerEmpresaId(req) {
+        const id = Number(req?.user?.empresaId ?? req?.usuario?.empresaId ?? 1);
+        return Number.isInteger(id) && id > 0 ? id : 1;
+    }
+
+    inyectarEmpresaEnDatos(req, data = {}) {
+        const empresaId = this.obtenerEmpresaId(req);
+        if (!this.dao?.useEmpresa || !data || typeof data !== 'object') {
+            return data;
+        }
+        return {
+            ...data,
+            empresaId: data.empresaId ?? empresaId,
+        };
+    }
+
     obtenerTodos = async (req, res) => {
         try {
-            const registros = await this.dao.getAll();
+            const empresaId = this.obtenerEmpresaId(req);
+            const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
+            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId);
             if (!registros) {
                 throw new Error("No se encontraron registros");
             }
@@ -29,7 +51,8 @@ export class BaseController {
             if (isNaN(id)) {
                 throw new Error("ID no válido");
             }
-            const registro = await this.dao.getById(id);
+            const empresaId = this.obtenerEmpresaId(req);
+            const registro = await this.dao.getById(id, empresaId);
             if (!registro) {
                 return this.respuestaNoEncontrado(res, "Registro no encontrado");
             }
