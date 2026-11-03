@@ -8,12 +8,13 @@ export class EstadoClienteController extends BaseController {
 
     crear = async (req, res) => {
         try {
-            const { nombre, descripcion } = req.body;
+            const { nombre, descripcion, color } = req.body;
             this.validar({ nombre });
             
             const registro = await this.dao.create({
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
+                color: color ? color.trim() : null,
             });
             
             return this.respuestaExito(res, registro, 'Estado de cliente creado correctamente');
@@ -25,12 +26,13 @@ export class EstadoClienteController extends BaseController {
     actualizar = async (req, res) => {
         try {
             const id = Number(req.params.id);
-            const { nombre, descripcion } = req.body;
+            const { nombre, descripcion, color } = req.body;
             this.validar({ nombre });
             
             const registro = await this.dao.update(id, {
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
+                color: color !== undefined ? (color ? color.trim() : null) : undefined,
             });
             
             return this.respuestaExito(res, registro, 'Estado de cliente actualizado correctamente');
