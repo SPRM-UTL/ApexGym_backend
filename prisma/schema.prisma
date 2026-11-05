@@ -51,6 +51,7 @@ model Empresa {
   productos              Producto[]
   metodosPago            MetodoPago[]
   servicios              Servicio[]
+  transaccionesPagos     TransaccionPago[]
 
   @@map("empresas")
 }
@@ -619,4 +620,46 @@ model Servicio {
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
 
   @@map("servicios")
+}
+
+enum EstadoTransaccionPago {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  EXPIRADO
+  REEMBOLSADO
+}
+
+enum ProveedorPago {
+  SANDBOX_SIMULADO
+  MERCADO_PAGO
+  PAYPAL
+  STRIPE
+  TERMINAL_MANUAL
+  EFECTIVO
+}
+
+model TransaccionPago {
+  id                Int                   @id @default(autoincrement())
+  empresaId         Int                   @default(1) @map("empresa_id")
+  uuidIdempotencia  String                @unique @map("uuid_idempotencia") @db.VarChar(100)
+  proveedor         ProveedorPago         @default(SANDBOX_SIMULADO)
+  referenciaExterna String?               @map("referencia_externa") @db.VarChar(150)
+  monto             Decimal               @db.Decimal(10, 2)
+  moneda            String                @default("MXN") @db.VarChar(10)
+  estado            EstadoTransaccionPago @default(PENDIENTE)
+  concepto          String                @db.VarChar(255)
+  correoCliente     String?               @map("correo_cliente") @db.VarChar(191)
+  datosRespuesta    String?               @map("datos_respuesta") @db.Text
+  urlCheckout       String?               @map("url_checkout") @db.VarChar(500)
+  folioVoucher      String?               @map("folio_voucher") @db.VarChar(100)
+  metadatos         Json?
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, estado])
+  @@map("transacciones_pagos")
 }

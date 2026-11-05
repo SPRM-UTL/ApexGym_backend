@@ -34,6 +34,8 @@ import { EmpresaController } from '../controller/EmpresaController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 
 
+import { PagoController } from '../controller/PagoController.js';
+
 const router = express.Router();
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
@@ -85,6 +87,8 @@ const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
 const empresaController = new EmpresaController();
 const empresaRoutes = express.Router();
+const pagoController = new PagoController();
+const pagoRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -917,5 +921,15 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+
+// ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
+pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
+pagoRoutes.post('/crear-cobro', autenticarUsuario, pagoController.crearCobro.bind(pagoController));
+pagoRoutes.post('/simular-resolucion/:id', autenticarUsuario, pagoController.simularResolucion.bind(pagoController));
+pagoRoutes.post('/reembolsar/:id', autenticarUsuario, pagoController.reembolsar.bind(pagoController));
+pagoRoutes.get('/resumen', autenticarUsuario, pagoController.obtenerResumen.bind(pagoController));
+pagoRoutes.get('/transacciones', autenticarUsuario, pagoController.obtenerTodos.bind(pagoController));
+pagoRoutes.get('/transacciones/:id', autenticarUsuario, pagoController.obtenerPorId.bind(pagoController));
+router.use('/pagos', pagoRoutes);
 
 export { router as api };
