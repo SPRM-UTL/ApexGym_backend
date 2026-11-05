@@ -492,6 +492,8 @@ model Producto {
   stockActual         Int       @default(0) @map("stock_actual")
   stockMinimo         Int       @default(1) @map("stock_minimo")
   estado              String    @default("activo") @db.VarChar(30)
+  imagenUrl           String?   @map("imagen_url") @db.LongText
+  imagenPublicId      String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
@@ -515,12 +517,14 @@ model MetodoPago {
 }
 
 model Servicio {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique @db.VarChar(100)
-  descripcion String?   @db.VarChar(200)
-  precio      Decimal   @default(0) @db.Decimal(10, 2)
-  estado      String    @default("activo") @db.VarChar(50)
-  //disponibleCompra Boolean   @default(false) @map("disponible_compra")
+  id               Int       @id @default(autoincrement())
+  nombre           String    @unique @db.VarChar(100)
+  descripcion      String?   @db.VarChar(200)
+  precio           Decimal   @default(0) @db.Decimal(10, 2)
+  estado           String    @default("activo") @db.VarChar(50)
+  disponibleCompra Boolean   @default(false) @map("disponible_compra")
+  imagenUrl        String?   @map("imagen_url") @db.LongText
+  imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
