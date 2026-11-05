@@ -676,6 +676,10 @@ estadoMembresiaRoutes.delete(
 
 // ── Rutas de Tipos de Membresía ──────────────────────────────────────────────
 tipoMembresiaRoutes.get(
+    '/membresiasCliente',
+    tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Listar'),
@@ -727,6 +731,11 @@ tipoVisitaRoutes.delete(
 );
 
 // ── Rutas de Clientes Membresías ─────────────────────────────────────────────
+clienteMembresiaRoutes.get(
+    '/mi-membresia',
+    autenticarUsuario,
+    clienteMembresiaController.obtenerMiMembresia.bind(clienteMembresiaController)
+);
 clienteMembresiaRoutes.get(
     '/',
     autenticarUsuario,
