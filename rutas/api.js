@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Sistema: ApexGym Backend
  * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
  * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
@@ -614,6 +614,16 @@ estadoClienteRoutes.delete(
 );
 
 // ── Rutas de Clientes ────────────────────────────────────────────────────────
+clienteRoutes.get(
+    '/mi-perfil',
+    autenticarUsuario,
+    clienteController.obtenerMiPerfil.bind(clienteController)
+);
+clienteRoutes.put(
+    '/mi-perfil',
+    autenticarUsuario,
+    clienteController.actualizarMiPerfil.bind(clienteController)
+);
 clienteRoutes.get(
     '/',
     autenticarUsuario,
