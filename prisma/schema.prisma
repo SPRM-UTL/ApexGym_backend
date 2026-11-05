@@ -332,6 +332,7 @@ model Cliente {
   estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
   ventas        Venta[]
+  asistencias   Asistencia[]  
   @@map("clientes")
 }
 
@@ -351,6 +352,8 @@ model ClienteMembresia {
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
   estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
   detallesVenta   DetalleVenta[]
+  asistencias     Asistencia[]    
+
   @@map("clientes_membresias")
 }
 
@@ -394,17 +397,19 @@ model TipoVisita {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  visitas Visita[]          // Relación bidireccional agregada
+
   @@map("tipos_visitas")
 }
 
 model CategoriaProducto {
-  id          Int        @id @default(autoincrement())
-  nombre      String     @unique @db.VarChar(100)
-  descripcion String?    @db.Text
-  estado      String     @default("activo") @db.VarChar(30)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  deletedAt   DateTime?  @map("deleted_at")
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @db.Text
+  estado      String    @default("activo") @db.VarChar(30)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
   productos   Producto[]
 
   @@map("categoria_productos")
@@ -490,6 +495,8 @@ model Producto {
   stockActual         Int       @default(0) @map("stock_actual")
   stockMinimo         Int       @default(1) @map("stock_minimo")
   estado              String    @default("activo") @db.VarChar(30)
+  imagenUrl           String?   @map("imagen_url") @db.LongText
+  imagenPublicId      String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
@@ -574,16 +581,18 @@ model MetodoPago {
 }
 
 model Servicio {
-  id          Int     @id @default(autoincrement())
-  nombre      String  @unique @db.VarChar(100)
-  descripcion String? @db.VarChar(200)
-  precio      Decimal @default(0) @db.Decimal(10, 2)
-  estado      String  @default("activo") @db.VarChar(50)
+  id               Int       @id @default(autoincrement())
+  nombre           String    @unique @db.VarChar(100)
+  descripcion      String?   @db.VarChar(200)
+  precio           Decimal   @default(0) @db.Decimal(10, 2)
+  estado           String    @default("activo") @db.VarChar(50)
   disponibleCompra Boolean   @default(false) @map("disponible_compra")
+  imagenUrl        String?   @map("imagen_url") @db.LongText
+  imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   detallesVenta       DetalleVenta[]
   @@map("servicios")
@@ -593,4 +602,35 @@ enum TipoItem {
   PRODUCTO
   SERVICIO
   MEMBRESIA
+}
+model Asistencia {
+  id                 Int       @id @default(autoincrement())
+  clienteId          Int       @map("cliente_id")
+  clienteMembresiaId Int?      @map("cliente_membresia_id")
+  fechaHora          DateTime  @default(now()) @map("fecha_hora")
+  observaciones      String?   @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  cliente          Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  clienteMembresia ClienteMembresia? @relation(fields: [clienteMembresiaId], references: [id], onDelete: SetNull)
+
+  @@map("asistencias")
+}
+
+model Visita {
+  id              Int       @id @default(autoincrement())
+  nombreVisitante String    @map("nombre_visitante") @db.VarChar(150)
+  tipoVisitaId    Int       @map("tipo_visita_id")
+  costo           Decimal   @db.Decimal(10, 2)
+  fechaHora       DateTime  @default(now()) @map("fecha_hora")
+  observaciones   String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tipoVisita TipoVisita @relation(fields: [tipoVisitaId], references: [id], onDelete: Restrict)
+
+  @@map("visitas")
 }

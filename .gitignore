@@ -36,9 +36,11 @@ repomix-output.xml
 
 # Directorios de imágenes y archivos subidos
 uploads/
-public/uploads/
-public/imagenes/
+/public/uploads/
+/uploads/productos/
 /public/imagenes/
+/public/imagenes/productos/
+/public/imagenes/empleados/
 imagenes/
 /imagenes/
 usuarios/
