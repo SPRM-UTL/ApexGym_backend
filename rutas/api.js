@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sistema: ApexGym Backend
  * Modificación: 01/10/2026 - Emmanuelle Hernández Oropeza
  * Descripción: Control operativo de caja: validaciones de saldo disponible en salidas,
@@ -32,6 +32,8 @@ import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+import { AsistenciaController } from '../controller/AsistenciaController.js';
+import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
@@ -89,6 +91,10 @@ const empresaController = new EmpresaController();
 const empresaRoutes = express.Router();
 const pagoController = new PagoController();
 const pagoRoutes = express.Router();
+const asistenciaController = new AsistenciaController();
+const asistenciaRoutes = express.Router();
+const visitaController = new VisitaController();
+const visitaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -897,6 +903,71 @@ empresaRoutes.put(
 
 router.use('/empresa', empresaRoutes);
 router.use('/empresas', empresaRoutes);
+
+// ── Rutas de Asistencias ────────────────────────────────────────────────────
+asistenciaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    asistenciaController.obtenerTodos.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/buscar-cliente',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    asistenciaController.buscarCliente.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/hoy',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    asistenciaController.obtenerHoy.bind(asistenciaController)
+);
+
+asistenciaRoutes.get(
+    '/cliente/:clienteId',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    asistenciaController.historialPorCliente.bind(asistenciaController)
+);
+
+asistenciaRoutes.post(
+    '/validar-y-registrar',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Crear'),
+    asistenciaController.validarYRegistrar.bind(asistenciaController)
+);
+
+asistenciaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Eliminar'),
+    asistenciaController.eliminar.bind(asistenciaController)
+);
+
+// ── Rutas de Visitas ────────────────────────────────────────────────────────
+visitaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    visitaController.obtenerTodos.bind(visitaController)
+);
+
+visitaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Crear'),
+    visitaController.crear.bind(visitaController)
+);
+
+visitaRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Eliminar'),
+    visitaController.eliminar.bind(visitaController)
+);
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
@@ -921,6 +992,8 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+router.use('/asistencias', asistenciaRoutes);
+router.use('/visitas', visitaRoutes);
 
 // ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));

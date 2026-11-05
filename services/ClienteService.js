@@ -1,4 +1,5 @@
 import { clienteDao } from '../dao/ClienteDao.js';
+import { tokenDao } from '../dao/TokenDao.js';
 import { usuarioDao } from '../dao/UsuarioDao.js';
 
 export class ClienteService {
@@ -8,33 +9,33 @@ export class ClienteService {
     }
 
     verificarCredenciales = async (data) => {
-            const { email, contrasenia } = data;
-    
-            const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
+        const { email, contrasenia } = data;
 
-            if (!usuario) {
-                throw new Error("Usuario Inexistente");
-            }
+        const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
 
-            const cliente = await this.dao.getByUser(usuario.id);
-    
-            if (!cliente) {
-                throw new Error("Credenciales inválidas");
-            }
-    
-            const token = await tokenDao.crearTokenSesion(usuario.id);
-    
-            return {
-                usuario,
-                token
-            };
+        if (!usuario) {
+            throw new Error("Usuario Inexistente");
+        }
+
+        const cliente = await this.dao.getByUser(usuario.id);
+
+        if (!cliente) {
+            throw new Error("Credenciales inválidas");
+        }
+
+        const token = await tokenDao.crearTokenSesion(usuario.id);
+
+        return {
+            usuario,
+            token
         };
+    };
 
     verificarCorreo = async (data) => {
-            const { correo } = data;
-            const usuario = await usuarioDao.getByEmail(correo);
-            return {usuario};
-        };
+        const { correo } = data;
+        const usuario = await usuarioDao.getByEmail(correo);
+        return { usuario };
+    };
 
     crear = async (datos) => {
         const {
