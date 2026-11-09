@@ -5,7 +5,7 @@ import { transaccionPagoDao } from '../dao/TransaccionPagoDao.js';
 export class PagoService {
     constructor() {
         this.driver = (process.env.PAGOS_DRIVER || 'sandbox').toLowerCase();
-        this.mpAccessToken = process.env.MP_ACCESS_TOKEN || null;
+        this.mpAccessToken = process.env.MP_ACCESS_TOKEN?.trim() || null;
         this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     }
 
@@ -50,6 +50,7 @@ export class PagoService {
                 idempotente: true,
                 mensaje: 'Transacción recuperada por llave de idempotencia (sin doble cobro)',
                 transaccion: existente,
+                urlCheckout: existente.urlCheckout,
             };
         }
 
@@ -102,7 +103,7 @@ export class PagoService {
         let referenciaExterna = null;
         let urlCheckout = null;
 
-        // 2. Procesamiento según método de pago
+        // 4. Procesamiento según método de pago
         if (proveedor === 'EFECTIVO') {
             const efectivoRecibido = metadatos?.efectivoRecibido !== undefined ? Number(metadatos.efectivoRecibido) : null;
             if (efectivoRecibido !== null && efectivoRecibido < montoNumerico) {
@@ -116,14 +117,75 @@ export class PagoService {
             }
             estadoInicial = 'APROBADO';
             referenciaExterna = `TERM_MANUAL_${folioVoucher.trim()}`;
-        } else if (proveedor === 'MERCADO_PAGO' && this.driver === 'mercadopago' && this.mpAccessToken) {
-            // Modo Producción / Sandbox oficial con Mercado Pago SDK
-            referenciaExterna = `MP_ORD_${Date.now()}`;
-            urlCheckout = `https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=${referenciaExterna}`;
         } else {
-            // Modo Sandbox Simulado (Por defecto: ideal para experimentación ágil)
-            referenciaExterna = `SANDBOX_REF_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-            urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
+            // Cobro Digital / En Línea: verificar si existe Access Token de Mercado Pago
+            const tokenMercadoPago = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
+            const tieneTokenMercadoPago = Boolean(tokenMercadoPago && tokenMercadoPago.length > 20);
+
+            if (tieneTokenMercadoPago) {
+                proveedor = 'MERCADO_PAGO';
+                try {
+                    const preferenceBody = {
+                        items: [
+                            {
+                                id: `apex_${Date.now()}`,
+                                title: concepto.trim(),
+                                quantity: 1,
+                                currency_id: 'MXN',
+                                unit_price: montoNumerico,
+                            },
+                        ],
+                        ...(correoCliente?.trim()
+                            ? {
+                                  payer: {
+                                      email: correoCliente.trim(),
+                                  },
+                              }
+                            : {}),
+                        back_urls: {
+                            success: `${this.frontendUrl}/pagos-experimentacion?estado=aprobado`,
+                            failure: `${this.frontendUrl}/pagos-experimentacion?estado=fallido`,
+                            pending: `${this.frontendUrl}/pagos-experimentacion?estado=pendiente`,
+                        },
+                        external_reference: `APEX_${empresaId}_${Date.now()}`,
+                        statement_descriptor: 'APEXGYM',
+                    };
+
+                    // auto_return solo es válido en Mercado Pago con dominios HTTPS públicos; en localhost se omite para evitar error 400
+                    if (this.frontendUrl.startsWith('https://')) {
+                        preferenceBody.auto_return = 'approved';
+                    }
+
+                    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${tokenMercadoPago}`,
+                            'Content-Type': 'application/json',
+                            'X-Idempotency-Key': llaveIdempotencia,
+                        },
+                        body: JSON.stringify(preferenceBody),
+                    });
+
+                    const mpData = await mpResponse.json();
+                    if (mpResponse.ok && (mpData.init_point || mpData.sandbox_init_point)) {
+                        referenciaExterna = mpData.id;
+                        urlCheckout = mpData.init_point || mpData.sandbox_init_point;
+                        estadoInicial = 'PENDIENTE';
+                    } else {
+                        console.error('Error al generar preferencia en Mercado Pago:', mpData);
+                        referenciaExterna = `FALLBACK_MP_${Date.now()}`;
+                        urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
+                    }
+                } catch (mpErr) {
+                    console.error('Fallo de conexión con API de Mercado Pago:', mpErr);
+                    referenciaExterna = `ERROR_MP_${Date.now()}`;
+                    urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
+                }
+            } else {
+                // Modo Sandbox Simulado local por defecto
+                referenciaExterna = `SANDBOX_REF_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
+            }
         }
 
         const metadatosGuardados = {
@@ -131,6 +193,7 @@ export class PagoService {
             ...(tipoTarjeta ? { tipoTarjeta } : {}),
             ...(marcaTarjeta ? { marcaTarjeta } : {}),
             ...(ultimosDigitos ? { ultimosDigitos } : {}),
+            pasarelaReal: Boolean(this.mpAccessToken && this.mpAccessToken.length > 20),
         };
 
         try {
@@ -163,7 +226,7 @@ export class PagoService {
                         idempotente: true,
                         mensaje: 'Transacción recuperada por llave de idempotencia (concurrencia prevenida)',
                         transaccion: transaccionExistente,
-                        urlCheckout,
+                        urlCheckout: transaccionExistente.urlCheckout,
                     };
                 }
             }
@@ -173,7 +236,6 @@ export class PagoService {
 
     /**
      * Simula la resolución asíncrona de un pago (Aprobado / Rechazado).
-     * Ideal para pruebas locales sin necesidad de túnel ngrok.
      */
     async simularResolucion(id, nuevoEstado, empresaId = 1) {
         const estadosValidos = ['APROBADO', 'RECHAZADO', 'EXPIRADO'];
@@ -232,14 +294,111 @@ export class PagoService {
     }
 
     /**
-     * Procesa una notificación HTTP entrante de pasarela (Webhook).
+     * Sincroniza automáticamente transacciones pendientes con pagos aprobados en Mercado Pago.
      */
-    async procesarWebhook(payload = {}, headers = {}) {
-        // En modo simulado, confirmamos recepción
+    async sincronizarConMercadoPago(empresaId = 1) {
+        const token = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
+        if (!token) return;
+
+        try {
+            const resp = await fetch('https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=10', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const pagos = data.results || [];
+
+            for (const pago of pagos) {
+                if (pago.status === 'approved') {
+                    const extRef = pago.external_reference;
+                    const transaccion = await transaccionPagoDao.model.findFirst({
+                        where: {
+                            empresaId,
+                            estado: 'PENDIENTE',
+                            deletedAt: null,
+                            OR: [
+                                ...(extRef ? [{ referenciaExterna: extRef }] : []),
+                                { monto: Number(pago.transaction_amount) }
+                            ]
+                        },
+                        orderBy: { id: 'desc' }
+                    });
+
+                    if (transaccion) {
+                        await transaccionPagoDao.actualizarEstado(
+                            transaccion.id,
+                            'APROBADO',
+                            {
+                                mercadoPagoPaymentId: pago.id,
+                                metodo: pago.payment_method_id,
+                                status: pago.status,
+                                statusDetail: pago.status_detail,
+                                fechaAprobado: pago.date_approved
+                            },
+                            empresaId
+                        );
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error al sincronizar con Mercado Pago:', err.message);
+        }
+    }
+
+    /**
+     * Procesa una notificación HTTP entrante de pasarela (Webhook de Mercado Pago).
+     */
+    async procesarWebhook(query = {}, body = {}) {
+        const paymentId = query['data.id'] || query.id || body?.data?.id || body?.id;
+        const topic = query.type || query.topic || body?.type || body?.action;
+
+        if (paymentId && this.mpAccessToken) {
+            try {
+                const resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.mpAccessToken}`,
+                    },
+                });
+
+                if (resp.ok) {
+                    const paymentData = await resp.json();
+                    const status = paymentData.status; // 'approved', 'rejected', 'pending'
+                    const externalRef = paymentData.external_reference;
+
+                    let nuevoEstado = 'PENDIENTE';
+                    if (status === 'approved') nuevoEstado = 'APROBADO';
+                    else if (status === 'rejected' || status === 'cancelled') nuevoEstado = 'RECHAZADO';
+                    else if (status === 'refunded') nuevoEstado = 'REEMBOLSADO';
+
+                    // Buscar transacción local por referencia o id
+                    const transaccion = await transaccionPagoDao.model.findFirst({
+                        where: {
+                            OR: [
+                                { referenciaExterna: externalRef },
+                                { id: Number(externalRef?.split('_')[2]) || -1 },
+                            ],
+                            deletedAt: null,
+                        },
+                    });
+
+                    if (transaccion) {
+                        await transaccionPagoDao.actualizarEstado(
+                            transaccion.id,
+                            nuevoEstado,
+                            { webhookMercadoPago: paymentData },
+                            transaccion.empresaId
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error('Error procesando webhook en vivo:', err);
+            }
+        }
+
         return {
             recibido: true,
             timestamp: new Date().toISOString(),
-            modo: this.driver,
         };
     }
 }

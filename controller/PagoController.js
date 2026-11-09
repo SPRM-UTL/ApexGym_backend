@@ -8,6 +8,22 @@ export class PagoController extends BaseController {
     }
 
     /**
+     * GET /api/pagos/transacciones
+     * Lista transacciones sincronizando automáticamente con Mercado Pago.
+     */
+    obtenerTodos = async (req, res) => {
+        try {
+            const empresaId = this.obtenerEmpresaId(req);
+            await pagoService.sincronizarConMercadoPago(empresaId).catch(() => {});
+            const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
+            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId);
+            return this.respuestaExito(res, registros || [], "Registros obtenidos exitosamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    /**
      * POST /api/pagos/crear-cobro
      * Genera una preferencia o registro de cobro con soporte de idempotencia.
      */
