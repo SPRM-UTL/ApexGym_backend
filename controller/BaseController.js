@@ -39,6 +39,48 @@ export class BaseController {
         }
     }
 
+    obtenerCatalogoPaginado = async (req, res) => {
+        const pagina = Number(req.query.pagina ?? 1);
+        const limiteSolicitado = Number(req.query.limite ?? 12);
+        const terminoSolicitado = req.query.q ?? '';
+        const termino = typeof terminoSolicitado === 'string' ? terminoSolicitado.trim() : '';
+        const categoriaSolicitada = req.query.categoriaId;
+        const categoriaId = categoriaSolicitada === undefined ? undefined : Number(categoriaSolicitada);
+        const orden = req.query.orden ?? 'nombre-asc';
+        const ordenesPermitidos = ['nombre-asc', 'nombre-desc', 'precio-asc', 'precio-desc'];
+        const limite = Math.min(limiteSolicitado, 50);
+        const desplazamiento = (pagina - 1) * limite;
+
+        if (!Number.isSafeInteger(pagina) || pagina < 1
+            || !Number.isSafeInteger(limiteSolicitado) || limiteSolicitado < 1
+            || !Number.isSafeInteger(desplazamiento)
+            || typeof terminoSolicitado !== 'string'
+            || termino.length > 100
+            || (categoriaSolicitada !== undefined && (!Number.isSafeInteger(categoriaId) || categoriaId < 1))
+            || typeof orden !== 'string'
+            || !ordenesPermitidos.includes(orden)) {
+            return res.status(400).json(new ResponseModel(
+                null,
+                1,
+                'Los filtros o parámetros de paginación no son válidos',
+                400
+            ));
+        }
+
+        try {
+            const resultado = await this.dao.obtenerCatalogoPaginado({
+                termino,
+                pagina,
+                limite,
+                categoriaId,
+                orden,
+            });
+            return this.respuestaExito(res, resultado, 'Catálogo obtenido exitosamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    }
+
     respuestaError(res, error) {
         const response = new ResponseModel(null, 1, error.message || 'Error interno del servidor', this.statusError);
         return res.status(this.statusError).json(response);

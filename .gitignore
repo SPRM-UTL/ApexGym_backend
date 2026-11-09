@@ -79,3 +79,7 @@ backend/migrations/
 
 =======
 >>>>>>> c3c08c9aee440ce1dc836111d4fe91e1546a7859
+
+# Versionar las migraciones Prisma de la aplicacion
+!prisma/migrations/
+!prisma/migrations/**

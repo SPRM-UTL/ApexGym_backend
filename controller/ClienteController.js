@@ -30,6 +30,35 @@ export class ClienteController extends BaseController {
         }
     };
 
+    buscarPorNombreOId = async (req, res) => {
+        try {
+            const termino = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+            const esId = /^\d+$/.test(termino);
+            const pagina = Number(req.query.pagina ?? 1);
+            const limiteSolicitado = Number(req.query.limite ?? 20);
+
+            if (!termino || (termino.length < 2 && !esId)) {
+                return this.respuestaExito(res, {
+                    registros: [],
+                    total: 0,
+                    pagina: Number.isInteger(pagina) && pagina > 0 ? pagina : 1,
+                    limite: 20,
+                }, 'Ingresa al menos 2 caracteres o un ID válido');
+            }
+            if (!Number.isInteger(pagina) || pagina < 1) {
+                throw new Error('La página debe ser un entero mayor que cero');
+            }
+            if (!Number.isInteger(limiteSolicitado) || limiteSolicitado < 1) {
+                throw new Error('El límite debe ser un entero mayor que cero');
+            }
+
+            const limite = Math.min(limiteSolicitado, 50);
+            const resultado = await clienteDao.buscarPorNombreOId(termino, { pagina, limite });
+            return this.respuestaExito(res, resultado, 'Clientes encontrados');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
     eliminar = async (req, res) => {
         try {
             const registro = await clienteService.eliminar(req.params.id);

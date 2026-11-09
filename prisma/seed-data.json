@@ -23,14 +23,14 @@
   ],
   "secciones": [
     {
-      "nombre": "AdministraciÃ³n",
-      "descripcion": "SecciÃ³n de administraciÃ³n del sistema",
+      "nombre": "Administración",
+      "descripcion": "Sección de administración del sistema",
       "imagenUrl": "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Usuarios",
-          "descripcion": "GestiÃ³n de usuarios del sistema",
+          "descripcion": "Gestión de usuarios del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -42,8 +42,8 @@
           "orden": 1
         },
         {
-          "nombre": "ConfiguraciÃ³n del Sistema",
-          "descripcion": "GestiÃ³n de parÃ¡metros configurables del sistema",
+          "nombre": "Configuración del Sistema",
+          "descripcion": "Gestión de parámetros configurables del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -55,8 +55,8 @@
           "orden": 2
         },
         {
-          "nombre": "AdministraciÃ³n de roles",
-          "descripcion": "GestiÃ³n de roles y permisos del sistema",
+          "nombre": "Administración de roles",
+          "descripcion": "Gestión de roles y permisos del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1560472355-536de3962603?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -145,8 +145,8 @@
           ]
         },
         {
-          "nombre": "Metodos de Pago",
-          "descripcion": "Diferentes metodos de Pago",
+          "nombre": "Métodos de Pago",
+          "descripcion": "Diferentes métodos de pago",
           "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -266,14 +266,14 @@
       ]
     },
     {
-      "nombre": "GestiÃ³n de Clientes",
-      "descripcion": "MÃ³dulos operativos de clientes",
+      "nombre": "Gestión de Clientes",
+      "descripcion": "Módulos operativos de clientes",
       "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Clientes",
-          "descripcion": "AdministraciÃ³n de clientes del gimnasio",
+          "descripcion": "Administración de clientes del gimnasio",
           "imagenUrl": "https://img.freepik.com/foto-gratis/joven-atractiva-haciendo-ejercicio-gimnasio_1139-715.jpg",
           "imagenPublicId": null,
           "acciones": [
@@ -286,7 +286,7 @@
         },
         {
           "nombre": "Estados de Cliente",
-          "descripcion": "CatÃ¡logo de estados de clientes",
+          "descripcion": "Catálogo de estados de clientes",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -298,8 +298,8 @@
           "orden": 2
         },
         {
-          "nombre": "Tipos de MembresÃ­a",
-          "descripcion": "Planes de membresÃ­a disponibles",
+          "nombre": "Tipos de Membresía",
+          "descripcion": "Planes de membresía disponibles",
           "imagenUrl": "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -311,8 +311,8 @@
           "orden": 3
         },
         {
-          "nombre": "Estados de MembresÃ­a",
-          "descripcion": "CatÃ¡logo de estados de membresÃ­a",
+          "nombre": "Estados de Membresía",
+          "descripcion": "Catálogo de estados de membresía",
           "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -325,7 +325,7 @@
         },
         {
           "nombre": "Tipos de Visita",
-          "descripcion": "CatÃ¡logo de accesos temporales",
+          "descripcion": "Catálogo de accesos temporales",
           "imagenUrl": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -353,13 +353,13 @@
     },
     {
       "nombre": "Ventas y Caja",
-      "descripcion": "GestiÃ³n de ventas, aperturas y movimiento de cajas",
+      "descripcion": "Gestión de ventas, aperturas y movimiento de cajas",
       "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Cajas",
-          "descripcion": "GestiÃ³n de cajas del establecimiento",
+          "descripcion": "Gestión de cajas del establecimiento",
           "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -398,7 +398,7 @@
         },
         {
           "nombre": "Corte de Caja",
-          "descripcion": "Arqueo final, cÃ¡lculo de faltantes/sobrantes y cierre de turno",
+          "descripcion": "Arqueo final, cálculo de faltantes/sobrantes y cierre de turno",
           "imagenUrl": "https://images.unsplash.com/photo-1579621970795-87facc2f976d?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -410,8 +410,8 @@
           "orden": 4
         },
         {
-          "nombre": "Metodos de Pago",
-          "descripcion": "Diferentes metodos de Pago",
+          "nombre": "Métodos de Pago",
+          "descripcion": "Diferentes métodos de pago",
           "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -424,7 +424,7 @@
         },
         {
           "nombre": "Servicios",
-          "descripcion": "GestiÃ³n de servicios del gimnasio",
+          "descripcion": "Gestión de servicios del gimnasio",
           "imagenUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -453,13 +453,13 @@
     },
     {
       "nombre": "Empleados",
-      "descripcion": "GestiÃ³n de personal, puestos, Ã¡reas y estados laborales",
+      "descripcion": "Gestión de personal, puestos, áreas y estados laborales",
       "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
-          "nombre": "Ãreas de Trabajo",
-          "descripcion": "GestiÃ³n de Ã¡reas de trabajo",
+          "nombre": "Áreas de Trabajo",
+          "descripcion": "Gestión de áreas de trabajo",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -472,7 +472,7 @@
         },
         {
           "nombre": "Puestos",
-          "descripcion": "GestiÃ³n de puestos de trabajo",
+          "descripcion": "Gestión de puestos de trabajo",
           "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -485,7 +485,7 @@
         },
         {
           "nombre": "Estados de Empleado",
-          "descripcion": "GestiÃ³n de estados de empleados",
+          "descripcion": "Gestión de estados de empleados",
           "imagenUrl": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -498,7 +498,7 @@
         },
         {
           "nombre": "Empleados",
-          "descripcion": "GestiÃ³n de la informaciÃ³n del personal",
+          "descripcion": "Gestión de la información del personal",
           "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -514,13 +514,13 @@
     },
     {
       "nombre": "Inventario",
-      "descripcion": "GestiÃ³n de productos y categorÃ­as",
+      "descripcion": "Gestión de productos y categorías",
       "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
-          "nombre": "CategorÃ­as de Productos",
-          "descripcion": "AdministraciÃ³n de categorÃ­as de productos",
+          "nombre": "Categorías de Productos",
+          "descripcion": "Administración de categorías de productos",
           "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -533,7 +533,7 @@
         },
         {
           "nombre": "Productos",
-          "descripcion": "AdministraciÃ³n de productos",
+          "descripcion": "Administración de productos",
           "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -549,13 +549,13 @@
     },
     {
       "nombre": "Rendimiento Laboral",
-      "descripcion": "CatÃ¡logos para el seguimiento del rendimiento laboral",
+      "descripcion": "Catálogos para el seguimiento del rendimiento laboral",
       "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Tipos de Actividad",
-          "descripcion": "GestiÃ³n de tipos de actividad laboral",
+          "descripcion": "Gestión de tipos de actividad laboral",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -568,27 +568,6 @@
         }
       ],
       "orden": 6
-    },
-    {
-      "nombre": "Ventas",
-      "descripcion": "Modulo de ventas",
-      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
-      "imagenPublicId": null,
-      "modulos": [
-        {
-          "nombre": "Registro de ventas",
-          "descripcion": "GestiÃ³n de ventas",
-          "imagenUrl": null,
-          "imagenPublicId": null,
-          "acciones": [
-            "Listar",
-            "Crear",
-            "Editar",
-            "Eliminar"
-          ]
-        }
-      ],
-      "orden": 7
     }
     
   ],
@@ -605,10 +584,9 @@
   "roles": [
     {
       "nombre": "Administrador",
-      "descripcion": "Acceso total a la administraciÃ³n del sistema",
+      "descripcion": "Acceso total a la administración del sistema",
       "permisos": "todos",
       "asignarAlPrimerUsuario": true
     }
   ]
 }
-

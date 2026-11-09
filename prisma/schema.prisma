@@ -519,11 +519,14 @@ model Venta {
   folioVentaId        Int               @unique @map("folio_venta_id")
   aperturaCajaId      Int?              @map("apertura_caja_id")
   metodoPagoId        Int?              @map("metodo_pago_id")
-  total               Float             
+  total               Float
+  montoRecibido       Float?            @map("monto_recibido")
+  cambio              Float?
   subtotal            Float             @default(0)
   descuento           Float             @default(0)
   metodoPagoLegacy    String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
   estado              String            @default("completado") @db.VarChar(30)
+  motivoCancelacion   String?           @map("motivo_cancelacion") @db.VarChar(500)
   
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt() @map("updated_at")
@@ -569,6 +572,7 @@ model DetalleVenta {
 model MetodoPago {
   id          Int       @id @default(autoincrement())
   nombre      String    @unique @db.VarChar(30)
+  codigo      String?   @unique @db.VarChar(30)
   descripcion String?   @db.VarChar(200)
   estado      String    @default("activo") @db.VarChar(50)
   createdAt   DateTime  @default(now()) @map("created_at")

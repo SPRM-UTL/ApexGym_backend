@@ -64,6 +64,7 @@ async getAll() {
                 select: {
                     id: true,
                     nombre: true,
+                    codigo: true,
                 },
             },
         },
@@ -114,6 +115,7 @@ async getById(id, client = this.prisma) {
                 select: {
                     id: true,
                     nombre: true,
+                    codigo: true,
                 },
             },
             detalleVenta: {
@@ -160,10 +162,10 @@ async create(data) {
     const {
         detalleVenta,
         empleadoId,
-        usuarioId,
         clienteId,
         subtotal : subtotalEnviado,
         total : totalEnviado,
+        montoRecibido: montoRecibidoEnviado,
         ...restoDatos
     } = data;
 
@@ -173,7 +175,6 @@ async create(data) {
     );
 
     const idEmpleado = this.validarId(empleadoId, 'el empleado');
-    const idUsuario = this.validarId(usuarioId, 'el usuario');
     const idCliente = this.validarId(clienteId, 'el cliente');
 
     this.validarDetalles(detalleVenta);
@@ -182,16 +183,13 @@ async create(data) {
         const empleado = await tx.empleado.findFirst({
             where: {
                 id: idEmpleado,
-                usuarioId: idUsuario,
                 deletedAt: null,
             },
             select: { id: true },
         });
 
         if (!empleado) {
-            throw new Error(
-                'El empleado no existe o no está asociado al usuario autenticado'
-            );
+            throw new Error('El empleado no existe');
         }
 
         const cliente = await tx.cliente.findFirst({
@@ -230,6 +228,13 @@ async create(data) {
         );
 
         const { subtotal, total } = this.calcularTotal(detalles);
+        const esPagoEfectivo = metodoPago.codigo === 'EFECTIVO';
+        const montoRecibido = esPagoEfectivo
+            ? this.validarMontoRecibido(montoRecibidoEnviado, total)
+            : total;
+        const cambio = esPagoEfectivo
+            ? currency(montoRecibido).subtract(total).value
+            : 0;
 
         this.validarMontos(
             { subtotal, total },
@@ -244,6 +249,8 @@ async create(data) {
                 metodoPago: { connect: { id: metodoPago.id } },
                 subtotal,
                 total,
+                montoRecibido,
+                cambio,
                 detalleVenta: {
                     create: detalles,
                 },
@@ -371,7 +378,7 @@ async update(id, data) {
         return this.getById(ventaId, tx);
     });
 }
-async cancel(id) {
+async cancel(id, motivoCancelacion) {
     const ventaId = this.validarId(id, 'la venta');
 
     return this.prisma.$transaction(async (tx) => {
@@ -382,6 +389,12 @@ async cancel(id) {
             },
             include: {
                 detalleVenta: true,
+                metodoPago: {
+                    select: { codigo: true },
+                },
+                folioVenta: {
+                    select: { id: true },
+                },
             },
         });
 
@@ -409,11 +422,28 @@ async cancel(id) {
 
         await this.ajustarStock(tx, venta.detalleVenta, []);
 
+        const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO'
+            || (!venta.metodoPago && String(venta.metodoPagoLegacy ?? '').trim().toLowerCase() === 'efectivo');
+
+        if (esPagoEfectivo) {
+            await tx.movimientoCaja.create({
+                data: {
+                    aperturaCajaId: caja.id,
+                    empleadoId: venta.empleadoId,
+                    tipo: 'SALIDA',
+                    monto: venta.total,
+                    concepto: `Cancelación de venta folio ${venta.folioVenta.id}`,
+                    estado: 'PENDIENTE',
+                },
+            });
+        }
+
         return tx.venta.update({
             where: { id: ventaId },
             data: {
                 deletedAt: new Date(),
                 estado: ESTADO_VENTA.CANCELADA,
+                motivoCancelacion,
             },
             omit: this.omit,
         });
@@ -484,6 +514,17 @@ validarDetalles(detalleVenta) {
     }
 }
 
+    validarMontoRecibido(valor, total) {
+        const monto = Number(valor);
+        if (valor === undefined || valor === null || valor === '' || !Number.isFinite(monto) || monto < 0) {
+            throw new Error('El monto recibido es requerido para pagos en efectivo');
+        }
+        if (currency(monto).intValue < currency(total).intValue) {
+            throw new Error('El monto recibido no cubre el total de la venta');
+        }
+        return currency(monto).value;
+    }
+
     async validarMetodoPago(tx, metodoPagoId) {
         const id = Number(metodoPagoId);
 
@@ -501,7 +542,7 @@ validarDetalles(detalleVenta) {
                 estado: "activo",
                 deletedAt: null,
             },
-            select: { id: true },
+            select: { id: true, codigo: true },
         });
         if (!metodo) {
             throw new Error("Método de pago no válido");

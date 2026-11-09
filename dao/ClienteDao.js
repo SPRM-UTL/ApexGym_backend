@@ -54,6 +54,39 @@ export class ClienteDao extends BaseDao {
         });
     }
 
+    async buscarPorNombreOId(termino, { pagina = 1, limite = 20 } = {}) {
+        const consulta = String(termino ?? '').trim();
+        const idNumerico = /^\d+$/.test(consulta) ? Number(consulta) : null;
+        const where = {
+            deletedAt: null,
+            OR: [
+                { nombre: { contains: consulta } },
+                { apellidoPaterno: { contains: consulta } },
+                { apellidoMaterno: { contains: consulta } },
+                ...(Number.isSafeInteger(idNumerico) && idNumerico > 0 ? [{ id: idNumerico }] : []),
+            ],
+        };
+        const skip = (pagina - 1) * limite;
+        const select = {
+            id: true,
+            nombre: true,
+            apellidoPaterno: true,
+            apellidoMaterno: true,
+        };
+
+        const [registros, total] = await Promise.all([
+            this.model.findMany({
+                where,
+                select,
+                orderBy: [{ nombre: 'asc' }, { apellidoPaterno: 'asc' }, { id: 'asc' }],
+                skip,
+                take: limite,
+            }),
+            this.model.count({ where }),
+        ]);
+
+        return { registros, total, pagina, limite };
+    }
     /**
      * Busca clientes activos cuyo nombre, apellido paterno o apellido materno
      * contenga el término de búsqueda. Máximo 20 resultados.

@@ -1,6 +1,7 @@
 
 import { ventaDao } from '../dao/VentaDao.js';
 import { BaseController } from './BaseController.js';
+import { ResponseModel } from '../modelos/ResponseModel.js';
 
 export class VentaController extends BaseController {
     constructor() {
@@ -16,6 +17,7 @@ export class VentaController extends BaseController {
                 detalleVenta,
                 subtotal,
                 total,
+                montoRecibido,
             } = req.body;
 
             const clienteId = req.body.clienteId ?? req.body.clientId;
@@ -24,12 +26,12 @@ export class VentaController extends BaseController {
 
             const registro = await this.dao.create({
                 empleadoId: this.leerId(empleadoId, 'empleado'),
-                usuarioId: this.leerId(req.usuario.id, 'usuario'),
                 aperturaCajaId: Number(aperturaCajaId),
                 clienteId: Number(clienteId),
                 metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),
                 subtotal: this.leerMonto(subtotal, 'subtotal'),
                 total: this.leerMonto(total, 'total'),
+                montoRecibido: montoRecibido === undefined ? undefined : this.leerMonto(montoRecibido, 'monto recibido'),
                 detalleVenta: this.normalizarDetalles(detalleVenta),
             });
 
@@ -97,7 +99,21 @@ export class VentaController extends BaseController {
     cancel = async (req, res) => {
         try {
             const id = this.leerId(req.params.id);
-            const respuesta = await this.dao.cancel(id);
+            const motivoCancelacion = req.body?.motivoCancelacion;
+            if (
+                typeof motivoCancelacion !== 'string'
+                || !motivoCancelacion.trim()
+                || motivoCancelacion.trim().length > 500
+            ) {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'El motivo de cancelación es obligatorio y no debe exceder 500 caracteres',
+                    400
+                ));
+            }
+
+            const respuesta = await this.dao.cancel(id, motivoCancelacion.trim());
 
             return this.respuestaExito(
                 res,
@@ -105,6 +121,9 @@ export class VentaController extends BaseController {
                 'Se canceló la venta con éxito'
             );
         } catch (error) {
+            if (error.status === 400) {
+                return res.status(400).json(new ResponseModel(null, 1, error.message, 400));
+            }
             return this.respuestaError(res, error);
         }
     };

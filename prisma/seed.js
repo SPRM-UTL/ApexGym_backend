@@ -184,6 +184,16 @@ async function crearUsuarioDefault() {
 async function main() {
     console.log('Iniciando seed declarativo...');
 
+    await prisma.metodoPago.upsert({
+        where: { codigo: 'EFECTIVO' },
+        update: { estado: 'activo', deletedAt: null },
+        create: {
+            nombre: 'Efectivo',
+            codigo: 'EFECTIVO',
+            descripcion: 'Pago en efectivo',
+        },
+    });
+
     const defaultUser = await crearUsuarioDefault();
 
     // 2. CREACIÓN DE USUARIOS (Primero para que existan antes de asignar roles)

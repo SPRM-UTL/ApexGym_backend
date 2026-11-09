@@ -6,6 +6,15 @@ export class MetodoPagoController extends BaseController{
         super(metodoPagoDao);
     }
 
+    obtenerActivos = async (req, res) => {
+        try {
+            const metodos = await metodoPagoDao.obtenerActivos();
+            return this.respuestaExito(res, metodos, "Métodos de pago activos obtenidos correctamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     crear = async(req,res)=>{
         const {
             nombre, 

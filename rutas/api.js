@@ -388,6 +388,12 @@ empleadoRoutes.delete(
 
 // ── Rutas de Categorías de Productos ───────────────────────────────────────
 CategoriaProductoRoutes.get(
+    '/filtro-venta',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Listar'),
+    categoriaProductoController.obtenerParaVenta.bind(categoriaProductoController)
+);
+CategoriaProductoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Listar'),
@@ -415,6 +421,12 @@ CategoriaProductoRoutes.delete(
     categoriaProductoController.eliminar.bind(categoriaProductoController)
 );
 //------Productos ------------------
+productoRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Productos','Listar'),
+    productoController.obtenerCatalogoPaginado.bind(productoController)
+);
 productoRoutes.get(
     '/',
     autenticarUsuario,
@@ -618,6 +630,12 @@ estadoClienteRoutes.delete(
 
 // ── Rutas de Clientes ────────────────────────────────────────────────────────
 clienteRoutes.get(
+    '/buscar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteController.buscarPorNombreOId.bind(clienteController)
+);
+clienteRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Clientes', 'Listar'),
@@ -684,6 +702,12 @@ estadoMembresiaRoutes.delete(
 );
 
 // ── Rutas de Tipos de Membresía ──────────────────────────────────────────────
+tipoMembresiaRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Listar'),
+    tipoMembresiaController.obtenerCatalogoPaginado.bind(tipoMembresiaController)
+);
 tipoMembresiaRoutes.get(
     '/',
     autenticarUsuario,
@@ -793,6 +817,12 @@ clienteMembresiaRoutes.delete(
 //---Rutas Médodos de Pago-------------------------
 
 metodoPagoRoutes.get(
+    '/activos',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago','Listar'),
+    metodoPagoController.obtenerActivos.bind(metodoPagoController)
+);
+metodoPagoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Metodos de Pago','Listar'),
@@ -857,6 +887,12 @@ ventaRoutes.delete(
 )
 
 //---Rutas Servicios-------------------------
+servicioRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerCatalogoPaginado.bind(servicioController)
+);
 servicioRoutes.get(
     '/',
     autenticarUsuario,
