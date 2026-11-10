@@ -61,7 +61,7 @@ media_*
 !.vscode/extensions.json
 .idea/
 
-# Migraciones locales/copias; mantener prisma/migrations versionado
+# Migraciones de Prisma y copias locales
 prisma/migrations/
 public/uploads/.vs/ 
 
