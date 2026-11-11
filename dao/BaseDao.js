@@ -35,13 +35,12 @@ export class BaseDao {
         };
     }
 
-    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }) {
+    async getAll(additionalWhere = {}) {
         return this.model.findMany({
             where: {
                 deletedAt: null,
                 ...additionalWhere
             },
-            orderBy: additionalOrderBy,
             omit: this.omit
         });
     }

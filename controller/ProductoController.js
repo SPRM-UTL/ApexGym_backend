@@ -7,7 +7,7 @@ export class ProductoController extends BaseController{
    } 
 
    crear = async(req,res)=>{
-    const {categoriaProductoId,codigoBarras,nombre,descripcion,precioVenta,precioCompra,stockActual,stockMinimo,disponibleCompra}= req.body;
+    const {categoriaProductoId,codigoBarras,nombre,descripcion,precioVenta,precioCompra,stockActual,stockMinimo}= req.body;
     try{
         const productoAgregado = await productoDao.create({
             categoriaProductoId: Number(categoriaProductoId),
@@ -18,7 +18,6 @@ export class ProductoController extends BaseController{
             precioCompra: precioCompra ? parseFloat(precioCompra) : null,
             stockActual: stockActual ? Number(stockActual) : 0,
             stockMinimo: stockMinimo ? Number(stockMinimo) : 1,
-            disponibleCompra: disponibleCompra
         });
         return this.respuestaExito(res, productoAgregado,"Producto añadido con éxito");
     }
@@ -28,7 +27,7 @@ export class ProductoController extends BaseController{
    }
 
    actualizar = async(req,res)=>{
-    const {productoId,categoriaProductoId,codigoBarras,nombre,descripcion,precioVenta,precioCompra,stockActual,stockMinimo,disponibleCompra}= req.body;
+    const {productoId,categoriaProductoId,codigoBarras,nombre,descripcion,precioVenta,precioCompra,stockActual,stockMinimo}= req.body;
     try{
       const productoEditado = await productoDao.update(productoId, {
         ...(categoriaProductoId && { categoriaProductoId: Number(categoriaProductoId) }),
@@ -39,7 +38,6 @@ export class ProductoController extends BaseController{
         ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null,}),
         ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
         ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),
-        ...(disponibleCompra !== undefined && { disponibleCompra: disponibleCompra }),
       });
         return this.respuestaExito(res,productoEditado,"Producto editado con exito")
     }catch(error){
@@ -53,15 +51,6 @@ export class ProductoController extends BaseController{
         try{
             const productoEliminado = await productoDao.delete(productoId)
             return this.respuestaExito(res,productoEliminado,"Producto eliminado con éxito")
-        }catch(error){
-            return this.respuestaError(res,error);
-        }
-    }
-
-    getProductosCliente = async(req,res)=>{
-        try{
-            const productos = await productoDao.getAll({disponibleCompra: true})
-            return this.respuestaExito(res,productos,"Productos cargados con exito")
         }catch(error){
             return this.respuestaError(res,error);
         }
