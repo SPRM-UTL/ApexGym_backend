@@ -1,4 +1,4 @@
-﻿{
+{
   "acciones": [
     {
       "nombre": "Listar",
@@ -23,14 +23,14 @@
   ],
   "secciones": [
     {
-      "nombre": "AdministraciÃ³n",
-      "descripcion": "SecciÃ³n de administraciÃ³n del sistema",
+      "nombre": "Administración",
+      "descripcion": "Sección de administración del sistema",
       "imagenUrl": "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Usuarios",
-          "descripcion": "GestiÃ³n de usuarios del sistema",
+          "descripcion": "Gestión de usuarios del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -42,8 +42,8 @@
           "orden": 1
         },
         {
-          "nombre": "ConfiguraciÃ³n del Sistema",
-          "descripcion": "GestiÃ³n de parÃ¡metros configurables del sistema",
+          "nombre": "Configuración del Sistema",
+          "descripcion": "Gestión de parámetros configurables del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -55,8 +55,8 @@
           "orden": 2
         },
         {
-          "nombre": "AdministraciÃ³n de roles",
-          "descripcion": "GestiÃ³n de roles y permisos del sistema",
+          "nombre": "Administración de roles",
+          "descripcion": "Gestión de roles y permisos del sistema",
           "imagenUrl": "https://images.unsplash.com/photo-1560472355-536de3962603?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -84,14 +84,14 @@
       "orden": 1
     },
     {
-      "nombre": "GestiÃ³n de Clientes",
-      "descripcion": "MÃ³dulos operativos de clientes",
+      "nombre": "Gestión de Clientes",
+      "descripcion": "Módulos operativos de clientes",
       "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Clientes",
-          "descripcion": "AdministraciÃ³n de clientes del gimnasio",
+          "descripcion": "Administración de clientes del gimnasio",
           "imagenUrl": "https://img.freepik.com/foto-gratis/joven-atractiva-haciendo-ejercicio-gimnasio_1139-715.jpg",
           "imagenPublicId": null,
           "acciones": [
@@ -104,7 +104,7 @@
         },
         {
           "nombre": "Estados de Cliente",
-          "descripcion": "CatÃ¡logo de estados de clientes",
+          "descripcion": "Catálogo de estados de clientes",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -116,8 +116,8 @@
           "orden": 2
         },
         {
-          "nombre": "Tipos de MembresÃ­a",
-          "descripcion": "Planes de membresÃ­a disponibles",
+          "nombre": "Tipos de Membresía",
+          "descripcion": "Planes de membresía disponibles",
           "imagenUrl": "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -129,8 +129,8 @@
           "orden": 3
         },
         {
-          "nombre": "Estados de MembresÃ­a",
-          "descripcion": "CatÃ¡logo de estados de membresÃ­a",
+          "nombre": "Estados de Membresía",
+          "descripcion": "Catálogo de estados de membresía",
           "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -143,7 +143,7 @@
         },
         {
           "nombre": "Tipos de Visita",
-          "descripcion": "CatÃ¡logo de accesos temporales",
+          "descripcion": "Catálogo de accesos temporales",
           "imagenUrl": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -171,13 +171,13 @@
     },
     {
       "nombre": "Ventas y Caja",
-      "descripcion": "GestiÃ³n de ventas, aperturas y movimiento de cajas",
+      "descripcion": "Gestión de ventas, aperturas y movimiento de cajas",
       "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Cajas",
-          "descripcion": "GestiÃ³n de cajas del establecimiento",
+          "descripcion": "Gestión de cajas del establecimiento",
           "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -216,7 +216,7 @@
         },
         {
           "nombre": "Corte de Caja",
-          "descripcion": "Arqueo final, cÃ¡lculo de faltantes/sobrantes y cierre de turno",
+          "descripcion": "Arqueo final, cálculo de faltantes/sobrantes y cierre de turno",
           "imagenUrl": "https://images.unsplash.com/photo-1579621970795-87facc2f976d?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -242,7 +242,7 @@
         },
         {
           "nombre": "Servicios",
-          "descripcion": "GestiÃ³n de servicios del gimnasio",
+          "descripcion": "Gestión de servicios del gimnasio",
           "imagenUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -271,13 +271,13 @@
     },
     {
       "nombre": "Empleados",
-      "descripcion": "GestiÃ³n de personal, puestos, Ã¡reas y estados laborales",
+      "descripcion": "Gestión de personal, puestos, áreas y estados laborales",
       "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
-          "nombre": "Ãreas de Trabajo",
-          "descripcion": "GestiÃ³n de Ã¡reas de trabajo",
+          "nombre": "Áreas de Trabajo",
+          "descripcion": "Gestión de áreas de trabajo",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -290,7 +290,7 @@
         },
         {
           "nombre": "Puestos",
-          "descripcion": "GestiÃ³n de puestos de trabajo",
+          "descripcion": "Gestión de puestos de trabajo",
           "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -303,7 +303,7 @@
         },
         {
           "nombre": "Estados de Empleado",
-          "descripcion": "GestiÃ³n de estados de empleados",
+          "descripcion": "Gestión de estados de empleados",
           "imagenUrl": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -316,7 +316,7 @@
         },
         {
           "nombre": "Empleados",
-          "descripcion": "GestiÃ³n de la informaciÃ³n del personal",
+          "descripcion": "Gestión de la información del personal",
           "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -332,13 +332,13 @@
     },
     {
       "nombre": "Inventario",
-      "descripcion": "GestiÃ³n de productos y categorÃ­as",
+      "descripcion": "Gestión de productos y categorías",
       "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
-          "nombre": "CategorÃ­as de Productos",
-          "descripcion": "AdministraciÃ³n de categorÃ­as de productos",
+          "nombre": "Categorías de Productos",
+          "descripcion": "Administración de categorías de productos",
           "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -351,7 +351,7 @@
         },
         {
           "nombre": "Productos",
-          "descripcion": "AdministraciÃ³n de productos",
+          "descripcion": "Administración de productos",
           "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -367,13 +367,13 @@
     },
     {
       "nombre": "Rendimiento Laboral",
-      "descripcion": "CatÃ¡logos para el seguimiento del rendimiento laboral",
+      "descripcion": "Catálogos para el seguimiento del rendimiento laboral",
       "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Tipos de Actividad",
-          "descripcion": "GestiÃ³n de tipos de actividad laboral",
+          "descripcion": "Gestión de tipos de actividad laboral",
           "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -389,13 +389,13 @@
     },
     {
       "nombre": "Ventas",
-      "descripcion": "Modulo de ventas",
+      "descripcion": "Módulo de ventas",
       "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
       "imagenPublicId": null,
       "modulos": [
         {
           "nombre": "Registro de ventas",
-          "descripcion": "GestiÃ³n de ventas",
+          "descripcion": "Gestión de ventas",
           "imagenUrl": null,
           "imagenPublicId": null,
           "acciones": [
@@ -415,15 +415,315 @@
       "email": "admin@apexgym.com",
       "password": "Password123!",
       "rolNombre": "Administrador"
+    },
+    {
+      "nombre": "Ana López",
+      "email": "recepcion@apexgym.com",
+      "password": "Password123!",
+      "rolNombre": "Administrador"
+    },
+    {
+      "nombre": "Luis Hernández",
+      "email": "cajero@apexgym.com",
+      "password": "Password123!",
+      "rolNombre": "Administrador"
+    },
+    {
+      "nombre": "Carlos Ramírez",
+      "email": "carlos.ramirez@apexgym.com",
+      "password": "Password123!",
+      "rolNombre": "Cliente"
+    },
+    {
+      "nombre": "Sofía Delgado",
+      "email": "sofia.delgado@apexgym.com",
+      "password": "Password123!",
+      "rolNombre": "Cliente"
     }
   ],
   "roles": [
     {
       "nombre": "Administrador",
-      "descripcion": "Acceso total a la administraciÃ³n del sistema",
+      "descripcion": "Acceso total a la administración del sistema",
       "permisos": "todos",
       "asignarAlPrimerUsuario": true
+    },
+    {
+      "nombre": "Cliente",
+      "descripcion": "Acceso para clientes del gimnasio",
+      "permisos": []
     }
-  ]
+  ],
+  "ejemplos": {
+    "estadosCliente": [
+      { "nombre": "Activo", "descripcion": "Cliente con acceso al gimnasio", "color": "#22c55e" },
+      { "nombre": "Inactivo", "descripcion": "Cliente sin membresía vigente", "color": "#94a3b8" },
+      { "nombre": "Suspendido", "descripcion": "Acceso bloqueado de forma temporal", "color": "#f59e0b" }
+    ],
+    "estadosMembresia": [
+      { "nombre": "Vigente", "descripcion": "Membresía dentro del periodo contratado", "color": "#22c55e" },
+      { "nombre": "Vencida", "descripcion": "Membresía fuera de vigencia", "color": "#ef4444" },
+      { "nombre": "Cancelada", "descripcion": "Membresía cancelada antes de su vencimiento", "color": "#64748b" }
+    ],
+    "tiposMembresia": [
+      { "nombre": "Semanal", "descripcion": "Acceso por 7 días", "duracionDias": 7, "precio": "149.00", "estado": "ACTIVO" },
+      { "nombre": "Mensual", "descripcion": "Acceso ilimitado por 30 días", "duracionDias": 30, "precio": "499.00", "estado": "ACTIVO" },
+      { "nombre": "Trimestral", "descripcion": "Acceso ilimitado por 90 días", "duracionDias": 90, "precio": "1299.00", "estado": "ACTIVO" },
+      { "nombre": "Anual", "descripcion": "Acceso ilimitado por 365 días", "duracionDias": 365, "precio": "4499.00", "estado": "ACTIVO" }
+    ],
+    "tiposVisita": [
+      { "nombre": "Pase de día", "descripcion": "Acceso por una sola visita", "costo": "80.00", "estado": "ACTIVO" },
+      { "nombre": "Pase de semana", "descripcion": "Acceso temporal por 7 días", "costo": "350.00", "estado": "ACTIVO" },
+      { "nombre": "Clase de prueba", "descripcion": "Clase guiada sin costo", "costo": "0.00", "estado": "ACTIVO" }
+    ],
+    "categoriasProducto": [
+      { "nombre": "Suplementos", "descripcion": "Proteínas, creatina y aminoácidos", "estado": "activo" },
+      { "nombre": "Bebidas", "descripcion": "Agua y bebidas deportivas", "estado": "activo" },
+      { "nombre": "Accesorios", "descripcion": "Toallas, guantes y candados", "estado": "activo" },
+      { "nombre": "Ropa", "descripcion": "Playeras y shorts del gimnasio", "estado": "activo" }
+    ],
+    "productos": [
+      { "categoria": "Suplementos", "codigoBarras": "7501234567001", "nombre": "Proteína whey 1 kg", "descripcion": "Proteína de suero sabor vainilla", "precioVenta": 899, "precioCompra": 620, "stockActual": 12, "stockMinimo": 3, "estado": "activo", "disponibleCompra": true },
+      { "categoria": "Suplementos", "codigoBarras": "7501234567002", "nombre": "Creatina monohidratada 300 g", "descripcion": "Creatina en polvo sin sabor", "precioVenta": 450, "precioCompra": 280, "stockActual": 8, "stockMinimo": 2, "estado": "activo", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567003", "nombre": "Agua natural 600 ml", "descripcion": "Agua embotellada", "precioVenta": 20, "precioCompra": 8, "stockActual": 48, "stockMinimo": 12, "estado": "activo", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567004", "nombre": "Bebida isotónica 500 ml", "descripcion": "Bebida para reposición de electrolitos", "precioVenta": 35, "precioCompra": 18, "stockActual": 4, "stockMinimo": 6, "estado": "activo", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567005", "nombre": "Toalla Apex", "descripcion": "Toalla de entrenamiento", "precioVenta": 180, "precioCompra": 95, "stockActual": 15, "stockMinimo": 4, "estado": "activo", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567006", "nombre": "Guantes de entrenamiento", "descripcion": "Guantes con muñequera", "precioVenta": 320, "precioCompra": 170, "stockActual": 2, "stockMinimo": 3, "estado": "activo", "disponibleCompra": false },
+      { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "activo", "disponibleCompra": false }
+    ],
+    "metodosPago": [
+      { "nombre": "Efectivo", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
+      { "nombre": "Tarjeta", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
+      { "nombre": "Transferencia", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
+    ],
+    "servicios": [
+      { "nombre": "Evaluación física", "descripcion": "Medición inicial de composición corporal", "precio": "150.00", "estado": "ACTIVO", "disponibleCompra": true },
+      { "nombre": "Entrenamiento personal", "descripcion": "Sesión individual de 60 minutos", "precio": "250.00", "estado": "ACTIVO", "disponibleCompra": true },
+      { "nombre": "Clase de spinning", "descripcion": "Clase grupal de 45 minutos", "precio": "80.00", "estado": "ACTIVO", "disponibleCompra": true },
+      { "nombre": "Locker mensual", "descripcion": "Renta de locker por 30 días", "precio": "100.00", "estado": "INACTIVO", "disponibleCompra": false }
+    ],
+    "areasTrabajo": [
+      { "nombre": "Recepción", "descripcion": "Atención a clientes y control de acceso", "estado": "ACTIVO" },
+      { "nombre": "Piso de entrenamiento", "descripcion": "Área de pesas, cardio y clases", "estado": "ACTIVO" },
+      { "nombre": "Nutrición", "descripcion": "Asesoría alimentaria", "estado": "ACTIVO" }
+    ],
+    "puestos": [
+      { "area": "Recepción", "nombre": "Recepcionista", "descripcion": "Registro de accesos y atención en mostrador", "salarioBase": "8500.00", "estado": "ACTIVO" },
+      { "area": "Recepción", "nombre": "Cajero", "descripcion": "Cobro de membresías, visitas y tienda", "salarioBase": "9000.00", "estado": "ACTIVO" },
+      { "area": "Piso de entrenamiento", "nombre": "Entrenador", "descripcion": "Rutinas y supervisión de piso", "salarioBase": "12000.00", "estado": "ACTIVO" },
+      { "area": "Nutrición", "nombre": "Nutriólogo", "descripcion": "Planes de alimentación", "salarioBase": "15000.00", "estado": "ACTIVO" }
+    ],
+    "estadosEmpleado": [
+      { "nombre": "Activo", "descripcion": "Empleado en funciones" },
+      { "nombre": "Vacaciones", "descripcion": "Empleado ausente por vacaciones" },
+      { "nombre": "Baja", "descripcion": "Empleado dado de baja" }
+    ],
+    "empleados": [
+      {
+        "puesto": "Recepcionista",
+        "area": "Recepción",
+        "estado": "Activo",
+        "usuarioEmail": "recepcion@apexgym.com",
+        "nombre": "Ana",
+        "apellidoPaterno": "López",
+        "apellidoMaterno": "García",
+        "telefono": "4771234501",
+        "correo": "ana.lopez@apexgym.com",
+        "direccion": "Blvd. La Luz 120, León, Gto.",
+        "fechaNacimiento": "1996-03-14",
+        "fechaIngreso": "2024-02-01"
+      },
+      {
+        "puesto": "Cajero",
+        "area": "Recepción",
+        "estado": "Activo",
+        "usuarioEmail": "cajero@apexgym.com",
+        "nombre": "Luis",
+        "apellidoPaterno": "Hernández",
+        "apellidoMaterno": "Ríos",
+        "telefono": "4771234502",
+        "correo": "luis.hernandez@apexgym.com",
+        "direccion": "Calle Madero 45, León, Gto.",
+        "fechaNacimiento": "1992-11-02",
+        "fechaIngreso": "2023-08-15"
+      },
+      {
+        "puesto": "Entrenador",
+        "area": "Piso de entrenamiento",
+        "estado": "Vacaciones",
+        "nombre": "Mariana",
+        "apellidoPaterno": "Soto",
+        "apellidoMaterno": "Vega",
+        "telefono": "4771234503",
+        "correo": "mariana.soto@apexgym.com",
+        "direccion": "Av. Panorama 880, León, Gto.",
+        "fechaNacimiento": "1994-07-21",
+        "fechaIngreso": "2025-01-06"
+      }
+    ],
+    "tiposActividad": [
+      { "area": "Recepción", "nombre": "Atención en recepción", "descripcion": "Registro de clientes y visitas", "estado": "ACTIVO" },
+      { "area": "Piso de entrenamiento", "nombre": "Entrenamiento personal", "descripcion": "Sesión individual en piso", "estado": "ACTIVO" },
+      { "area": "Piso de entrenamiento", "nombre": "Supervisión de piso", "descripcion": "Recorrido y apoyo a socios", "estado": "ACTIVO" }
+    ],
+    "cajas": [
+      { "nombre": "Caja Recepción", "ubicacion": "Mostrador principal", "estado": "ACTIVO" },
+      { "nombre": "Caja Tienda", "ubicacion": "Área de suplementos", "estado": "ACTIVO" },
+      { "nombre": "Caja Bodega", "ubicacion": "Bodega, fuera de servicio", "estado": "INACTIVO" }
+    ],
+    "clientes": [
+      {
+        "estado": "Activo",
+        "usuarioEmail": "carlos.ramirez@apexgym.com",
+        "nombre": "Carlos",
+        "apellidoPaterno": "Ramírez",
+        "apellidoMaterno": "Mendoza",
+        "fechaNacimiento": "1998-04-12",
+        "genero": "Masculino",
+        "telefono": "4772001101",
+        "correo": "carlos.ramirez@apexgym.com",
+        "direccion": "Calle 5 de Mayo 210, León, Gto.",
+        "contactoEmergenciaNombre": "Laura Ramírez",
+        "contactoEmergenciaTelefono": "4772001191",
+        "fechaRegistro": "2026-01-10",
+        "membresia": { "tipo": "Mensual", "estado": "Vigente", "fechaInicio": "2026-11-01", "fechaFin": "2026-12-01", "renovacionAutomatica": true },
+        "asistencias": [
+          { "clave": "carlos-2026-11-10", "fechaHora": "2026-11-10T07:40:00-06:00", "observaciones": "Ingreso matutino" },
+          { "clave": "carlos-2026-11-11", "fechaHora": "2026-11-11T18:10:00-06:00", "observaciones": "Ingreso vespertino" },
+          { "clave": "carlos-2026-11-12", "fechaHora": "2026-11-12T06:55:00-06:00", "observaciones": "Ingreso de apertura" }
+        ]
+      },
+      {
+        "estado": "Activo",
+        "usuarioEmail": "sofia.delgado@apexgym.com",
+        "nombre": "Sofía",
+        "apellidoPaterno": "Delgado",
+        "apellidoMaterno": "Ruiz",
+        "fechaNacimiento": "2001-09-03",
+        "genero": "Femenino",
+        "telefono": "4772001102",
+        "correo": "sofia.delgado@apexgym.com",
+        "direccion": "Privada del Parque 18, León, Gto.",
+        "contactoEmergenciaNombre": "Rosa Ruiz",
+        "contactoEmergenciaTelefono": "4772001192",
+        "fechaRegistro": "2026-09-15",
+        "membresia": { "tipo": "Trimestral", "estado": "Vigente", "fechaInicio": "2026-09-15", "fechaFin": "2026-12-14", "renovacionAutomatica": false },
+        "asistencias": [
+          { "clave": "sofia-2026-11-11", "fechaHora": "2026-11-11T09:05:00-06:00", "observaciones": "Clase de spinning" }
+        ]
+      },
+      {
+        "estado": "Inactivo",
+        "nombre": "Javier",
+        "apellidoPaterno": "Morales",
+        "apellidoMaterno": "Peña",
+        "fechaNacimiento": "1989-01-28",
+        "genero": "Masculino",
+        "telefono": "4772001103",
+        "correo": "javier.morales@apexgym.com",
+        "direccion": "Col. San Juan de Dios 402, León, Gto.",
+        "contactoEmergenciaNombre": "Elena Peña",
+        "contactoEmergenciaTelefono": "4772001193",
+        "fechaRegistro": "2025-06-01",
+        "membresia": { "tipo": "Mensual", "estado": "Vencida", "fechaInicio": "2026-08-01", "fechaFin": "2026-08-31", "renovacionAutomatica": false }
+      },
+      {
+        "estado": "Suspendido",
+        "nombre": "Valeria",
+        "apellidoPaterno": "Cruz",
+        "apellidoMaterno": "Santos",
+        "fechaNacimiento": "1995-12-19",
+        "genero": "Femenino",
+        "telefono": "4772001104",
+        "correo": "valeria.cruz@apexgym.com",
+        "direccion": "Av. Universidad 1500, León, Gto.",
+        "contactoEmergenciaNombre": "Miguel Cruz",
+        "contactoEmergenciaTelefono": "4772001194",
+        "fechaRegistro": "2026-02-20",
+        "membresia": { "tipo": "Mensual", "estado": "Cancelada", "fechaInicio": "2026-10-01", "fechaFin": "2026-10-31", "renovacionAutomatica": false }
+      },
+      {
+        "estado": "Activo",
+        "nombre": "Diego",
+        "apellidoPaterno": "Navarro",
+        "apellidoMaterno": "Lara",
+        "fechaNacimiento": "2003-06-08",
+        "genero": "Otro",
+        "telefono": "4772001105",
+        "correo": "diego.navarro@apexgym.com",
+        "direccion": "Fracc. Jardines del Moral 77, León, Gto.",
+        "contactoEmergenciaNombre": "Patricia Lara",
+        "contactoEmergenciaTelefono": "4772001195",
+        "fechaRegistro": "2026-01-10",
+        "membresia": { "tipo": "Anual", "estado": "Vigente", "fechaInicio": "2026-01-10", "fechaFin": "2027-01-10", "renovacionAutomatica": true },
+        "asistencias": [
+          { "clave": "diego-2026-11-09", "fechaHora": "2026-11-09T17:30:00-06:00", "observaciones": "Entrenamiento de fuerza" }
+        ]
+      },
+      {
+        "estado": "Activo",
+        "nombre": "Paola",
+        "apellidoPaterno": "Jiménez",
+        "apellidoMaterno": "Ortiz",
+        "fechaNacimiento": "2000-02-17",
+        "genero": "Femenino",
+        "telefono": "4772001106",
+        "correo": "paola.jimenez@apexgym.com",
+        "direccion": "Calle Olímpica 9, León, Gto.",
+        "contactoEmergenciaNombre": "Andrés Jiménez",
+        "contactoEmergenciaTelefono": "4772001196",
+        "fechaRegistro": "2026-11-12"
+      }
+    ],
+    "visitas": [
+      { "clave": "visita-andrea", "nombreVisitante": "Andrea Guzmán", "tipo": "Pase de día", "costo": "80.00", "fechaHora": "2026-11-12T10:20:00-06:00", "observaciones": "Visita de prueba en horario matutino" },
+      { "clave": "visita-roberto", "nombreVisitante": "Roberto Salinas", "tipo": "Pase de semana", "costo": "350.00", "fechaHora": "2026-11-11T16:45:00-06:00", "observaciones": "Pase semanal pagado en efectivo" },
+      { "clave": "visita-irene", "nombreVisitante": "Irene Campos", "tipo": "Clase de prueba", "costo": "0.00", "fechaHora": "2026-11-10T19:00:00-06:00", "observaciones": "Clase de spinning de cortesía" }
+    ],
+    "aperturasCaja": [
+      {
+        "clave": "apertura-recepcion-abierta",
+        "caja": "Caja Recepción",
+        "empleadoCorreo": "ana.lopez@apexgym.com",
+        "montoInicial": "1500.00",
+        "fechaApertura": "2026-11-12T08:00:00-06:00",
+        "estado": "ABIERTA",
+        "desgloseInicio": "{\"500\":1,\"200\":3,\"100\":3,\"50\":2,\"20\":5}",
+        "observaciones": "Turno matutino de recepción",
+        "movimientos": [
+          { "clave": "mov-recepcion-membresia", "tipo": "ENTRADA", "monto": "499.00", "concepto": "Pago de membresía mensual", "estado": "VALIDADO", "observaciones": "Cobro en efectivo de Carlos Ramírez" },
+          { "clave": "mov-recepcion-limpieza", "tipo": "SALIDA", "monto": "80.00", "concepto": "Compra de artículos de limpieza", "estado": "PENDIENTE", "observaciones": "Pendiente de validar por caja" }
+        ]
+      },
+      {
+        "clave": "apertura-tienda-cerrada",
+        "caja": "Caja Tienda",
+        "empleadoCorreo": "luis.hernandez@apexgym.com",
+        "montoInicial": "2000.00",
+        "fechaApertura": "2026-11-11T09:00:00-06:00",
+        "estado": "CERRADA",
+        "desgloseInicio": "{\"500\":2,\"200\":3,\"100\":4,\"50\":2}",
+        "observaciones": "Turno de tienda del 11 de noviembre",
+        "movimientos": [
+          { "clave": "mov-tienda-pase", "tipo": "ENTRADA", "monto": "350.00", "concepto": "Venta de pase de semana", "estado": "VALIDADO", "observaciones": "Pago en efectivo de Roberto Salinas" },
+          { "clave": "mov-tienda-agua", "tipo": "SALIDA", "monto": "120.00", "concepto": "Reposición de agua para mostrador", "estado": "VALIDADO", "observaciones": "Salida de efectivo validada" }
+        ],
+        "corte": {
+          "clave": "corte-tienda-2026-11-11",
+          "efectivoContado": "2230.00",
+          "totalEntradas": "350.00",
+          "totalSalidas": "120.00",
+          "totalVentas": "350.00",
+          "totalVentasEfectivo": "350.00",
+          "diferencia": "0.00",
+          "estado": "VALIDADO",
+          "desgloseFin": "{\"500\":2,\"200\":4,\"100\":3,\"50\":2,\"20\":4}",
+          "fechaValidacion": "2026-11-11T21:10:00-06:00",
+          "fechaCorte": "2026-11-11T21:05:00-06:00",
+          "observaciones": "Corte cuadrado del turno de tienda"
+        }
+      }
+    ]
+  }
 }
 
