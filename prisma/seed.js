@@ -1,5 +1,6 @@
 /**
- * Seed declarativo de secciones, módulos, permisos y roles.
+ * Seed declarativo de secciones, módulos, permisos, roles
+ * y registros de ejemplo para pruebas.
  * Los datos editables viven en ./seed-data.json.
  *
  * Ejecución: npx prisma db seed
@@ -181,6 +182,267 @@ async function crearUsuarioDefault() {
     return usuario;
 }
 
+const dia = (iso) => new Date(`${iso}T00:00:00.000Z`);
+const marcaEjemplo = (clave) => `[Ejemplo:${clave}]`;
+
+async function guardar(modelo, where, data) {
+    const existente = await prisma[modelo].findFirst({ where });
+    if (existente) {
+        return prisma[modelo].update({
+            where: { id: existente.id },
+            data: { ...data, deletedAt: null },
+        });
+    }
+    return prisma[modelo].create({ data });
+}
+
+function tomar(item, campos) {
+    const data = {};
+    for (const campo of campos) {
+        if (item[campo] !== undefined) data[campo] = item[campo];
+    }
+    return data;
+}
+
+function exigir(mapa, nombre, catalogo) {
+    const registro = mapa.get(nombre);
+    if (!registro) {
+        throw new Error(`El ejemplo referencia "${nombre}" y no existe en ${catalogo}.`);
+    }
+    return registro;
+}
+
+async function sembrarCatalogo(modelo, items, campos) {
+    const mapa = new Map();
+    for (const item of items ?? []) {
+        const registro = await guardar(modelo, { nombre: item.nombre }, tomar(item, campos));
+        mapa.set(item.nombre, registro);
+    }
+    return mapa;
+}
+
+async function sembrarEjemplos(ejemplos) {
+    if (!ejemplos) return;
+
+    const estadosCliente = await sembrarCatalogo('estadoCliente', ejemplos.estadosCliente, ['nombre', 'descripcion', 'color']);
+    const estadosMembresia = await sembrarCatalogo('estadoMembresia', ejemplos.estadosMembresia, ['nombre', 'descripcion', 'color']);
+    const tiposMembresia = await sembrarCatalogo('tipoMembresia', ejemplos.tiposMembresia, ['nombre', 'descripcion', 'duracionDias', 'precio', 'estado']);
+    const tiposVisita = await sembrarCatalogo('tipoVisita', ejemplos.tiposVisita, ['nombre', 'descripcion', 'costo', 'estado']);
+    const estadosEmpleado = await sembrarCatalogo('estadoEmpleado', ejemplos.estadosEmpleado, ['nombre', 'descripcion']);
+    const areas = await sembrarCatalogo('areaTrabajo', ejemplos.areasTrabajo, ['nombre', 'descripcion', 'estado']);
+    const cajas = await sembrarCatalogo('caja', ejemplos.cajas, ['nombre', 'ubicacion', 'estado']);
+
+    const categorias = new Map();
+    for (const item of ejemplos.categoriasProducto ?? []) {
+        const registro = await prisma.categoriaProducto.upsert({
+            where: { nombre: item.nombre },
+            update: { ...tomar(item, ['descripcion', 'estado']), deletedAt: null },
+            create: tomar(item, ['nombre', 'descripcion', 'estado']),
+        });
+        categorias.set(item.nombre, registro);
+    }
+
+    for (const item of ejemplos.productos ?? []) {
+        const categoria = exigir(categorias, item.categoria, 'categorías de producto');
+        const data = {
+            ...tomar(item, ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockActual', 'stockMinimo', 'estado', 'disponibleCompra']),
+            categoriaProductoId: categoria.id,
+        };
+        await prisma.producto.upsert({
+            where: { codigoBarras: item.codigoBarras },
+            update: { ...data, deletedAt: null },
+            create: { ...data, codigoBarras: item.codigoBarras },
+        });
+    }
+
+    for (const item of ejemplos.metodosPago ?? []) {
+        const data = tomar(item, ['descripcion', 'estado']);
+        await prisma.metodoPago.upsert({
+            where: { nombre: item.nombre },
+            update: { ...data, deletedAt: null },
+            create: { nombre: item.nombre, ...data },
+        });
+    }
+
+    for (const item of ejemplos.servicios ?? []) {
+        const data = tomar(item, ['descripcion', 'precio', 'estado', 'disponibleCompra']);
+        await prisma.servicio.upsert({
+            where: { nombre: item.nombre },
+            update: { ...data, deletedAt: null },
+            create: { nombre: item.nombre, ...data },
+        });
+    }
+
+    const puestos = new Map();
+    for (const item of ejemplos.puestos ?? []) {
+        const area = exigir(areas, item.area, 'áreas de trabajo');
+        const registro = await guardar('puesto', { nombre: item.nombre, areaTrabajoId: area.id }, {
+            areaTrabajoId: area.id,
+            ...tomar(item, ['nombre', 'descripcion', 'salarioBase', 'estado']),
+        });
+        puestos.set(`${item.area}::${item.nombre}`, registro);
+    }
+
+    const empleados = new Map();
+    for (const item of ejemplos.empleados ?? []) {
+        const puesto = exigir(puestos, `${item.area}::${item.puesto}`, 'puestos');
+        const area = exigir(areas, item.area, 'áreas de trabajo');
+        const estado = exigir(estadosEmpleado, item.estado, 'estados de empleado');
+        const usuario = item.usuarioEmail
+            ? await prisma.usuario.findUnique({ where: { email: item.usuarioEmail } })
+            : null;
+        const registro = await guardar('empleado', { correo: item.correo }, {
+            puestoId: puesto.id,
+            areaTrabajoId: area.id,
+            estadoEmpleadoId: estado.id,
+            usuarioId: usuario?.id ?? null,
+            ...tomar(item, ['nombre', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'direccion']),
+            fechaNacimiento: dia(item.fechaNacimiento),
+            fechaIngreso: dia(item.fechaIngreso),
+        });
+        empleados.set(item.correo, registro);
+    }
+
+    for (const item of ejemplos.tiposActividad ?? []) {
+        const area = item.area ? exigir(areas, item.area, 'áreas de trabajo') : null;
+        await guardar('tipoActividad', { nombre: item.nombre }, {
+            areaTrabajoId: area?.id ?? null,
+            ...tomar(item, ['nombre', 'descripcion', 'estado']),
+        });
+    }
+
+    for (const item of ejemplos.clientes ?? []) {
+        const estado = exigir(estadosCliente, item.estado, 'estados de cliente');
+        const usuario = item.usuarioEmail
+            ? await prisma.usuario.findUnique({ where: { email: item.usuarioEmail } })
+            : null;
+        const cliente = await guardar('cliente', { correo: item.correo }, {
+            estadoClienteId: estado.id,
+            usuarioId: usuario?.id ?? null,
+            ...tomar(item, [
+                'nombre', 'apellidoPaterno', 'apellidoMaterno', 'genero', 'telefono', 'correo',
+                'direccion', 'contactoEmergenciaNombre', 'contactoEmergenciaTelefono',
+            ]),
+            fechaNacimiento: dia(item.fechaNacimiento),
+            fechaRegistro: dia(item.fechaRegistro),
+        });
+
+        let membresia = null;
+        if (item.membresia) {
+            const tipo = exigir(tiposMembresia, item.membresia.tipo, 'tipos de membresía');
+            const estadoMembresia = exigir(estadosMembresia, item.membresia.estado, 'estados de membresía');
+            const fechaInicio = dia(item.membresia.fechaInicio);
+            membresia = await guardar('clienteMembresia', {
+                clienteId: cliente.id,
+                tipoMembresiaId: tipo.id,
+                fechaInicio,
+            }, {
+                clienteId: cliente.id,
+                tipoMembresiaId: tipo.id,
+                estadoMembresiaId: estadoMembresia.id,
+                fechaInicio,
+                fechaFin: dia(item.membresia.fechaFin),
+                renovacionAutomatica: item.membresia.renovacionAutomatica ?? false,
+            });
+        }
+
+        for (const asistencia of item.asistencias ?? []) {
+            const nota = marcaEjemplo(asistencia.clave);
+            await guardar('asistencia', { observaciones: { startsWith: nota } }, {
+                clienteId: cliente.id,
+                clienteMembresiaId: membresia?.id ?? null,
+                fechaHora: new Date(asistencia.fechaHora),
+                observaciones: `${nota} ${asistencia.observaciones ?? ''}`.trim(),
+            });
+        }
+    }
+
+    for (const item of ejemplos.visitas ?? []) {
+        const tipo = exigir(tiposVisita, item.tipo, 'tipos de visita');
+        const nota = marcaEjemplo(item.clave);
+        await guardar('visita', { observaciones: { startsWith: nota } }, {
+            nombreVisitante: item.nombreVisitante,
+            tipoVisitaId: tipo.id,
+            costo: item.costo,
+            fechaHora: new Date(item.fechaHora),
+            observaciones: `${nota} ${item.observaciones ?? ''}`.trim(),
+        });
+    }
+
+    for (const item of ejemplos.aperturasCaja ?? []) {
+        const caja = exigir(cajas, item.caja, 'cajas');
+        const empleado = exigir(empleados, item.empleadoCorreo, 'empleados');
+        const nota = marcaEjemplo(item.clave);
+        let apertura = await prisma.aperturaCaja.findFirst({
+            where: { observaciones: { startsWith: nota } },
+        });
+
+        let estado = item.estado;
+        if (estado === 'ABIERTA') {
+            const otraAbierta = await prisma.aperturaCaja.findFirst({
+                where: {
+                    cajaId: caja.id,
+                    estado: 'ABIERTA',
+                    deletedAt: null,
+                    ...(apertura ? { id: { not: apertura.id } } : {}),
+                },
+            });
+            if (otraAbierta && !apertura) {
+                console.warn(`Se omite ${item.clave}: ${item.caja} ya tiene una sesión abierta.`);
+                continue;
+            }
+            if (otraAbierta && apertura) {
+                console.warn(`No se reabre ${item.clave}: ${item.caja} ya tiene otra sesión abierta.`);
+                estado = apertura.estado;
+            }
+        }
+
+        const dataApertura = {
+            cajaId: caja.id,
+            empleadoId: empleado.id,
+            montoInicial: item.montoInicial,
+            fechaApertura: new Date(item.fechaApertura),
+            estado,
+            desgloseInicio: item.desgloseInicio ?? null,
+            observaciones: `${nota} ${item.observaciones ?? ''}`.trim(),
+        };
+        apertura = apertura
+            ? await prisma.aperturaCaja.update({ where: { id: apertura.id }, data: { ...dataApertura, deletedAt: null } })
+            : await prisma.aperturaCaja.create({ data: dataApertura });
+
+        for (const movimiento of item.movimientos ?? []) {
+            const notaMovimiento = marcaEjemplo(movimiento.clave);
+            await guardar('movimientoCaja', { observaciones: { startsWith: notaMovimiento } }, {
+                aperturaCajaId: apertura.id,
+                empleadoId: empleado.id,
+                tipo: movimiento.tipo,
+                monto: movimiento.monto,
+                concepto: movimiento.concepto,
+                estado: movimiento.estado,
+                observaciones: `${notaMovimiento} ${movimiento.observaciones ?? ''}`.trim(),
+            });
+        }
+
+        if (item.corte) {
+            const notaCorte = marcaEjemplo(item.corte.clave);
+            await guardar('corteCaja', { observaciones: { startsWith: notaCorte } }, {
+                aperturaCajaId: apertura.id,
+                empleadoId: empleado.id,
+                ...tomar(item.corte, [
+                    'efectivoContado', 'totalEntradas', 'totalSalidas', 'totalVentas',
+                    'totalVentasEfectivo', 'diferencia', 'estado', 'desgloseFin',
+                ]),
+                desgloseInicio: item.desgloseInicio ?? null,
+                fechaValidacion: item.corte.fechaValidacion ? new Date(item.corte.fechaValidacion) : null,
+                fechaCorte: new Date(item.corte.fechaCorte),
+                observaciones: `${notaCorte} ${item.corte.observaciones ?? ''}`.trim(),
+            });
+        }
+    }
+
+    console.log('Registros de ejemplo sincronizados.');
+}
+
 async function main() {
     console.log('Iniciando seed declarativo...');
 
@@ -291,6 +553,8 @@ async function main() {
         });
     }
     console.log('Configuraciones del sistema sincronizadas.');
+
+    await sembrarEjemplos(seedData.ejemplos);
 
     console.log('Seed completado correctamente.');
 }
