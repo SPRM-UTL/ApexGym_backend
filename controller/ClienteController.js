@@ -199,6 +199,32 @@ export class ClienteController extends BaseController {
             return this.respuestaError(res, error);
         }
     }
+
+    obtenerMiPerfil = async (req, res) => {
+        try {
+            const usuarioId = req.usuario?.id;
+            if (!usuarioId) {
+                throw new Error('Usuario no autenticado');
+            }
+            const perfil = await clienteService.obtenerMiPerfil(usuarioId);
+            return this.respuestaExito(res, perfil, 'Perfil obtenido correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    actualizarMiPerfil = async (req, res) => {
+        try {
+            const usuarioId = req.usuario?.id;
+            if (!usuarioId) {
+                throw new Error('Usuario no autenticado');
+            }
+            const perfilActualizado = await clienteService.actualizarMiPerfil(usuarioId, req.body);
+            return this.respuestaExito(res, perfilActualizado, 'Perfil actualizado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
 }
 
 export const clienteController = new ClienteController();
