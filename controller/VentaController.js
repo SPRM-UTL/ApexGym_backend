@@ -8,6 +8,62 @@ export class VentaController extends BaseController {
         super(ventaDao);
     }
 
+    obtenerTodos = async (req, res) => {
+        try {
+            const pagina = Number(req.query.pagina ?? 1);
+            const limiteSolicitado = Number(req.query.limite ?? 20);
+            const clienteId = req.query.clienteId === undefined
+                ? undefined
+                : this.leerId(req.query.clienteId, 'cliente');
+            const cliente = typeof req.query.cliente === 'string'
+                ? req.query.cliente.trim()
+                : '';
+            const busqueda = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+            const estado = req.query.estado;
+            const metodoPagoId = req.query.metodoPagoId === undefined
+                ? undefined
+                : this.leerId(req.query.metodoPagoId, 'método de pago');
+            const fechaDesde = this.leerFecha(req.query.fechaDesde, 'fecha desde');
+            const fechaHasta = this.leerFecha(req.query.fechaHasta, 'fecha hasta');
+
+            if (
+                !Number.isSafeInteger(pagina) || pagina < 1
+                || !Number.isSafeInteger(limiteSolicitado) || limiteSolicitado < 1
+                || (req.query.cliente !== undefined && typeof req.query.cliente !== 'string')
+                || cliente.length > 100
+                || (req.query.q !== undefined && typeof req.query.q !== 'string')
+                || busqueda.length > 100
+                || (estado !== undefined && !['completada', 'cancelada'].includes(estado))
+                || (fechaDesde && fechaHasta && fechaDesde > fechaHasta)
+            ) {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'Los filtros o parámetros de paginación no son válidos',
+                    400
+                ));
+            }
+
+            const resultado = await this.dao.obtenerVentas({
+                pagina,
+                limite: Math.min(limiteSolicitado, 100),
+                clienteId,
+                cliente,
+                busqueda,
+                fechaDesde,
+                fechaHasta,
+                metodoPagoId,
+                estado,
+            });
+            return this.respuestaExito(res, resultado, 'Ventas obtenidas correctamente');
+        } catch (error) {
+            if (error.status === 400) {
+                return res.status(400).json(new ResponseModel(null, 1, error.message, 400));
+            }
+            return this.respuestaError(res, error);
+        }
+    };
+
     create = async (req, res) => {
         try {
             const {
@@ -28,6 +84,7 @@ export class VentaController extends BaseController {
                 empleadoId: this.leerId(empleadoId, 'empleado'),
                 aperturaCajaId: Number(aperturaCajaId),
                 clienteId: Number(clienteId),
+                usuarioId: this.leerId(req.usuario?.id, 'usuario autenticado'),
                 metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),
                 subtotal: this.leerMonto(subtotal, 'subtotal'),
                 total: this.leerMonto(total, 'total'),
@@ -41,6 +98,14 @@ export class VentaController extends BaseController {
                 'Venta creada correctamente'
             );
         } catch (error) {
+            if (error.code === 'APERTURA_CAJA_CERRADA') {
+                return res.status(error.status).json(new ResponseModel(
+                    { code: error.code },
+                    1,
+                    error.message,
+                    error.status
+                ));
+            }
             return this.respuestaError(res, error);
         }
     };
@@ -49,6 +114,15 @@ export class VentaController extends BaseController {
         try {
             const id = this.leerId(req.params.id);
             const { metodoPagoId, detalleVenta, subtotal, total } = req.body;
+
+            if (
+                detalleVenta === undefined
+                && (subtotal !== undefined || total !== undefined)
+            ) {
+                throw new Error(
+                    'El subtotal y el total solo se pueden validar junto con el detalle de la venta'
+                );
+            }
 
             const datos = {};
 
@@ -61,23 +135,8 @@ export class VentaController extends BaseController {
 
             if (detalleVenta !== undefined) {
                 datos.detalleVenta = this.normalizarDetalles(detalleVenta);
-            }
-
-            if (subtotal !== undefined) {
                 datos.subtotal = this.leerMonto(subtotal, 'subtotal');
-            }
-
-            if (total !== undefined) {
                 datos.total = this.leerMonto(total, 'total');
-            }
-
-            if (
-                detalleVenta === undefined &&
-                (subtotal !== undefined || total !== undefined)
-            ) {
-                throw new Error(
-                    'El subtotal y el total solo se pueden actualizar junto con el detalle de la venta'
-                );
             }
 
             if (Object.keys(datos).length === 0) {
@@ -141,24 +200,9 @@ normalizarDetalles(detalleVenta) {
             throw new Error("La cantidad debe ser un entero mayor que cero");
         }
 
-        const precioUnitario = Number(d.precioUnitario);
-        const subtotalLinea = Number(d.subtotal);
-
-        if (d.precioUnitario === undefined || d.precioUnitario === null || d.precioUnitario === '' ||
-            !Number.isFinite(precioUnitario) || precioUnitario < 0) {
-            throw new Error("El precioUnitario es obligatorio y debe ser válido");
-        }
-
-        if (d.subtotal === undefined || d.subtotal === null || d.subtotal === '' ||
-            !Number.isFinite(subtotalLinea) || subtotalLinea < 0) {
-            throw new Error("El subtotal del artículo es obligatorio y debe ser válido");
-        }
-
         const detalle = {
             tipoItem,
             cantidad,
-            precioUnitario,
-            subtotal: subtotalLinea,
             descripcion: d.descripcion ?? null,
             productoId: null,
             servicioId: null,
@@ -252,6 +296,30 @@ normalizarDetalles(detalleVenta) {
 
     return n;
 };
+
+    leerFecha = (valor, nombre) => {
+        if (valor === undefined || valor === '') return undefined;
+        if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+            const error = new Error(`El ${nombre} no es válido`);
+            error.status = 400;
+            throw error;
+        }
+
+        const [anio, mes, dia] = valor.split('-').map(Number);
+        const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+        if (
+            fecha.getUTCFullYear() !== anio
+            || fecha.getUTCMonth() !== mes - 1
+            || fecha.getUTCDate() !== dia
+        ) {
+            const error = new Error(`El ${nombre} no es válido`);
+            error.status = 400;
+            throw error;
+        }
+
+        if (nombre === 'fecha hasta') fecha.setUTCHours(23, 59, 59, 999);
+        return fecha;
+    };
 }
 
 export const ventaController = new VentaController();

@@ -54,6 +54,7 @@ export class ProductoDao extends BaseDao {
       id: true,
       nombre: true,
       precioVenta: true,
+      descuentoPorcentaje: true,
       imagenUrl: true,
       codigoBarras: true,
       categoriaProductoId: true,

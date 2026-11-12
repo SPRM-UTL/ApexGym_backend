@@ -32,6 +32,7 @@ import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 import { VentaController } from '../controller/VentaController.js';
+import { DevolucionController } from '../controller/DevolucionController.js';
 import { AsistenciaController } from '../controller/AsistenciaController.js';
 import { VisitaController } from '../controller/VisitaController.js';
 
@@ -53,6 +54,7 @@ const tipoVisitaController = new TipoVisitaController();
 const clienteMembresiaController = new ClienteMembresiaController();
 const metodoPagoController = new MetodoPagoController();
 const ventaController = new VentaController();
+const devolucionController = new DevolucionController();
 
 const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
@@ -466,6 +468,12 @@ aperturaCajaRoutes.get(
     autenticarUsuario,
     verificarPermiso('Apertura de Caja', 'Listar'),
     aperturaCajaController.obtenerTodos.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.get(
+    '/abierta',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Listar'),
+    aperturaCajaController.obtenerAbiertas.bind(aperturaCajaController)
 );
 aperturaCajaRoutes.get(
     '/:id',
@@ -884,6 +892,27 @@ ventaRoutes.get(
     ventaController.obtenerPorId.bind(ventaController)
 )
 
+ventaRoutes.get(
+    '/:id/devoluciones/disponibilidad',
+    autenticarUsuario,
+    verificarPermiso('Registro de ventas', 'Listar'),
+    devolucionController.obtenerDisponibilidad.bind(devolucionController)
+)
+
+ventaRoutes.post(
+    '/:id/devoluciones/previsualizar',
+    autenticarUsuario,
+    verificarPermiso('Registro de ventas', 'Crear'),
+    devolucionController.previsualizar.bind(devolucionController)
+)
+
+ventaRoutes.post(
+    '/:id/devoluciones',
+    autenticarUsuario,
+    verificarPermiso('Registro de ventas', 'Crear'),
+    devolucionController.crear.bind(devolucionController)
+)
+
 ventaRoutes.post(
     '/',
     autenticarUsuario,
@@ -891,18 +920,18 @@ ventaRoutes.post(
     ventaController.create.bind(ventaController)
 )
 
+ventaRoutes.post(
+    '/:id/cancelar',
+    autenticarUsuario,
+    verificarPermiso('Registro de ventas', 'Eliminar'),
+    ventaController.cancel.bind(ventaController)
+)
+
 ventaRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Registro de ventas' , 'Editar'),
     ventaController.update.bind(ventaController)
-)
-
-ventaRoutes.delete(
-    '/:id',
-    autenticarUsuario,
-    verificarPermiso('Registro de ventas' , 'Eliminar'),
-    ventaController.cancel.bind(ventaController)
 )
 
 //---Rutas Servicios-------------------------

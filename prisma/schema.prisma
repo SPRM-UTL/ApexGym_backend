@@ -20,6 +20,7 @@ model Usuario {
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
   cliente         Cliente?
+  ventasRegistradas Venta[]
 
   @@map("usuarios")
 }
@@ -168,6 +169,7 @@ model Empleado {
   movimientosCaja MovimientoCaja[]
   cortesCaja      CorteCaja[]
   ventas          Venta[]
+  devoluciones    Devolucion[]
 
   @@map("empleados")
 }
@@ -434,6 +436,7 @@ model AperturaCaja {
   movimientos MovimientoCaja[]
   cortes      CorteCaja[]
   venta            Venta[]
+  devoluciones     Devolucion[]
 
   @@map("aperturas_caja")
 }
@@ -454,6 +457,8 @@ model MovimientoCaja {
 
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  devolucionId Int?          @unique @map("devolucion_id")
+  devolucion   Devolucion?   @relation(fields: [devolucionId], references: [id], onDelete: Restrict)
 
   @@map("movimientos_caja")
 }
@@ -465,8 +470,11 @@ model CorteCaja {
   efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
   totalEntradas   Decimal   @default(0) @map("total_entradas") @db.Decimal(10, 2)
   totalSalidas    Decimal   @default(0) @map("total_salidas") @db.Decimal(10, 2)
-  totalVentas     Decimal   @default(0) @map("total_ventas") @db.Decimal(10, 2)
-  totalVentasEfectivo Decimal @default(0) @map("total_ventas_efectivo") @db.Decimal(10, 2)
+  totalVentas     Decimal?  @map("total_ventas") @db.Decimal(10, 2)
+  totalVentasEfectivo Decimal? @map("total_ventas_efectivo") @db.Decimal(10, 2)
+  totalVentasCanceladas Decimal? @map("total_ventas_canceladas") @db.Decimal(10, 2)
+  totalDevoluciones Decimal? @map("total_devoluciones") @db.Decimal(10, 2)
+  efectivoEsperado Decimal? @map("efectivo_esperado") @db.Decimal(10, 2)
   diferencia      Decimal   @db.Decimal(10, 2)
   estado          String    @default("PENDIENTE") @db.VarChar(20)
   desgloseInicio  String?   @map("desglose_inicio") @db.Text
@@ -491,6 +499,7 @@ model Producto {
   nombre              String    @db.VarChar(150)
   descripcion         String?   @db.Text
   precioVenta         Float     @map("precio_venta")
+  descuentoPorcentaje Decimal  @default(0) @map("descuento_porcentaje") @db.Decimal(5, 2)
   precioCompra        Float?    @map("precio_compra")
   stockActual         Int       @default(0) @map("stock_actual")
   stockMinimo         Int       @default(1) @map("stock_minimo")
@@ -515,7 +524,8 @@ model FolioVenta {
 model Venta {
   id                  Int               @id @default(autoincrement())
   empleadoId          Int               @map("empleado_id")
-  clientId            Int               @map("cliente_id")
+  clienteId           Int               @map("cliente_id")
+  usuarioId           Int?              @map("usuario_id")
   folioVentaId        Int               @unique @map("folio_venta_id")
   aperturaCajaId      Int?              @map("apertura_caja_id")
   metodoPagoId        Int?              @map("metodo_pago_id")
@@ -534,14 +544,17 @@ model Venta {
 
   aperturaCaja        AperturaCaja?     @relation(fields: [aperturaCajaId], references: [id])
   empleado            Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
-  cliente             Cliente           @relation(fields: [clientId], references: [id])
+  cliente             Cliente           @relation(fields: [clienteId], references: [id])
+  usuario             Usuario?          @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
   metodoPago          MetodoPago?       @relation(fields: [metodoPagoId], references: [id], onDelete: Restrict)
   folioVenta          FolioVenta        @relation(fields: [folioVentaId], references: [id])
   detalleVenta        DetalleVenta[]
+  devoluciones       Devolucion[]
 
   @@index([empleadoId])
+  @@index([usuarioId])
   @@index([metodoPagoId])
-  @@index([clientId])
+  @@index([clienteId])
   @@map("venta")
 }
 
@@ -559,6 +572,7 @@ model DetalleVenta {
   descripcion      String?        @db.VarChar(200) 
   cantidad         Int            @default(1)
   precioUnitario   Float          @map("precio_unitario")
+  descuentoUnitario Decimal       @default(0) @map("descuento_unitario") @db.Decimal(10, 2)
   subtotal         Float
 
   venta            Venta              @relation(fields: [ventaId], references: [id], onDelete: Cascade)
@@ -566,6 +580,7 @@ model DetalleVenta {
   servicio         Servicio?          @relation(fields: [servicioId], references: [id])
   tipoMembresia    TipoMembresia?     @relation(fields: [tipoMembresiaId], references: [id])
   clienteMembresia ClienteMembresia?  @relation(fields: [clienteMembresiaId], references: [id])
+  devoluciones    DevolucionDetalle[]
 
   @@map("detalle_venta")
 }
@@ -580,6 +595,7 @@ model MetodoPago {
   deletedAt   DateTime? @map("deleted_at")
 
   ventas      Venta[]
+  devoluciones Devolucion[]
 
   @@map("metodo_pago")
 }
@@ -637,4 +653,45 @@ model Visita {
   tipoVisita TipoVisita @relation(fields: [tipoVisitaId], references: [id], onDelete: Restrict)
 
   @@map("visitas")
+}
+
+
+model Devolucion {
+  id             Int      @id @default(autoincrement())
+  ventaId        Int      @map("venta_id")
+  aperturaCajaId Int      @map("apertura_caja_id")
+  empleadoId     Int      @map("empleado_id")
+  metodoPagoId   Int      @map("metodo_pago_id")
+  monto          Decimal  @db.Decimal(10, 2)
+  motivo         String   @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  venta          Venta          @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  aperturaCaja   AperturaCaja   @relation(fields: [aperturaCajaId], references: [id], onDelete: Restrict)
+  empleado       Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  metodoPago     MetodoPago     @relation(fields: [metodoPagoId], references: [id], onDelete: Restrict)
+  detalles       DevolucionDetalle[]
+  movimientoCaja MovimientoCaja?
+
+  @@index([ventaId])
+  @@index([aperturaCajaId])
+  @@index([empleadoId])
+  @@index([metodoPagoId])
+  @@map("devoluciones")
+}
+
+model DevolucionDetalle {
+  id               Int      @id @default(autoincrement())
+  devolucionId     Int      @map("devolucion_id")
+  detalleVentaId   Int      @map("detalle_venta_id")
+  cantidad         Int
+  monto            Decimal  @db.Decimal(10, 2)
+  regresaAStock    Boolean  @default(false) @map("regresa_a_stock")
+
+  devolucion   Devolucion   @relation(fields: [devolucionId], references: [id], onDelete: Restrict)
+  detalleVenta DetalleVenta @relation(fields: [detalleVentaId], references: [id], onDelete: Restrict)
+
+  @@index([devolucionId])
+  @@index([detalleVentaId])
+  @@map("devolucion_detalle")
 }

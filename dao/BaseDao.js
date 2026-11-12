@@ -4,7 +4,7 @@ const { PrismaClient } = pkg;
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 
-const pool = mariadb.createPool({
+export const pool = mariadb.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     user: process.env.DB_USER,

@@ -33,6 +33,15 @@ export class AperturaCajaDao extends BaseDao {
         });
     }
 
+    async getAbiertas() {
+        return this.prisma.aperturaCaja.findMany({
+            where: { estado: 'ABIERTA', deletedAt: null },
+            omit: this.omit,
+            include: INCLUDE_DEFAULT,
+            orderBy: [{ id: 'desc' }, { fechaApertura: 'desc' }],
+        });
+    }
+
     async getById(id) {
         return this.prisma.aperturaCaja.findUnique({
             where: { id, deletedAt: null },

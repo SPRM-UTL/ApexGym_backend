@@ -2,6 +2,32 @@ import { productoDao } from "../dao/ProductoDao.js";
 import { BaseController } from "./BaseController.js";
 import { guardarImagenServidor } from "../utilidades/guardarImagen.js";
 
+function normalizarDescuentoPorcentaje(valor) {
+    if (valor === undefined || valor === null || valor === '') {
+        return 0;
+    }
+
+    if (typeof valor !== 'number' && typeof valor !== 'string') {
+        throw new Error("El descuento debe ser un porcentaje numérico");
+    }
+
+    const texto = String(valor).trim();
+    if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(texto)) {
+        throw new Error("El descuento debe tener como máximo dos decimales");
+    }
+
+    const descuento = Number(texto);
+    if (
+        !Number.isFinite(descuento)
+        || descuento < 0
+        || descuento > 100
+    ) {
+        throw new Error("El descuento debe ser un porcentaje entre 0 y 100, con hasta dos decimales");
+    }
+
+    return descuento;
+}
+
 export class ProductoController extends BaseController {
     constructor() {
         super(productoDao);
@@ -14,6 +40,7 @@ export class ProductoController extends BaseController {
             nombre,
             descripcion,
             precioVenta,
+            descuentoPorcentaje,
             precioCompra,
             stockActual,
             stockMinimo,
@@ -30,6 +57,7 @@ export class ProductoController extends BaseController {
                 nombre,
                 descripcion: descripcion || null,
                 precioVenta: parseFloat(precioVenta),
+                descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
                 precioCompra: precioCompra ? parseFloat(precioCompra) : null,
                 stockActual: stockActual ? Number(stockActual) : 0,
                 stockMinimo: stockMinimo ? Number(stockMinimo) : 1,
@@ -51,6 +79,7 @@ export class ProductoController extends BaseController {
             nombre,
             descripcion,
             precioVenta,
+            descuentoPorcentaje,
             precioCompra,
             stockActual,
             stockMinimo,
@@ -67,6 +96,9 @@ export class ProductoController extends BaseController {
                 ...(nombre && { nombre }),
                 ...(descripcion !== undefined && { descripcion }),
                 ...(precioVenta !== undefined && { precioVenta: parseFloat(precioVenta) }),
+                ...(descuentoPorcentaje !== undefined && {
+                    descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
+                }),
                 ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null }),
                 ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
                 ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),

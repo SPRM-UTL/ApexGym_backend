@@ -14,15 +14,12 @@ agent/
 .claude/
 .cursor/
 .devin/
-<<<<<<< HEAD
 /apuntes/
-=======
 .copilot/
 .gemini/
 .antigravity/
 .system_generated/
 .brain/
->>>>>>> c3c08c9aee440ce1dc836111d4fe91e1546a7859
 
 # Archivos de logs y temporales
 npm-debug.log*
@@ -45,6 +42,13 @@ imagenes/
 /imagenes/
 usuarios/
 /usuarios/
+tests/
+
+prisma/migrations/
+prisma/migrations/**
+
+prisma/migrations/
+prisma/migrations/**
 
 # Archivos de imágenes subidas, capturas y multimedia
 .user_uploaded/
@@ -61,21 +65,18 @@ media_*
 !.vscode/extensions.json
 .idea/
 
-# Migraciones de Prisma y copias locales
-prisma/migrations/
+# Copias locales de migraciones
 public/uploads/.vs/ 
 
 migrations/
+prisma/migrations/
+prisma/migrations/**
 backend/migrations/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/
-<<<<<<< HEAD
 
 # Directorios de imágenes
 /public/imagenes/
 /imagenes/
 /usuarios/
-
-=======
->>>>>>> c3c08c9aee440ce1dc836111d4fe91e1546a7859

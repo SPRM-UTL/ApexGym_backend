@@ -22,6 +22,15 @@ export class AperturaCajaController extends BaseController {
         super(aperturaCajaDao);
     }
 
+    obtenerAbiertas = async (req, res) => {
+        try {
+            const registros = await this.dao.getAbiertas();
+            return this.respuestaExito(res, registros, 'Aperturas de caja abiertas obtenidas correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     crear = async (req, res) => {
         try {
             const { cajaId, empleadoId, montoInicial, fechaApertura, observaciones, desgloseInicio } = req.body;

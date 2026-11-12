@@ -1,9 +1,17 @@
 import { BaseDao } from "./BaseDao.js";
 //dependecia que nos permite hacer movimientos y redondeo de dinero
 import currency from "currency.js";
+import { TASA_IVA } from "../utilidades/constantes.js";
 
 const ESTADO_CAJA = { ABIERTA: "ABIERTA", CERRADA: "CERRADA" };
 const ESTADO_VENTA = { COMPLETADA : "completada" , CANCELADA : "cancelada"}
+const ETIQUETAS_ESTADO_DEVOLUCION = {
+    SIN_DEVOLUCION: 'Sin devolución',
+    SIN_DEVOLUCIONES: 'Sin devoluciones',
+    DEVUELTA_PARCIALMENTE: 'Devuelta parcialmente',
+    DEVUELTA_TOTALMENTE: 'Devuelta totalmente',
+};
+
 export class VentaDao extends BaseDao {
     constructor() {
         super(
@@ -72,11 +80,118 @@ async getAll() {
     });
 }
 
+async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, fechaHasta, metodoPagoId, estado }) {
+    const condiciones = [
+        {
+            OR: [
+                { deletedAt: null },
+                { estado: { in: ['cancelada', 'cancelado'] } },
+            ],
+        },
+    ];
+
+    if (clienteId !== undefined) condiciones.push({ clienteId });
+    if (metodoPagoId !== undefined) condiciones.push({ metodoPagoId });
+    if (cliente) {
+        condiciones.push({
+            cliente: {
+                is: {
+                    OR: [
+                        { nombre: { contains: cliente } },
+                        { apellidoPaterno: { contains: cliente } },
+                        { apellidoMaterno: { contains: cliente } },
+                    ],
+                },
+            },
+        });
+    }
+    if (busqueda) {
+        const idNumerico = /^\d+$/.test(busqueda) ? Number(busqueda) : null;
+        condiciones.push({
+            OR: [
+                ...(Number.isSafeInteger(idNumerico) && idNumerico > 0
+                    ? [{ folioVenta: { is: { id: idNumerico } } }]
+                    : []),
+                {
+                    cliente: {
+                        is: {
+                            OR: [
+                                { nombre: { contains: busqueda } },
+                                { apellidoPaterno: { contains: busqueda } },
+                                { apellidoMaterno: { contains: busqueda } },
+                            ],
+                        },
+                    },
+                },
+                {
+                    empleado: {
+                        is: {
+                            OR: [
+                                { nombre: { contains: busqueda } },
+                                { apellidoPaterno: { contains: busqueda } },
+                            ],
+                        },
+                    },
+                },
+                { estado: { contains: busqueda } },
+                { metodoPago: { is: { nombre: { contains: busqueda } } } },
+            ],
+        });
+    }
+    if (fechaDesde || fechaHasta) {
+        condiciones.push({
+            createdAt: {
+                ...(fechaDesde && { gte: fechaDesde }),
+                ...(fechaHasta && { lte: fechaHasta }),
+            },
+        });
+    }
+    if (estado === 'completada') {
+        condiciones.push({ estado: { in: ['completada', 'completado', 'completa'] } });
+    } else if (estado === 'cancelada') {
+        condiciones.push({ estado: { in: ['cancelada', 'cancelado'] } });
+    }
+
+    const where = { AND: condiciones };
+    const skip = (pagina - 1) * limite;
+    const include = {
+        cliente: { select: { id: true, nombre: true, apellidoPaterno: true, apellidoMaterno: true } },
+        empleado: { select: { id: true, nombre: true, apellidoPaterno: true } },
+        folioVenta: { select: { id: true } },
+        aperturaCaja: {
+            select: {
+                id: true,
+                estado: true,
+                empleado: { select: { id: true, nombre: true } },
+                caja: { select: { id: true, nombre: true } },
+            },
+        },
+        metodoPago: { select: { id: true, nombre: true, codigo: true } },
+    };
+
+    const [registros, total] = await Promise.all([
+        this.prisma.venta.findMany({
+            where,
+            omit: { ...this.omit, createdAt: false },
+            include,
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            skip,
+            take: limite,
+        }),
+        this.prisma.venta.count({ where }),
+    ]);
+
+    return { registros, total, pagina, limite };
+}
+
 async getById(id, client = this.prisma) {
     const venta = await client.venta.findFirst({
         where: {
             id: Number(id),
-            deletedAt: null,
+            OR: [
+                { deletedAt: null },
+                { estado: { in: ['cancelada', 'cancelado'] } },
+            ],
         },
         omit: this.omit,
         include: {
@@ -118,8 +233,37 @@ async getById(id, client = this.prisma) {
                     codigo: true,
                 },
             },
+            devoluciones: {
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    createdAt: true,
+                    monto: true,
+                    motivo: true,
+                    empleado: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellidoPaterno: true,
+                            apellidoMaterno: true,
+                        },
+                    },
+                    metodoPago: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            codigo: true,
+                        },
+                    },
+                },
+            },
             detalleVenta: {
                 include: {
+                    devoluciones: {
+                        select: {
+                            cantidad: true,
+                        },
+                    },
                     producto: {
                         select: {
                             id: true,
@@ -145,16 +289,184 @@ async getById(id, client = this.prisma) {
 
     if (!venta) return null;
 
-    return {
-        ...venta,
-        detalleVenta: venta.detalleVenta.map((detalle) => ({
-            ...detalle,
+    const estadoVenta = String(venta.estado ?? '').trim().toLowerCase();
+    const ventaCompletada = ['completada', 'completado'].includes(estadoVenta);
+    const detalleVenta = venta.detalleVenta.map((detalle) => {
+        const { devoluciones, ...detalleVenta } = detalle;
+        const cantidadDevuelta = devoluciones.reduce(
+            (total, devolucion) => total + Number(devolucion.cantidad),
+            0
+        );
+        const cantidadDisponible = detalle.cantidad - cantidadDevuelta;
+        const esMembresia = detalle.tipoItem === 'MEMBRESIA';
+
+        const estadoDevolucion = cantidadDevuelta === 0
+            ? 'SIN_DEVOLUCION'
+            : cantidadDisponible <= 0
+                ? 'DEVUELTA_TOTALMENTE'
+                : 'DEVUELTA_PARCIALMENTE';
+
+        return {
+            ...detalleVenta,
+            cantidadDevuelta,
+            cantidadDisponible,
+            estadoDevolucion,
+            estadoDevolucionEtiqueta: ETIQUETAS_ESTADO_DEVOLUCION[estadoDevolucion],
+            puedeDevolverse: ventaCompletada && !esMembresia && cantidadDisponible > 0,
             articuloNombre:
                 detalle.producto?.nombre ??
                 detalle.servicio?.nombre ??
                 detalle.tipoMembresia?.nombre ??
                 detalle.descripcion,
+        };
+    });
+    const totalDevuelto = venta.devoluciones.reduce(
+        (total, devolucion) => total.add(Number(devolucion.monto)),
+        currency(0)
+    );
+    const cantidadVendida = detalleVenta.reduce((total, detalle) => total + detalle.cantidad, 0);
+    const cantidadDevuelta = detalleVenta.reduce((total, detalle) => total + detalle.cantidadDevuelta, 0);
+    const cantidadDisponible = detalleVenta.reduce(
+        (total, detalle) => total + (
+            detalle.puedeDevolverse ? detalle.cantidadDisponible : 0
+        ),
+        0
+    );
+    const puedeRegistrarDevolucion = ventaCompletada && cantidadDisponible > 0;
+    const estadoDevolucion = cantidadDevuelta === 0
+        ? 'SIN_DEVOLUCIONES'
+        : cantidadVendida > 0 && cantidadDevuelta >= cantidadVendida
+            ? 'DEVUELTA_TOTALMENTE'
+            : 'DEVUELTA_PARCIALMENTE';
+    const estadoDevolucionEtiqueta = ETIQUETAS_ESTADO_DEVOLUCION[estadoDevolucion];
+
+    return {
+        ...venta,
+        devoluciones: venta.devoluciones.map((devolucion) => ({
+            ...devolucion,
+            monto: Number(devolucion.monto),
+            empleadoNombre: [
+                devolucion.empleado.nombre,
+                devolucion.empleado.apellidoPaterno,
+                devolucion.empleado.apellidoMaterno,
+            ].filter(Boolean).join(' '),
         })),
+        detalleVenta,
+        estadoDevolucion,
+        estadoDevolucionEtiqueta,
+        puedeRegistrarDevolucion,
+        resumenDevoluciones: {
+            cantidadDevoluciones: venta.devoluciones.length,
+            cantidadVendida,
+            cantidadDevuelta,
+            cantidadDisponible,
+            totalDevuelto: totalDevuelto.value,
+            neto: currency(venta.total).subtract(totalDevuelto.value).value,
+            estadoDevolucion,
+            estadoDevolucionEtiqueta,
+            puedeRegistrarDevolucion,
+        },
+    };
+}
+
+async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
+    const idApertura = Number(aperturaCajaId);
+    if (!Number.isSafeInteger(idApertura) || idApertura <= 0) {
+        throw new Error('ID de apertura no válido');
+    }
+
+    const ventas = await client.venta.findMany({
+        where: {
+            aperturaCajaId: idApertura,
+            deletedAt: null,
+        },
+        select: {
+            id: true,
+            total: true,
+            estado: true,
+            metodoPagoId: true,
+            metodoPagoLegacy: true,
+            metodoPago: {
+                select: {
+                    id: true,
+                    nombre: true,
+                    codigo: true,
+                },
+            },
+        },
+    });
+
+    let totalVentas = currency(0);
+    let cantidadVentas = 0;
+    let totalVentasEfectivo = currency(0);
+    let totalVentasEfectivoCanceladas = currency(0);
+    let totalVentasCanceladas = currency(0);
+    let cantidadVentasCanceladas = 0;
+    const metodosMap = new Map();
+
+    for (const venta of ventas) {
+        const totalItem = currency(venta.total);
+        const esCancelada = ['cancelada', 'cancelado'].includes(String(venta.estado ?? '').trim().toLowerCase());
+        const esEfectivo = venta.metodoPago?.codigo === 'EFECTIVO'
+            || (!venta.metodoPago && String(venta.metodoPagoLegacy ?? '').trim().toLowerCase() === 'efectivo');
+
+        if (esCancelada) {
+            totalVentasCanceladas = totalVentasCanceladas.add(totalItem);
+            cantidadVentasCanceladas += 1;
+            if (esEfectivo) {
+                totalVentasEfectivoCanceladas = totalVentasEfectivoCanceladas.add(totalItem);
+            }
+        } else {
+            totalVentas = totalVentas.add(totalItem);
+            cantidadVentas += 1;
+            if (esEfectivo) {
+                totalVentasEfectivo = totalVentasEfectivo.add(totalItem);
+            }
+
+            const metodoKey = String(venta.metodoPago?.id ?? venta.metodoPagoId ?? 'sin_metodo');
+            if (!metodosMap.has(metodoKey)) {
+                metodosMap.set(metodoKey, {
+                    metodoPagoId: venta.metodoPago?.id ?? venta.metodoPagoId ?? null,
+                    codigo: venta.metodoPago?.codigo ?? null,
+                    nombre: venta.metodoPago?.nombre ?? 'Sin método asignado',
+                    total: currency(0),
+                    cantidad: 0,
+                    transacciones: 0,
+                });
+            }
+            const itemMetodo = metodosMap.get(metodoKey);
+            itemMetodo.total = itemMetodo.total.add(totalItem);
+            itemMetodo.cantidad += 1;
+            itemMetodo.transacciones += 1;
+        }
+    }
+
+    const ventasPorMetodoPago = Array.from(metodosMap.values()).map((m) => ({
+        metodoPagoId: m.metodoPagoId,
+        codigo: m.codigo,
+        nombre: m.nombre,
+        total: m.total.value,
+        cantidad: m.cantidad,
+        transacciones: m.transacciones,
+    }));
+
+    const totalVentasEfectivoBruto = totalVentasEfectivo.add(totalVentasEfectivoCanceladas);
+    const promedioVentas = cantidadVentas > 0
+        ? currency(totalVentas.value / cantidadVentas).value
+        : 0;
+
+    return {
+        totalVentas: totalVentas.value,
+        cantidadVentas,
+        transaccionesVentas: cantidadVentas,
+        promedioVentas,
+        ticketPromedio: promedioVentas,
+        totalVentasEfectivo: totalVentasEfectivo.value,
+        ventasPorMetodoPago,
+        totalVentasCanceladas: totalVentasCanceladas.value,
+        cantidadVentasCanceladas,
+        totalVentasEfectivoCanceladas: totalVentasEfectivoCanceladas.value,
+        totalVentasEfectivoBruto: totalVentasEfectivoBruto.value,
     };
 }
 
@@ -163,8 +475,9 @@ async create(data) {
         detalleVenta,
         empleadoId,
         clienteId,
-        subtotal : subtotalEnviado,
-        total : totalEnviado,
+        usuarioId,
+        subtotal: subtotalEnviado,
+        total: totalEnviado,
         montoRecibido: montoRecibidoEnviado,
         ...restoDatos
     } = data;
@@ -176,6 +489,7 @@ async create(data) {
 
     const idEmpleado = this.validarId(empleadoId, 'el empleado');
     const idCliente = this.validarId(clienteId, 'el cliente');
+    const idUsuario = this.validarId(usuarioId, 'el usuario autenticado');
 
     this.validarDetalles(detalleVenta);
 
@@ -209,17 +523,20 @@ async create(data) {
             restoDatos.metodoPagoId
         );
 
-        const cajaAbierta = await tx.aperturaCaja.findFirst({
-            where: {
-                id: aperturaCajaId,
-                empleadoId: empleado.id,
-                estado: ESTADO_CAJA.ABIERTA,
-                deletedAt: null,
-            },
-        });
+        // Bloquear la fila de apertura para serializar con corte de caja
+        const aperturasBloqueadas = await tx.$queryRaw`
+            SELECT id, estado, empleado_id AS empleadoId
+            FROM aperturas_caja
+            WHERE id = ${aperturaCajaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        const cajaAbierta = aperturasBloqueadas[0];
 
-        if (!cajaAbierta) {
-            throw new Error('La apertura de caja no está disponible');
+        if (!cajaAbierta || cajaAbierta.estado !== ESTADO_CAJA.ABIERTA || Number(cajaAbierta.empleadoId) !== Number(empleado.id)) {
+            const error = new Error('La apertura de caja no está disponible');
+            error.code = 'APERTURA_CAJA_CERRADA';
+            error.status = 409;
+            throw error;
         }
 
         const detalles = await this.prepararDetalles(
@@ -228,6 +545,10 @@ async create(data) {
         );
 
         const { subtotal, total } = this.calcularTotal(detalles);
+        this.validarMontos(
+            { subtotal, total },
+            { subtotal: subtotalEnviado, total: totalEnviado }
+        );
         const esPagoEfectivo = metodoPago.codigo === 'EFECTIVO';
         const montoRecibido = esPagoEfectivo
             ? this.validarMontoRecibido(montoRecibidoEnviado, total)
@@ -236,16 +557,12 @@ async create(data) {
             ? currency(montoRecibido).subtract(total).value
             : 0;
 
-        this.validarMontos(
-            { subtotal, total },
-            { subtotal: subtotalEnviado, total: totalEnviado }
-        );
-
         const nuevaVenta = await tx.venta.create({
             data: {
                 aperturaCaja: { connect: { id: cajaAbierta.id } },
                 empleado: { connect: { id: empleado.id } },
                 cliente: { connect: { id: cliente.id } },
+                usuario: { connect: { id: idUsuario } },
                 metodoPago: { connect: { id: metodoPago.id } },
                 subtotal,
                 total,
@@ -276,10 +593,51 @@ async update(id, data) {
     }
 
     if (data.detalleVenta !== undefined) {
+        if (data.subtotal === undefined || data.total === undefined) {
+            throw new Error('El subtotal y el total son requeridos al actualizar el detalle de una venta');
+        }
         this.validarDetalles(data.detalleVenta);
     }
 
     return this.prisma.$transaction(async (tx) => {
+        const referenciaVenta = await tx.venta.findFirst({
+            where: {
+                id: ventaId,
+                deletedAt: null,
+            },
+            select: { aperturaCajaId: true },
+        });
+
+        if (!referenciaVenta) {
+            throw new Error('La venta no existe');
+        }
+        if (!referenciaVenta.aperturaCajaId) {
+            throw new Error('La venta no tiene una apertura de caja asociada');
+        }
+
+        // Bloquear la fila de apertura para serializar con corte de caja
+        const cajasUpdateBloqueadas = await tx.$queryRaw`
+            SELECT id, estado
+            FROM aperturas_caja
+            WHERE id = ${referenciaVenta.aperturaCajaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        const caja = cajasUpdateBloqueadas[0];
+
+        if (!caja || caja.estado !== ESTADO_CAJA.ABIERTA) {
+            throw new Error('La caja de esta venta está cerrada');
+        }
+
+        const ventasUpdateBloqueadas = await tx.$queryRaw`
+            SELECT id
+            FROM venta
+            WHERE id = ${ventaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        if (ventasUpdateBloqueadas.length === 0) {
+            throw new Error('La venta no existe');
+        }
+
         const venta = await tx.venta.findFirst({
             where: {
                 id: ventaId,
@@ -289,27 +647,11 @@ async update(id, data) {
                 detalleVenta: true,
             },
         });
-
         if (!venta) {
             throw new Error('La venta no existe');
         }
-
         if (venta.estado === ESTADO_VENTA.CANCELADA) {
             throw new Error('No se puede modificar una venta cancelada');
-        }
-
-        const caja = await tx.aperturaCaja.findFirst({
-            where: {
-                id: venta.aperturaCajaId,
-                estado: ESTADO_CAJA.ABIERTA,
-                deletedAt: null,
-            },
-        });
-
-        if (!caja) {
-            throw new Error(
-                'La caja de esta venta está cerrada'
-            );
         }
 
         const metodoPago = data.metodoPagoId === undefined
@@ -342,13 +684,9 @@ async update(id, data) {
         const { subtotal, total } = this.calcularTotal(
             detalles,
         );
-
         this.validarMontos(
             { subtotal, total },
-            {
-                subtotal: data.subtotal ?? subtotal,
-                total: data.total ?? total,
-            }
+            { subtotal: data.subtotal, total: data.total }
         );
 
         await tx.detalleVenta.deleteMany({
@@ -376,17 +714,51 @@ async update(id, data) {
         );
 
         return this.getById(ventaId, tx);
-    });
+    }, { isolationLevel: 'ReadCommitted' });
 }
 async cancel(id, motivoCancelacion) {
     const ventaId = this.validarId(id, 'la venta');
 
     return this.prisma.$transaction(async (tx) => {
-        const venta = await tx.venta.findFirst({
+        const referenciaVenta = await tx.venta.findFirst({
             where: {
                 id: ventaId,
                 deletedAt: null,
             },
+            select: { aperturaCajaId: true },
+        });
+
+        if (!referenciaVenta) {
+            throw new Error('La venta no existe');
+        }
+        if (!referenciaVenta.aperturaCajaId) {
+            throw new Error('La venta no tiene una apertura de caja asociada');
+        }
+
+        const cajasCancelBloqueadas = await tx.$queryRaw`
+            SELECT id, estado
+            FROM aperturas_caja
+            WHERE id = ${referenciaVenta.aperturaCajaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        const caja = cajasCancelBloqueadas[0];
+
+        if (!caja || caja.estado !== ESTADO_CAJA.ABIERTA) {
+            throw new Error('No se puede cancelar: la caja está cerrada');
+        }
+
+        const ventasCancelBloqueadas = await tx.$queryRaw`
+            SELECT id
+            FROM venta
+            WHERE id = ${ventaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        if (ventasCancelBloqueadas.length === 0) {
+            throw new Error('La venta no existe');
+        }
+
+        const venta = await tx.venta.findFirst({
+            where: { id: ventaId, deletedAt: null },
             include: {
                 detalleVenta: true,
                 metodoPago: {
@@ -398,26 +770,15 @@ async cancel(id, motivoCancelacion) {
             },
         });
 
-        if (!venta) {
-            throw new Error('La venta no existe');
-        }
-
         if (venta.estado === ESTADO_VENTA.CANCELADA) {
             throw new Error('La venta ya está cancelada');
         }
 
-        const caja = await tx.aperturaCaja.findFirst({
-            where: {
-                id: venta.aperturaCajaId,
-                estado: ESTADO_CAJA.ABIERTA,
-                deletedAt: null,
-            },
+        const devolucionesExistentes = await tx.devolucion.count({
+            where: { ventaId },
         });
-
-        if (!caja) {
-            throw new Error(
-                'No se puede cancelar: la caja está cerrada'
-            );
+        if (devolucionesExistentes > 0) {
+            throw new Error('No se puede cancelar una venta que ya tiene devoluciones');
         }
 
         await this.ajustarStock(tx, venta.detalleVenta, []);
@@ -441,13 +802,12 @@ async cancel(id, motivoCancelacion) {
         return tx.venta.update({
             where: { id: ventaId },
             data: {
-                deletedAt: new Date(),
                 estado: ESTADO_VENTA.CANCELADA,
                 motivoCancelacion,
             },
             omit: this.omit,
         });
-    });
+    }, { isolationLevel: 'ReadCommitted' });
 }
     validarId(id, modulo = "indefinido") {
     const n = Number(id);
@@ -577,6 +937,7 @@ async prepararDetalles(tx, items, detallesViejos = []) {
         let servicioId = null;
         let tipoMembresiaId = null;
         let precio;
+        let descuentoUnitario = currency(0).value;
 
         switch (tipoItem) {
             case "PRODUCTO": {
@@ -603,6 +964,19 @@ async prepararDetalles(tx, items, detallesViejos = []) {
                 precio =
                     anterior?.precioUnitario ??
                     registro.precioVenta;
+                const descuentoPorcentaje = Number(registro.descuentoPorcentaje ?? 0);
+                if (
+                    !Number.isFinite(descuentoPorcentaje)
+                    || descuentoPorcentaje < 0
+                    || descuentoPorcentaje > 100
+                ) {
+                    throw new Error(
+                        `El descuento del producto ${productoId} debe estar entre 0 y 100`
+                    );
+                }
+                descuentoUnitario = anterior
+                    ? currency(anterior.descuentoUnitario ?? 0).value
+                    : currency(precio).multiply(descuentoPorcentaje / 100).value;
 
                 break;
             }
@@ -663,19 +1037,13 @@ async prepararDetalles(tx, items, detallesViejos = []) {
             );
         }
 
-        const subtotalLinea = currency(precio).multiply(cantidad).value
-        const nombre = registro.nombre ?? tipoItem
-
-        if (item.precioUnitario = undefined){
-            if(currency(item.precioUnitario.intValue !== currency(precio).intValue)){
-                throw new Error(`Precio es de ${nombre} no coincide el precio actual ${precio}, enviado : ${item.precioUnitario}`)
-            }
-            if (currency(item.subtotal).intValue !== currency(subtotalLinea).intValue) {
-            throw new Error(
-                `El subtotal de "${nombre}" no coincide con ${cantidad} x ${precio} = ${subtotalLinea}`
-            );  
-            }
+        if (currency(descuentoUnitario).intValue > currency(precio).intValue) {
+            throw new Error(`El descuento de "${registro.nombre ?? tipoItem}" no puede superar su precio`);
         }
+        const subtotalLinea = currency(precio)
+            .subtract(descuentoUnitario)
+            .multiply(cantidad)
+            .value;
 
         detalles.push({
             tipoItem,
@@ -686,6 +1054,7 @@ async prepararDetalles(tx, items, detallesViejos = []) {
             descripcion: item.descripcion ?? registro.nombre ?? null,
             cantidad,
             precioUnitario: precio,
+            descuentoUnitario,
             subtotal: subtotalLinea
         });
     }
@@ -749,24 +1118,36 @@ async ajustarStock(tx, detallesViejos, detallesNuevos) {
     //Permite hacer el calculo total de la venta
     calcularTotal(detalles) {
         const subtotal = detalles.reduce((acc, d) => acc.add(d.subtotal), currency(0));
-        const iva = subtotal.multiply(0.16);
+        const iva = subtotal.multiply(TASA_IVA);
         const total = subtotal.add(iva);
         return { subtotal: subtotal.value, total: total.value };
     }
-    
-    validarMontos(calculados, enviados) {
-        const coincide = (a, b) => currency(a).intValue === currency(b).intValue;
 
+    validarMontos(calculados, enviados) {
+        const subtotalEnviado = Number(enviados.subtotal);
+        const totalEnviado = Number(enviados.total);
         if (
-            !coincide(calculados.subtotal, enviados.subtotal) ||
-            !coincide(calculados.total, enviados.total)
+            enviados.subtotal === undefined
+            || enviados.subtotal === null
+            || !Number.isFinite(subtotalEnviado)
+            || enviados.total === undefined
+            || enviados.total === null
+            || !Number.isFinite(totalEnviado)
         ) {
+            throw new Error('El subtotal y el total enviados deben ser montos válidos');
+        }
+
+        const coincide = (calculado, enviado) =>
+            currency(calculado).intValue === currency(enviado).intValue;
+
+        if (!coincide(calculados.subtotal, subtotalEnviado)
+            || !coincide(calculados.total, totalEnviado)) {
             throw new Error(
-                `Los montos no coinciden. Subtotal: ${calculados.subtotal}, total: ${calculados.total}`
+                `Los montos enviados no coinciden con el cálculo del servidor. Subtotal esperado: ${calculados.subtotal}, total esperado: ${calculados.total}`
             );
         }
     }
-    
+
 }
 
 export const ventaDao = new VentaDao();

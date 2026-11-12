@@ -12,6 +12,8 @@
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
+import currency from 'currency.js';
+import { ventaDao } from '../dao/VentaDao.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
@@ -57,47 +59,58 @@ export class MovimientoCajaController extends BaseController {
 
             this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones: obsLimpia });
 
-            // Verificar que la apertura exista y esté ABIERTA
-            const apertura = await prisma.aperturaCaja.findUnique({
-                where: { id: Number(aperturaCajaId), deletedAt: null },
-            });
-            if (!apertura) throw new Error('La apertura de caja especificada no existe');
-            if (apertura.estado !== 'ABIERTA')
-                throw new Error('No se pueden registrar movimientos en una apertura cerrada');
-
+            const idApertura = Number(aperturaCajaId);
             const tipoNormalizado = tipo.trim().toUpperCase();
+            const registro = await prisma.$transaction(async (tx) => {
+                const aperturas = await tx.$queryRaw`
+                    SELECT id, estado, monto_inicial AS montoInicial
+                    FROM aperturas_caja
+                    WHERE id = ${idApertura} AND deleted_at IS NULL
+                    FOR UPDATE
+                `;
+                const apertura = aperturas[0];
+                if (!apertura) throw new Error('La apertura de caja especificada no existe');
+                if (apertura.estado !== 'ABIERTA')
+                    throw new Error('No se pueden registrar movimientos en una apertura cerrada');
 
-            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja
-            if (tipoNormalizado === 'SALIDA') {
-                const [sumaEntradas, sumaSalidas] = await Promise.all([
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                ]);
+                if (tipoNormalizado === 'SALIDA') {
+                    const [sumaEntradas, sumaSalidas, resumenVentas] = await Promise.all([
+                        tx.movimientoCaja.aggregate({
+                            where: { aperturaCajaId: idApertura, tipo: 'ENTRADA', deletedAt: null },
+                            _sum: { monto: true },
+                        }),
+                        tx.movimientoCaja.aggregate({
+                            where: { aperturaCajaId: idApertura, tipo: 'SALIDA', deletedAt: null },
+                            _sum: { monto: true },
+                        }),
+                        ventaDao.obtenerResumenVentasPorApertura(idApertura, tx),
+                    ]);
 
-                const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-                const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-                const saldoDisponible = Number(apertura.montoInicial) + totalEntradas - totalSalidas;
+                    const totalEntradas = currency(String(sumaEntradas._sum.monto ?? 0)).value;
+                    const totalSalidas = currency(String(sumaSalidas._sum.monto ?? 0)).value;
+                    const saldoDisponible = currency(String(apertura.montoInicial ?? 0))
+                        .add(totalEntradas)
+                        .subtract(totalSalidas)
+                        .add(resumenVentas.totalVentasEfectivoBruto)
+                        .value;
 
-                if (Number(monto) > saldoDisponible) {
-                    throw new Error(`Saldo insuficiente en caja. El saldo disponible es de $${saldoDisponible.toFixed(2)} y se intentó retirar $${Number(monto).toFixed(2)}`);
+                    if (Number(monto) > saldoDisponible) {
+                        throw new Error(`Saldo insuficiente en caja. El saldo disponible es de ${saldoDisponible.toFixed(2)} y se intentó retirar ${Number(monto).toFixed(2)}`);
+                    }
                 }
-            }
 
-            const registro = await this.dao.create({
-                aperturaCajaId: Number(aperturaCajaId),
-                empleadoId: Number(empleadoId),
-                tipo: tipoNormalizado,
-                monto: Number(monto),
-                concepto: concepto.trim(),
-                estado: 'PENDIENTE',
-                desglose: desgloseStr,
-                observaciones: obsLimpia,
+                return tx.movimientoCaja.create({
+                    data: {
+                        aperturaCajaId: idApertura,
+                        empleadoId: Number(empleadoId),
+                        tipo: tipoNormalizado,
+                        monto: Number(monto),
+                        concepto: concepto.trim(),
+                        estado: 'PENDIENTE',
+                        desglose: desgloseStr,
+                        observaciones: obsLimpia,
+                    },
+                });
             });
 
             return this.respuestaExito(res, registro, 'Movimiento de caja registrado correctamente');
@@ -170,7 +183,7 @@ export class MovimientoCajaController extends BaseController {
             });
             if (!apertura) throw new Error('Apertura no encontrada');
 
-            const [sumaEntradas, sumaSalidas, movimientos] = await Promise.all([
+            const [sumaEntradas, sumaSalidas, movimientos, resumenVentas] = await Promise.all([
                 prisma.movimientoCaja.aggregate({
                     where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
                     _sum: { monto: true },
@@ -180,12 +193,17 @@ export class MovimientoCajaController extends BaseController {
                     _sum: { monto: true },
                 }),
                 this.dao.getAllByApertura(aperturaCajaId),
+                ventaDao.obtenerResumenVentasPorApertura(aperturaCajaId),
             ]);
 
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-            const montoInicial = Number(apertura.montoInicial);
-            const saldoDisponible = montoInicial + totalEntradas - totalSalidas;
+            const totalEntradas = currency(String(sumaEntradas._sum.monto ?? 0)).value;
+            const totalSalidas = currency(String(sumaSalidas._sum.monto ?? 0)).value;
+            const montoInicial = currency(String(apertura.montoInicial ?? 0)).value;
+            const saldoDisponible = currency(montoInicial)
+                .add(totalEntradas)
+                .subtract(totalSalidas)
+                .add(resumenVentas.totalVentasEfectivoBruto)
+                .value;
             const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
             const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
 
@@ -197,9 +215,27 @@ export class MovimientoCajaController extends BaseController {
                     totalEntradas,
                     totalSalidas,
                     saldoDisponible,
+                    efectivoEsperado: saldoDisponible,
                     movimientos,
                     movimientosPendientes,
                     movimientosValidados,
+                    totalVentas: resumenVentas.totalVentas,
+                    totalVentasEfectivo: resumenVentas.totalVentasEfectivo,
+                    totalVentasCanceladas: resumenVentas.totalVentasCanceladas,
+                    totalVentasEfectivoCanceladas: resumenVentas.totalVentasEfectivoCanceladas,
+                    totalVentasEfectivoBruto: resumenVentas.totalVentasEfectivoBruto,
+                    cantidadVentas: resumenVentas.cantidadVentas,
+                    promedioVentas: resumenVentas.promedioVentas,
+                    ventasPorMetodoPago: resumenVentas.ventasPorMetodoPago,
+                    totales: {
+                        totalVentas: resumenVentas.totalVentas,
+                        transaccionesVentas: resumenVentas.cantidadVentas,
+                        ticketPromedio: resumenVentas.promedioVentas,
+                        ventasPorMetodoPago: resumenVentas.ventasPorMetodoPago,
+                        totalVentasCanceladas: resumenVentas.totalVentasCanceladas,
+                        cantidadVentasCanceladas: resumenVentas.cantidadVentasCanceladas,
+                        totalVentasEfectivo: resumenVentas.totalVentasEfectivo,
+                    },
                 },
                 'Resumen de apertura obtenido correctamente'
             );
