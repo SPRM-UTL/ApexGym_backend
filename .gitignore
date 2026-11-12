@@ -65,3 +65,4 @@ public/uploads/.vs/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/
+/prisma/migrations
