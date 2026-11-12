@@ -209,6 +209,39 @@ export class ClienteMembresiaController extends BaseController {
         if (!clienteId) throw new Error('El cliente es requerido');
         if (!tipoMembresiaId) throw new Error('El tipo de membresía es requerido');
     }
+
+    obtenerMiMembresia = async (req, res) => {
+        try {
+            const usuarioId = req.usuario?.id;
+            if (!usuarioId) {
+                throw new Error('Usuario no autenticado');
+            }
+
+            const cliente = await clienteDao.getByUser(Number(usuarioId));
+            if (!cliente) {
+                return this.respuestaExito(
+                    res,
+                    { cliente: null, membresiaActiva: null, historial: [] },
+                    'Sin perfil de cliente asociado'
+                );
+            }
+
+            const membresiaActiva = await this.dao.getActivaPorCliente(cliente.id);
+            const historial = await this.dao.getHistorialPorCliente(cliente.id);
+
+            return this.respuestaExito(
+                res,
+                {
+                    cliente,
+                    membresiaActiva: membresiaActiva || null,
+                    historial: historial || []
+                },
+                'Información de membresía cargada con éxito'
+            );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
 }
 
 export const clienteMembresiaController = new ClienteMembresiaController();
