@@ -56,11 +56,12 @@ media_*
 .idea/
 
 # Migraciones locales/copias; mantener prisma/migrations versionado
-prisma/migrations/
+!prisma/migrations/
+!prisma/migrations/**
 public/uploads/.vs/ 
 
-migrations/
-backend/migrations/
+/migrations/
+/backend/migrations/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/

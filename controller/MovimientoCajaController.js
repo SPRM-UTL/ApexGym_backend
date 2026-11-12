@@ -189,6 +189,73 @@ export class MovimientoCajaController extends BaseController {
             const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
             const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
 
+            // Transacciones financieras del turno (Efectivo, Terminal con voucher y Mercado Pago)
+            const corteAsociado = await prisma.corteCaja.findFirst({
+                where: { aperturaCajaId, deletedAt: null },
+                orderBy: { id: 'desc' },
+            });
+
+            const filtroFecha = {
+                gte: apertura.fechaApertura,
+                ...(corteAsociado?.fechaCorte ? { lte: corteAsociado.fechaCorte } : {}),
+            };
+
+            const transaccionesTurno = await prisma.transaccionPago.findMany({
+                where: {
+                    empresaId: apertura.empresaId,
+                    estado: 'APROBADO',
+                    createdAt: filtroFecha,
+                    deletedAt: null,
+                },
+                orderBy: { id: 'desc' },
+            });
+
+            let totalVentasEfectivo = 0;
+            let opsEfectivo = 0;
+            let totalVentasTerminal = 0;
+            let opsTerminal = 0;
+            let totalVentasDigital = 0;
+            let opsDigital = 0;
+
+            for (const t of transaccionesTurno) {
+                const monto = Number(t.monto);
+                if (t.proveedor === 'EFECTIVO') {
+                    totalVentasEfectivo += monto;
+                    opsEfectivo++;
+                } else if (t.proveedor === 'TERMINAL_MANUAL') {
+                    totalVentasTerminal += monto;
+                    opsTerminal++;
+                } else {
+                    totalVentasDigital += monto;
+                    opsDigital++;
+                }
+            }
+
+            const totalVentas = totalVentasEfectivo + totalVentasTerminal + totalVentasDigital;
+            const transaccionesVentas = transaccionesTurno.length;
+            const ticketPromedio = transaccionesVentas > 0 ? totalVentas / transaccionesVentas : 0;
+
+            const ventasPorMetodoPago = [
+                {
+                    metodoPagoId: 1,
+                    nombre: 'Efectivo en Caja',
+                    total: totalVentasEfectivo,
+                    transacciones: opsEfectivo,
+                },
+                {
+                    metodoPagoId: 2,
+                    nombre: 'Tarjeta en Terminal (Vouchers)',
+                    total: totalVentasTerminal,
+                    transacciones: opsTerminal,
+                },
+                {
+                    metodoPagoId: 3,
+                    nombre: 'Mercado Pago Digital / En Línea',
+                    total: totalVentasDigital,
+                    transacciones: opsDigital,
+                },
+            ];
+
             return this.respuestaExito(
                 res,
                 {
@@ -197,9 +264,20 @@ export class MovimientoCajaController extends BaseController {
                     totalEntradas,
                     totalSalidas,
                     saldoDisponible,
+                    totalVentasEfectivo,
                     movimientos,
                     movimientosPendientes,
                     movimientosValidados,
+                    totales: {
+                        totalVentas,
+                        transaccionesVentas,
+                        ticketPromedio,
+                        totalVentasEfectivo,
+                        totalVentasTerminal,
+                        totalVentasDigital,
+                        ventasPorMetodoPago,
+                    },
+                    transacciones: transaccionesTurno,
                 },
                 'Resumen de apertura obtenido correctamente'
             );

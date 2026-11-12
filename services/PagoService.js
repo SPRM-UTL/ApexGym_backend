@@ -212,6 +212,61 @@ export class PagoService {
                 metadatos: metadatosGuardados,
             });
 
+            // Auto-registro en Caja Activa si el cobro se liquidó en Efectivo físico
+            if (proveedor === 'EFECTIVO' && estadoInicial === 'APROBADO') {
+                try {
+                    let aperturaActiva = null;
+                    if (metadatos?.aperturaCajaId) {
+                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
+                            where: {
+                                id: Number(metadatos.aperturaCajaId),
+                                empresaId,
+                                estado: 'ABIERTA',
+                                deletedAt: null,
+                            },
+                        });
+                    }
+                    if (!aperturaActiva) {
+                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
+                            where: {
+                                empresaId,
+                                estado: 'ABIERTA',
+                                deletedAt: null,
+                            },
+                            orderBy: { id: 'desc' },
+                        });
+                    }
+
+                    if (aperturaActiva) {
+                        const movimiento = await transaccionPagoDao.prisma.movimientoCaja.create({
+                            data: {
+                                empresaId,
+                                aperturaCajaId: aperturaActiva.id,
+                                empleadoId: aperturaActiva.empleadoId,
+                                tipo: 'ENTRADA',
+                                monto: montoNumerico,
+                                concepto: `Cobro de Venta / Membresía - Transacción #${nuevaTransaccion.id}`,
+                                estado: 'VALIDADO',
+                                observaciones: `Registro automático generado por cobro en mostrador (Transacción #${nuevaTransaccion.id})`,
+                            },
+                        });
+
+                        await transaccionPagoDao.prisma.transaccionPago.update({
+                            where: { id: nuevaTransaccion.id },
+                            data: {
+                                metadatos: {
+                                    ...metadatosGuardados,
+                                    movimientoCajaId: movimiento.id,
+                                    aperturaCajaId: aperturaActiva.id,
+                                },
+                            },
+                        });
+                    }
+                } catch (movErr) {
+                    console.error('No se pudo registrar el movimiento automático de caja para el pago en efectivo:', movErr);
+                }
+            }
+
             return {
                 idempotente: false,
                 mensaje: estadoInicial === 'APROBADO' ? 'Pago procesado de inmediato' : 'Orden de cobro generada en espera de confirmación',
@@ -286,6 +341,37 @@ export class PagoService {
         };
 
         const actualizada = await transaccionPagoDao.actualizarEstado(id, 'REEMBOLSADO', datosRespuesta, empresaId);
+
+        // Si la transacción reembolsada fue en efectivo, registrar la salida automática en la caja activa
+        if (transaccion.proveedor === 'EFECTIVO') {
+            try {
+                const aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
+                    where: {
+                        empresaId,
+                        estado: 'ABIERTA',
+                        deletedAt: null,
+                    },
+                    orderBy: { id: 'desc' },
+                });
+
+                if (aperturaActiva) {
+                    await transaccionPagoDao.prisma.movimientoCaja.create({
+                        data: {
+                            empresaId,
+                            aperturaCajaId: aperturaActiva.id,
+                            empleadoId: aperturaActiva.empleadoId,
+                            tipo: 'SALIDA',
+                            monto: Number(transaccion.monto),
+                            concepto: `Reembolso de Transacción #${transaccion.id}: ${transaccion.concepto}`,
+                            estado: 'VALIDADO',
+                            observaciones: `Salida de efectivo por reembolso en mostrador (Transacción #${transaccion.id}). Motivo: ${motivo}`,
+                        },
+                    });
+                }
+            } catch (movErr) {
+                console.error('No se pudo registrar la salida automática de efectivo por reembolso:', movErr);
+            }
+        }
 
         return {
             mensaje: `Transacción ${id} reembolsada exitosamente`,
