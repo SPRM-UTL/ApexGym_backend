@@ -30,10 +30,13 @@ import { TipoVisitaController } from '../controller/TipoVisitaController.js';
 import { ClienteMembresiaController } from '../controller/ClienteMembresiaController.js';
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
+import { EmpresaController } from '../controller/EmpresaController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 import { AsistenciaController } from '../controller/AsistenciaController.js';
 import { VisitaController } from '../controller/VisitaController.js';
 
+
+import { PagoController } from '../controller/PagoController.js';
 
 const router = express.Router();
 const usuarioController = new UsuarioController();
@@ -84,6 +87,10 @@ const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
+const empresaController = new EmpresaController();
+const empresaRoutes = express.Router();
+const pagoController = new PagoController();
+const pagoRoutes = express.Router();
 const asistenciaController = new AsistenciaController();
 const asistenciaRoutes = express.Router();
 const visitaController = new VisitaController();
@@ -877,6 +884,44 @@ servicioRoutes.get(
     servicioController.getServiciosCliente.bind(servicioController)
 );
 
+// ── Rutas de Empresa ─────────────────────────────────────────────────────────
+empresaRoutes.get(
+    '/actual',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerActual.bind(empresaController)
+);
+
+empresaRoutes.put(
+    '/actual',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Editar'),
+    empresaController.actualizarActual.bind(empresaController)
+);
+
+empresaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerTodos.bind(empresaController)
+);
+
+empresaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Listar'),
+    empresaController.obtenerPorId.bind(empresaController)
+);
+
+empresaRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Empresa', 'Editar'),
+    empresaController.actualizarActual.bind(empresaController)
+);
+
+router.use('/empresa', empresaRoutes);
+router.use('/empresas', empresaRoutes);
 
 // ── Rutas de Asistencias ────────────────────────────────────────────────────
 asistenciaRoutes.get(
@@ -942,7 +987,6 @@ visitaRoutes.delete(
     verificarPermiso('Accesos y Visitas', 'Eliminar'),
     visitaController.eliminar.bind(visitaController)
 );
-
 router.use('/productos', productoRoutes);
 router.use('/categorias-productos', CategoriaProductoRoutes);
 router.use('/estados-cliente', estadoClienteRoutes);
@@ -969,5 +1013,15 @@ router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
 router.use('/asistencias', asistenciaRoutes);
 router.use('/visitas', visitaRoutes);
+
+// ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
+pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
+pagoRoutes.post('/crear-cobro', autenticarUsuario, pagoController.crearCobro.bind(pagoController));
+pagoRoutes.post('/simular-resolucion/:id', autenticarUsuario, pagoController.simularResolucion.bind(pagoController));
+pagoRoutes.post('/reembolsar/:id', autenticarUsuario, pagoController.reembolsar.bind(pagoController));
+pagoRoutes.get('/resumen', autenticarUsuario, pagoController.obtenerResumen.bind(pagoController));
+pagoRoutes.get('/transacciones', autenticarUsuario, pagoController.obtenerTodos.bind(pagoController));
+pagoRoutes.get('/transacciones/:id', autenticarUsuario, pagoController.obtenerPorId.bind(pagoController));
+router.use('/pagos', pagoRoutes);
 
 export { router as api };

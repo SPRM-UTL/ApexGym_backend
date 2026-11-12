@@ -2,7 +2,7 @@ import { BaseDao, prisma } from "./BaseDao.js";
 
 export class PermisoDao extends BaseDao {
     constructor() {
-        super("permiso");
+        super("permiso", { useEmpresa: false });
     }
 
     /**
@@ -62,10 +62,12 @@ export class PermisoDao extends BaseDao {
 
         const todos = [...permisosRol, ...permisosDirectos];
 
-        // Construir Set con clave compuesta MODULO|ACCION|METODO
-        const claves = new Set(
-            todos.map((p) => `${p.modulo.nombre}|${p.accion.nombre}|${p.metodo}`)
-        );
+        // Construir Set con clave compuesta MODULO|ACCION|METODO (exacta y normalizada en minúsculas)
+        const claves = new Set();
+        for (const p of todos) {
+            claves.add(`${p.modulo.nombre}|${p.accion.nombre}|${p.metodo}`);
+            claves.add(`${p.modulo.nombre.toLowerCase()}|${p.accion.nombre.toLowerCase()}|${p.metodo.toUpperCase()}`);
+        }
 
         return claves;
     }
@@ -73,13 +75,16 @@ export class PermisoDao extends BaseDao {
     /**
      * Verifica si un usuario tiene un permiso específico.
      * @param {number} usuarioId
-     * @param {string} modulo  - Ej: "Usuarios"
+     * @param {string} modulo  - Ej: "Usuarios" o "Empresa"
      * @param {string} accion  - Ej: "Listar"
      * @param {string} metodo  - Ej: "GET"
      */
     async tienePermiso(usuarioId, modulo, accion, metodo) {
         const claves = await this.obtenerPermisosEfectivos(usuarioId);
-        return claves.has(`${modulo}|${accion}|${metodo}`);
+        return (
+            claves.has(`${modulo}|${accion}|${metodo}`) ||
+            claves.has(`${String(modulo).toLowerCase()}|${String(accion).toLowerCase()}|${String(metodo).toUpperCase()}`)
+        );
     }
 }
 

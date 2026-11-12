@@ -10,7 +10,7 @@ const COOKIE_OPTIONS = {
 // ── Autenticación ────────────────────────────────────────────────────────────
 /**
  * Verifica que el request tenga un token válido (vía cookie o header Authorization: Bearer).
- * Inyecta req.usuario y req.token para uso posterior.
+ * Inyecta req.usuario y req.user con empresaId (fallback a 1) para uso posterior.
  */
 export const autenticarUsuario = async (req, res, next) => {
 
@@ -49,19 +49,19 @@ export const autenticarUsuario = async (req, res, next) => {
             }
             
             //limpiamos en caso de algun error
-            res.clearCookie('token', COOKIE_OPTIONS) //La cague 
+            res.clearCookie('token', COOKIE_OPTIONS)
             
             const response = new ResponseModel(null, 1, mensaje, 401);
             return res.status(401).json(response);
         }
 
-        
+        const usuarioAutenticado = {
+            ...resultado.token.usuario,
+            empresaId: resultado.token.usuario?.empresaId ?? 1,
+        };
 
-        req.usuario = resultado.token.usuario;
-        /**Se comento para evitar que le mande al frontend el token y sea vulnerable
-         * lo maneja por cookies siendo controlado solo por el backend
-        **/
-        /**req.token = resultado.token; */
+        req.usuario = usuarioAutenticado;
+        req.user = usuarioAutenticado;
 
         next();
 
@@ -89,7 +89,7 @@ export const verificarPermiso = (modulo, accion) => async (req, res, next) => {
 
     try {
 
-        const usuarioId = req.usuario?.id;
+        const usuarioId = req.usuario?.id ?? req.user?.id;
 
         if (!usuarioId) {
             const response = new ResponseModel(null, 1, "Usuario no autenticado", 401);
