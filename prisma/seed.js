@@ -1,8 +1,8 @@
 /**
- * Seed declarativo de secciones, módulos, permisos y roles.
+ * Seed declarativo de empresa principal, secciones, módulos, permisos y roles.
  * Los datos editables viven en ./seed-data.json.
  *
- * Ejecución: npx prisma db seed
+ * Ejecución: npx prisma db seed / npm run seed
  */
 
 import pkg from '@prisma/client';
@@ -24,6 +24,38 @@ const pool = mariadb.createPool({
 
 const adapter = new PrismaMariaDb(pool);
 const prisma = new PrismaClient({ adapter });
+
+const upsertEmpresaDefault = async () => {
+    const empresa = await prisma.empresa.upsert({
+        where: { id: 1 },
+        update: {
+            deletedAt: null,
+        },
+        create: {
+            id: 1,
+            nombreComercial: 'ApexGym',
+            razonSocial: 'ApexGym S.A. de C.V.',
+            rfc: 'APX260101AAA',
+            telefono: '555-019-2834',
+            email: 'contacto@apexgym.com',
+            direccion: 'Av. Principal #100, Col. Centro',
+            ciudad: 'Ciudad de México',
+            estado: 'CDMX',
+            codigoPostal: '06000',
+            logoUrl: null,
+            colorPrimario: '#FF6A00',
+            moneda: 'MXN',
+            simboloMoneda: '$',
+            zonaHoraria: 'America/Mexico_City',
+            toleranciaMinutos: 15,
+            mensajeTicket: '¡Gracias por entrenar en ApexGym!',
+            activo: true,
+        },
+    });
+
+    console.log(`Empresa por defecto asegurada: [id=${empresa.id}] ${empresa.nombreComercial}`);
+    return empresa;
+};
 
 const upsertSeccion = (seccion) => prisma.seccion.upsert({
     where: { nombre: seccion.nombre },
@@ -91,13 +123,12 @@ const upsertPermiso = (moduloId, accionId, metodo, descripcion) => prisma.permis
 
 const upsertRol = (rol) => prisma.rol.upsert({
     where: { nombre: rol.nombre },
-    update: { descripcion: rol.descripcion, deletedAt: null },
-    create: { nombre: rol.nombre, descripcion: rol.descripcion },
+    update: { descripcion: rol.descripcion, empresaId: 1, deletedAt: null },
+    create: { nombre: rol.nombre, descripcion: rol.descripcion, empresaId: 1 },
 });
 
 // Función para insertar/actualizar usuarios desde el JSON
 const upsertUsuario = async (usuario) => {
-    // Si tu JSON usa usuario.password o usuario.contrasenia, lo tomamos aquí:
     const plainPassword = usuario.password || usuario.contrasenia;
     const hashedPassword = encriptarContrasena(plainPassword);
 
@@ -105,13 +136,15 @@ const upsertUsuario = async (usuario) => {
         where: { email: usuario.email },
         update: {
             nombre: usuario.nombre,
-            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+            contrasenia: hashedPassword,
+            empresaId: 1,
             deletedAt: null,
         },
         create: {
             nombre: usuario.nombre,
             email: usuario.email,
-            contrasenia: hashedPassword, // Cambiado de password a contrasenia
+            contrasenia: hashedPassword,
+            empresaId: 1,
         },
     });
 };
@@ -168,12 +201,14 @@ async function crearUsuarioDefault() {
         where: { email },
         update: {
             contrasenia,
+            empresaId: 1,
             deletedAt: null,
         },
         create: {
             nombre: 'Administrador ApexGym',
             email,
             contrasenia,
+            empresaId: 1,
         },
     });
 
@@ -193,6 +228,8 @@ async function main() {
             descripcion: 'Pago en efectivo',
         },
     });
+    // 1. UPSERT OBLIGATORIO DE LA EMPRESA PRINCIPAL (id = 1)
+    await upsertEmpresaDefault();
 
     const defaultUser = await crearUsuarioDefault();
 
@@ -289,14 +326,14 @@ async function main() {
     }
 
     const configsDefault = [
-        { clave: 'mostrar_huella_digital_corte', valor: 'true', tipoDato: 'boolean', descripcion: 'Muestra u oculta la sección de huella digital y auditoría en el reporte PDF de corte de caja' },
-        { clave: 'logo_sistema', valor: '', tipoDato: 'string', descripcion: 'URL o ruta del logotipo del sistema para reportes' },
-        { clave: 'nombre_sistema', valor: 'ApexGym', tipoDato: 'string', descripcion: 'Nombre comercial del gimnasio' },
+        { clave: 'mostrar_huella_digital_corte', valor: 'true', tipoDato: 'boolean', descripcion: 'Muestra u oculta la sección de huella digital y auditoría en el reporte PDF de corte de caja', empresaId: 1 },
+        { clave: 'logo_sistema', valor: '', tipoDato: 'string', descripcion: 'URL o ruta del logotipo del sistema para reportes', empresaId: 1 },
+        { clave: 'nombre_sistema', valor: 'ApexGym', tipoDato: 'string', descripcion: 'Nombre comercial del gimnasio', empresaId: 1 },
     ];
     for (const configItem of configsDefault) {
         await prisma.configuracionSistema.upsert({
             where: { clave: configItem.clave },
-            update: { tipoDato: configItem.tipoDato, descripcion: configItem.descripcion, deletedAt: null },
+            update: { tipoDato: configItem.tipoDato, descripcion: configItem.descripcion, empresaId: 1, deletedAt: null },
             create: configItem,
         });
     }

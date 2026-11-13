@@ -6,8 +6,61 @@ datasource db {
   provider = "mysql"
 }
 
+model Empresa {
+  id                Int       @id @default(autoincrement())
+  nombreComercial   String    @map("nombre_comercial") @db.VarChar(150)
+  razonSocial       String?   @map("razon_social") @db.VarChar(200)
+  rfc               String?   @db.VarChar(20)
+  telefono          String?   @db.VarChar(30)
+  email             String?   @db.VarChar(191)
+  direccion         String?   @db.Text
+  ciudad            String?   @db.VarChar(100)
+  estado            String?   @db.VarChar(100)
+  codigoPostal      String?   @map("codigo_postal") @db.VarChar(20)
+  logoUrl           String?   @map("logo_url") @db.LongText
+  colorPrimario     String    @default("#FF6A00") @map("color_primario") @db.VarChar(20)
+  moneda            String    @default("MXN") @db.VarChar(10)
+  simboloMoneda     String    @default("$") @map("simbolo_moneda") @db.VarChar(10)
+  zonaHoraria       String    @default("America/Mexico_City") @map("zona_horaria") @db.VarChar(100)
+  toleranciaMinutos Int       @default(15) @map("tolerancia_minutos")
+  mensajeTicket     String?   @map("mensaje_ticket") @db.Text
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  usuarios               Usuario[]
+  roles                  Rol[]
+  areasTrabajo           AreaTrabajo[]
+  cajas                  Caja[]
+  puestos                Puesto[]
+  estadosEmpleados       EstadoEmpleado[]
+  empleados              Empleado[]
+  tiposActividad         TipoActividad[]
+  configuracionesSistema ConfiguracionSistema[]
+  estadosClientes        EstadoCliente[]
+  clientes               Cliente[]
+  clientesMembresias     ClienteMembresia[]
+  estadosMembresias      EstadoMembresia[]
+  tiposMembresias        TipoMembresia[]
+  tiposVisitas           TipoVisita[]
+  categoriasProductos    CategoriaProducto[]
+  aperturasCaja          AperturaCaja[]
+  movimientosCaja        MovimientoCaja[]
+  cortesCaja             CorteCaja[]
+  productos              Producto[]
+  metodosPago            MetodoPago[]
+  servicios              Servicio[]
+  asistencias            Asistencia[]
+  visitas                Visita[]
+  transaccionesPagos     TransaccionPago[]
+
+  @@map("empresas")
+}
+
 model Usuario {
   id              Int              @id @default(autoincrement())
+  empresaId       Int              @default(1) @map("empresa_id")
   nombre          String           @db.VarChar(150)
   email           String           @unique @db.VarChar(191)
   contrasenia     String           @map("contrasenia") @db.VarChar(255)
@@ -15,6 +68,7 @@ model Usuario {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   deletedAt       DateTime?        @map("deleted_at")
+  empresa         Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   tokens          Token[]
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
@@ -82,6 +136,7 @@ model Modulo {
 
 model AreaTrabajo {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @db.VarChar(100)
   descripcion String?   @db.Text
   estado      String    @db.VarChar(30)
@@ -89,6 +144,7 @@ model AreaTrabajo {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  empresa        Empresa         @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   tiposActividad TipoActividad[]
   puestos        Puesto[]
   empleados      Empleado[]
@@ -98,6 +154,7 @@ model AreaTrabajo {
 
 model Caja {
   id        Int       @id @default(autoincrement())
+  empresaId Int       @default(1) @map("empresa_id")
   nombre    String    @db.VarChar(100)
   ubicacion String?   @db.VarChar(255)
   estado    String    @db.VarChar(30)
@@ -105,6 +162,7 @@ model Caja {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  empresa       Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   aperturasCaja AperturaCaja[]
 
   @@map("cajas")
@@ -112,6 +170,7 @@ model Caja {
 
 model Puesto {
   id            Int       @id @default(autoincrement())
+  empresaId     Int       @default(1) @map("empresa_id")
   areaTrabajoId Int       @map("area_trabajo_id")
   nombre        String    @db.VarChar(100)
   descripcion   String?   @db.Text
@@ -121,6 +180,7 @@ model Puesto {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   areaTrabajo AreaTrabajo @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
   empleados   Empleado[]
 
@@ -129,12 +189,14 @@ model Puesto {
 
 model EstadoEmpleado {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @db.VarChar(100)
   descripcion String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   empleados Empleado[]
 
   @@map("estados_empleados")
@@ -142,6 +204,7 @@ model EstadoEmpleado {
 
 model Empleado {
   id               Int       @id @default(autoincrement())
+  empresaId        Int       @default(1) @map("empresa_id")
   puestoId         Int       @map("puesto_id")
   areaTrabajoId    Int       @map("area_trabajo_id")
   estadoEmpleadoId Int       @map("estado_empleado_id")
@@ -160,6 +223,7 @@ model Empleado {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
 
+  empresa        Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   puesto         Puesto         @relation(fields: [puestoId], references: [id], onDelete: Cascade)
   areaTrabajo    AreaTrabajo    @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
   estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
@@ -176,6 +240,7 @@ model Empleado {
 
 model TipoActividad {
   id            Int       @id @default(autoincrement())
+  empresaId     Int       @default(1) @map("empresa_id")
   areaTrabajoId Int?      @map("area_trabajo_id")
   nombre        String    @db.VarChar(150)
   descripcion   String?   @db.Text
@@ -184,6 +249,7 @@ model TipoActividad {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
+  empresa     Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   areaTrabajo AreaTrabajo? @relation(fields: [areaTrabajoId], references: [id], onDelete: SetNull)
 
   @@map("tipos_actividades")
@@ -191,6 +257,7 @@ model TipoActividad {
 
 model ConfiguracionSistema {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   clave       String    @unique @db.VarChar(100)
   valor       String    @db.Text
   tipoDato    String    @map("tipo_dato") @db.VarChar(30)
@@ -198,6 +265,8 @@ model ConfiguracionSistema {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
 
   @@map("configuraciones_sistema")
 }
@@ -246,12 +315,14 @@ model Permiso {
 
 model Rol {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @unique @db.VarChar(100)
   descripcion String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  empresa  Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   permisos RolPermiso[]
   usuarios UsuarioRol[]
 
@@ -299,6 +370,7 @@ model UsuarioPermiso {
 
 model EstadoCliente {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @db.VarChar(150)
   descripcion String?   @db.Text
   color       String?   @db.VarChar(20)
@@ -306,6 +378,7 @@ model EstadoCliente {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   clientes Cliente[]
 
   @@map("estados_clientes")
@@ -313,6 +386,7 @@ model EstadoCliente {
 
 model Cliente {
   id                         Int       @id @default(autoincrement())
+  empresaId                  Int       @default(1) @map("empresa_id")
   estadoClienteId            Int       @map("estado_cliente_id")
   nombre                     String    @db.VarChar(150)
   apellidoPaterno            String    @map("apellido_paterno") @db.VarChar(150)
@@ -329,9 +403,10 @@ model Cliente {
   updatedAt                  DateTime  @updatedAt @map("updated_at")
   deletedAt                  DateTime? @map("deleted_at")
 
-  usuarioId                  Int?          @unique @map("usuario_id")
-  usuario       Usuario?      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  estadoCliente EstadoCliente @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
+  usuarioId     Int?               @unique @map("usuario_id")
+  empresa       Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  usuario       Usuario?           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estadoCliente EstadoCliente      @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
   ventas        Venta[]
   asistencias   Asistencia[]  
@@ -340,6 +415,7 @@ model Cliente {
 
 model ClienteMembresia {
   id                   Int       @id @default(autoincrement())
+  empresaId            Int       @default(1) @map("empresa_id")
   clienteId            Int       @map("cliente_id")
   tipoMembresiaId      Int       @map("tipo_membresia_id")
   estadoMembresiaId    Int       @map("estado_membresia_id")
@@ -350,6 +426,7 @@ model ClienteMembresia {
   updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at")
 
+  empresa         Empresa         @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
   estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
@@ -361,6 +438,7 @@ model ClienteMembresia {
 
 model EstadoMembresia {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @db.VarChar(150)
   descripcion String?   @db.Text
   color       String?   @db.VarChar(20)
@@ -368,6 +446,7 @@ model EstadoMembresia {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  empresa            Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   clientesMembresias ClienteMembresia[]
 
   @@map("estados_membresias")
@@ -375,6 +454,7 @@ model EstadoMembresia {
 
 model TipoMembresia {
   id           Int       @id @default(autoincrement())
+  empresaId    Int       @default(1) @map("empresa_id")
   nombre       String    @db.VarChar(150)
   descripcion  String?   @db.Text
   duracionDias Int       @map("duracion_dias")
@@ -384,6 +464,7 @@ model TipoMembresia {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
+  empresa            Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   clientesMembresias ClienteMembresia[]
   detallesVenta DetalleVenta[]
   @@map("tipos_membresias")
@@ -391,6 +472,7 @@ model TipoMembresia {
 
 model TipoVisita {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @db.VarChar(150)
   descripcion String?   @db.Text
   costo       Decimal   @db.Decimal(10, 2)
@@ -399,26 +481,31 @@ model TipoVisita {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  visitas Visita[]          // Relación bidireccional agregada
+  empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  visitas Visita[]
 
   @@map("tipos_visitas")
 }
 
 model CategoriaProducto {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique @db.VarChar(100)
-  descripcion String?   @db.Text
-  estado      String    @default("activo") @db.VarChar(30)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-  productos   Producto[]
+  id          Int        @id @default(autoincrement())
+  empresaId   Int        @default(1) @map("empresa_id")
+  nombre      String     @unique @db.VarChar(100)
+  descripcion String?    @db.Text
+  estado      String     @default("activo") @db.VarChar(30)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  productos Producto[]
 
   @@map("categoria_productos")
 }
 
 model AperturaCaja {
   id             Int       @id @default(autoincrement())
+  empresaId      Int       @default(1) @map("empresa_id")
   cajaId         Int       @map("caja_id")
   empleadoId     Int       @map("empleado_id")
   montoInicial   Decimal   @map("monto_inicial") @db.Decimal(10, 2)
@@ -430,6 +517,7 @@ model AperturaCaja {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
+  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   caja     Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
   empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
@@ -443,6 +531,7 @@ model AperturaCaja {
 
 model MovimientoCaja {
   id             Int       @id @default(autoincrement())
+  empresaId      Int       @default(1) @map("empresa_id")
   aperturaCajaId Int       @map("apertura_caja_id")
   empleadoId     Int       @map("empleado_id")
   tipo           String    @db.VarChar(20)
@@ -455,6 +544,7 @@ model MovimientoCaja {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
+  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   devolucionId Int?          @unique @map("devolucion_id")
@@ -465,6 +555,7 @@ model MovimientoCaja {
 
 model CorteCaja {
   id              Int       @id @default(autoincrement())
+  empresaId           Int       @default(1) @map("empresa_id")
   aperturaCajaId  Int       @map("apertura_caja_id")
   empleadoId      Int       @map("empleado_id")
   efectivoContado Decimal   @map("efectivo_contado") @db.Decimal(10, 2)
@@ -486,6 +577,7 @@ model CorteCaja {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
+  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
@@ -494,6 +586,7 @@ model CorteCaja {
 
 model Producto {
   id                  Int       @id @default(autoincrement())
+  empresaId           Int       @default(1) @map("empresa_id")
   categoriaProductoId Int       @map("categoria_producto_id")
   codigoBarras        String?   @unique @map("codigo_barras") @db.VarChar(100)
   nombre              String    @db.VarChar(150)
@@ -509,8 +602,9 @@ model Producto {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
-  disponibleCompra Boolean   @default(false) @map("disponible_compra")
+  disponibleCompra    Boolean   @default(false) @map("disponible_compra")
 
+  empresa   Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   categoria CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
   detallesVenta       DetalleVenta[]
   @@map("producto")
@@ -586,6 +680,7 @@ model DetalleVenta {
 }
 model MetodoPago {
   id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
   nombre      String    @unique @db.VarChar(30)
   codigo      String?   @unique @db.VarChar(30)
   descripcion String?   @db.VarChar(200)
@@ -596,12 +691,14 @@ model MetodoPago {
 
   ventas      Venta[]
   devoluciones Devolucion[]
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
 
   @@map("metodo_pago")
 }
 
 model Servicio {
   id               Int       @id @default(autoincrement())
+  empresaId        Int       @default(1) @map("empresa_id")
   nombre           String    @unique @db.VarChar(100)
   descripcion      String?   @db.VarChar(200)
   precio           Decimal   @default(0) @db.Decimal(10, 2)
@@ -609,10 +706,11 @@ model Servicio {
   disponibleCompra Boolean   @default(false) @map("disponible_compra")
   imagenUrl        String?   @map("imagen_url") @db.LongText
   imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
 
   detallesVenta       DetalleVenta[]
   @@map("servicios")
@@ -623,8 +721,51 @@ enum TipoItem {
   SERVICIO
   MEMBRESIA
 }
+enum EstadoTransaccionPago {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  EXPIRADO
+  REEMBOLSADO
+}
+
+enum ProveedorPago {
+  SANDBOX_SIMULADO
+  MERCADO_PAGO
+  PAYPAL
+  STRIPE
+  TERMINAL_MANUAL
+  EFECTIVO
+}
+
+model TransaccionPago {
+  id                Int                   @id @default(autoincrement())
+  empresaId         Int                   @default(1) @map("empresa_id")
+  uuidIdempotencia  String                @unique @map("uuid_idempotencia") @db.VarChar(100)
+  proveedor         ProveedorPago         @default(SANDBOX_SIMULADO)
+  referenciaExterna String?               @map("referencia_externa") @db.VarChar(150)
+  monto             Decimal               @db.Decimal(10, 2)
+  moneda            String                @default("MXN") @db.VarChar(10)
+  estado            EstadoTransaccionPago @default(PENDIENTE)
+  concepto          String                @db.VarChar(255)
+  correoCliente     String?               @map("correo_cliente") @db.VarChar(191)
+  datosRespuesta    String?               @map("datos_respuesta") @db.Text
+  urlCheckout       String?               @map("url_checkout") @db.VarChar(500)
+  folioVoucher      String?               @map("folio_voucher") @db.VarChar(100)
+  metadatos         Json?
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, estado])
+  @@map("transacciones_pagos")
+}
+
 model Asistencia {
   id                 Int       @id @default(autoincrement())
+  empresaId          Int       @default(1) @map("empresa_id")
   clienteId          Int       @map("cliente_id")
   clienteMembresiaId Int?      @map("cliente_membresia_id")
   fechaHora          DateTime  @default(now()) @map("fecha_hora")
@@ -633,6 +774,7 @@ model Asistencia {
   updatedAt          DateTime  @updatedAt @map("updated_at")
   deletedAt          DateTime? @map("deleted_at")
 
+  empresa          Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   cliente          Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   clienteMembresia ClienteMembresia? @relation(fields: [clienteMembresiaId], references: [id], onDelete: SetNull)
 
@@ -641,6 +783,7 @@ model Asistencia {
 
 model Visita {
   id              Int       @id @default(autoincrement())
+  empresaId       Int       @default(1) @map("empresa_id")
   nombreVisitante String    @map("nombre_visitante") @db.VarChar(150)
   tipoVisitaId    Int       @map("tipo_visita_id")
   costo           Decimal   @db.Decimal(10, 2)
@@ -650,6 +793,7 @@ model Visita {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   tipoVisita TipoVisita @relation(fields: [tipoVisitaId], references: [id], onDelete: Restrict)
 
   @@map("visitas")

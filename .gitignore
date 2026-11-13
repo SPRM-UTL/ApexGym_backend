@@ -80,3 +80,15 @@ backend/migrations/
 /public/imagenes/
 /imagenes/
 /usuarios/
+
+# Migraciones locales/copias; mantener prisma/migrations versionado
+!prisma/migrations/
+!prisma/migrations/**
+public/uploads/.vs/ 
+
+/migrations/
+/backend/migrations/
+/prisma/migrations-copy/
+/migrations-copy/
+/backend/migrations-copy/
+/prisma/migrations
