@@ -30,6 +30,7 @@
     "express": "^5.2.1",
     "mariadb": "^3.5.4",
     "multer": "^2.4.0",
+    "multer-storage-cloudinary": "^4.0.0",
     "pg": "^8.23.0"
   },
   "devDependencies": {
