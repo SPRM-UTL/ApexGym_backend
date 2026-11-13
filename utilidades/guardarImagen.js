@@ -31,7 +31,7 @@ export function guardarImagenServidor(imagenData, modulo = 'general') {
         fs.mkdirSync(carpetaModulo, { recursive: true });
     }
 
-    const nombreArchivo = `img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${extension}`;
+    const nombreArchivo = `img_${Date.now()}.${extension}`;
     const rutaAbsoluta = path.join(carpetaModulo, nombreArchivo);
 
     fs.writeFileSync(rutaAbsoluta, buffer);
