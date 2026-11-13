@@ -2,9 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 /**
  * Guarda una imagen en formato base64 en el disco del servidor bajo la carpeta /public/imagenes/{modulo}/
  *
@@ -25,6 +22,10 @@ export function guardarImagenServidor(imagenData, modulo = 'general') {
     const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, 'base64');
+
+    // Calcular __dirname en tiempo de ejecución para compatibilidad con Cloudflare Workers
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
     const carpetaModulo = path.join(__dirname, '../public/imagenes', modulo);
     if (!fs.existsSync(carpetaModulo)) {
