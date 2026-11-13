@@ -1,6 +1,9 @@
 import { productoDao } from "../dao/ProductoDao.js";
 import { BaseController } from "./BaseController.js";
-import { guardarImagenServidor } from "../utilidades/guardarImagen.js";
+import {
+    eliminarImagenCloudinary,
+    guardarImagenServidor,
+} from "../utilidades/guardarImagen.js";
 
 function normalizarDescuentoPorcentaje(valor) {
     if (valor === undefined || valor === null || valor === '') {
@@ -49,7 +52,7 @@ export class ProductoController extends BaseController {
             imagenPublicId,
         } = req.body;
         try {
-            const rutaImagen = imagenUrl ? guardarImagenServidor(imagenUrl, 'productos') : null;
+            const imagen = imagenUrl ? await guardarImagenServidor(imagenUrl, 'productos') : null;
 
             const productoAgregado = await productoDao.create({
                 categoriaProductoId: Number(categoriaProductoId),
@@ -62,8 +65,8 @@ export class ProductoController extends BaseController {
                 stockActual: stockActual ? Number(stockActual) : 0,
                 stockMinimo: stockMinimo ? Number(stockMinimo) : 1,
                 disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
-                imagenUrl: rutaImagen,
-                imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
+                imagenUrl: imagen?.url ?? null,
+                imagenPublicId: imagen?.publicId ?? (imagenPublicId ? imagenPublicId.trim() : null),
             });
             return this.respuestaExito(res, productoAgregado, "Producto añadido con éxito");
         } catch (error) {
@@ -88,24 +91,78 @@ export class ProductoController extends BaseController {
             imagenPublicId,
         } = req.body;
         try {
-            const rutaImagen = imagenUrl !== undefined ? guardarImagenServidor(imagenUrl, 'productos') : undefined;
+            const id = Number(productoId);
+            const productoAnterior = await productoDao.getById(id, this.obtenerEmpresaId(req));
+            if (!productoAnterior) {
+                return this.respuestaNoEncontrado(res, 'Producto no encontrado');
+            }
 
-            const productoEditado = await productoDao.update(Number(productoId), {
-                ...(categoriaProductoId && { categoriaProductoId: Number(categoriaProductoId) }),
-                ...(codigoBarras !== undefined && { codigoBarras }),
-                ...(nombre && { nombre }),
-                ...(descripcion !== undefined && { descripcion }),
-                ...(precioVenta !== undefined && { precioVenta: parseFloat(precioVenta) }),
-                ...(descuentoPorcentaje !== undefined && {
-                    descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
-                }),
-                ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null }),
-                ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
-                ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),
-                ...(disponibleCompra !== undefined && { disponibleCompra: Boolean(disponibleCompra) }),
-                ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
-                ...(imagenPublicId !== undefined && { imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null }),
-            });
+            let camposImagen = {};
+            let publicIdImagenNueva = productoAnterior.imagenPublicId;
+            let imagenSubida = null;
+            let imagenSeReemplazo = false;
+            if (imagenUrl === null || imagenUrl === '') {
+                camposImagen = { imagenUrl: null, imagenPublicId: null };
+                publicIdImagenNueva = null;
+                imagenSeReemplazo = true;
+            } else if (imagenUrl !== undefined) {
+                const imagen = await guardarImagenServidor(imagenUrl, 'productos');
+                camposImagen = { imagenUrl: imagen?.url ?? null };
+                const urlSinCambios = imagen?.url === productoAnterior.imagenUrl;
+                imagenSeReemplazo = !urlSinCambios;
+                if (imagen?.publicId) {
+                    imagenSubida = imagen;
+                    publicIdImagenNueva = imagen.publicId;
+                    camposImagen.imagenPublicId = imagen.publicId;
+                } else if (!urlSinCambios) {
+                    publicIdImagenNueva = imagenPublicId ? imagenPublicId.trim() : null;
+                    camposImagen.imagenPublicId = publicIdImagenNueva;
+                }
+            } else if (imagenPublicId !== undefined) {
+                camposImagen.imagenPublicId = imagenPublicId ? imagenPublicId.trim() : null;
+                publicIdImagenNueva = camposImagen.imagenPublicId;
+            }
+
+            let productoEditado;
+            try {
+                productoEditado = await productoDao.update(id, {
+                    ...(categoriaProductoId && { categoriaProductoId: Number(categoriaProductoId) }),
+                    ...(codigoBarras !== undefined && { codigoBarras }),
+                    ...(nombre && { nombre }),
+                    ...(descripcion !== undefined && { descripcion }),
+                    ...(precioVenta !== undefined && { precioVenta: parseFloat(precioVenta) }),
+                    ...(descuentoPorcentaje !== undefined && {
+                        descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
+                    }),
+                    ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null }),
+                    ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
+                    ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),
+                    ...(disponibleCompra !== undefined && { disponibleCompra: Boolean(disponibleCompra) }),
+                    ...camposImagen,
+                });
+            } catch (error) {
+                if (imagenSubida?.publicId) {
+                    try {
+                        await eliminarImagenCloudinary(imagenSubida.publicId);
+                    } catch (errorLimpieza) {
+                        throw new Error(`${error.message}. No se pudo limpiar la nueva imagen de Cloudinary: ${errorLimpieza.message}`);
+                    }
+                }
+                throw error;
+            }
+
+            const publicIdAnterior = productoAnterior.imagenPublicId;
+            if (imagenSeReemplazo && publicIdAnterior && publicIdAnterior !== publicIdImagenNueva) {
+                try {
+                    await eliminarImagenCloudinary(publicIdAnterior);
+                } catch (error) {
+                    return this.respuestaError(
+                        res,
+                        new Error(`Producto actualizado, pero no se pudo eliminar la imagen anterior de Cloudinary: ${error.message}`)
+                    );
+                }
+            }
+
             return this.respuestaExito(res, productoEditado, "Producto editado con exito");
         } catch (error) {
             return this.respuestaError(res, error);

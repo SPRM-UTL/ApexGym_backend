@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { httpServerHandler } from 'cloudflare:node';
 import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 
@@ -38,10 +37,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', api);
 
+let serverHandler = app;
 if (typeof WebSocketPair === 'undefined') {
     app.listen(port, () => {
         console.log(`Servidor corriendo en http://localhost:${port}`);
     });
+} else {
+    const { httpServerHandler } = await import('cloudflare:node');
+    serverHandler = httpServerHandler(app);
 }
 
-export default httpServerHandler(app);
+export default serverHandler;

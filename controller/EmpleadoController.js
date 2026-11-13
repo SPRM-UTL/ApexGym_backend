@@ -41,7 +41,7 @@ export class EmpleadoController extends BaseController {
             });
 
             // Si se envió imagen base64, se guarda como archivo físico en /public/imagenes/empleados/
-            const rutaImagen = imagenUrl ? guardarImagenServidor(imagenUrl, 'empleados') : null;
+            const imagen = imagenUrl ? await guardarImagenServidor(imagenUrl, 'empleados') : null;
 
             const registro = await this.dao.create({
                 puestoId: Number(puestoId),
@@ -56,7 +56,7 @@ export class EmpleadoController extends BaseController {
                 direccion: direccion ? direccion.trim() : null,
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
-                imagenUrl: rutaImagen,
+                imagenUrl: imagen?.url ?? null,
                 imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
             });
 
@@ -103,7 +103,9 @@ export class EmpleadoController extends BaseController {
             });
 
             // Si se envió imagen base64, se guarda como archivo físico en /public/imagenes/empleados/
-            const rutaImagen = imagenUrl !== undefined ? guardarImagenServidor(imagenUrl, 'empleados') : undefined;
+            const imagen = imagenUrl !== undefined
+                ? await guardarImagenServidor(imagenUrl, 'empleados')
+                : undefined;
 
             const registro = await this.dao.update(id, {
                 puestoId: Number(puestoId),
@@ -118,7 +120,7 @@ export class EmpleadoController extends BaseController {
                 direccion: direccion ? direccion.trim() : null,
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
-                imagenUrl: rutaImagen,
+                ...(imagen !== undefined && { imagenUrl: imagen?.url ?? null }),
                 imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
             });
 

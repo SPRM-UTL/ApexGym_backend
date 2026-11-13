@@ -10,6 +10,6 @@ CLOUDFLARE=true
 
 # Cloudinary (para subida de imágenes en producción/contenedores)
 # Regístrate gratis en https://cloudinary.com (25GB almacenamiento, 25GB BW/mes gratis)
-CLOUDINARY_CLOUD_NAME=CLOUDINARY_CLOUD_NAME
-CLOUDINARY_API_KEY=CLOUDINARY_API_KEY
-CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET
+CLOUDINARY_CLOUD_NAME="sprm_images"
+CLOUDINARY_API_KEY="939581637956146"
+CLOUDINARY_API_SECRET="8JePAoiHksmkb43DLlgO_5mEOes"

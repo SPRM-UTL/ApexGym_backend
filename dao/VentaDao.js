@@ -184,7 +184,10 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
     return { registros, total, pagina, limite };
 }
 
-async getById(id, client = this.prisma) {
+async getById(id, clientOrEmpresaId = 1) {
+    const client = clientOrEmpresaId && typeof clientOrEmpresaId === 'object'
+        ? clientOrEmpresaId
+        : this.prisma;
     const venta = await client.venta.findFirst({
         where: {
             id: Number(id),
