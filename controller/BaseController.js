@@ -32,8 +32,9 @@ export class BaseController {
     obtenerTodos = async (req, res) => {
         try {
             const empresaId = this.obtenerEmpresaId(req);
+            const contexto = { sucursalId: req.query?.sucursalId ?? null };
             const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
-            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId);
+            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId, contexto);
             if (!registros) {
                 throw new Error("No se encontraron registros");
             }

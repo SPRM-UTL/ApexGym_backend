@@ -84,7 +84,7 @@ export class BaseDao {
         };
     }
 
-    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId = 1) {
+    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId = 1, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: this.aplicarFiltroEmpresa(
                 {

@@ -18,7 +18,9 @@ export class AsistenciaController extends BaseController {
             if (!termino || termino.length < 2) {
                 return this.respuestaExito(res, [], 'Ingresa al menos 2 caracteres para buscar');
             }
-            const clientes = await clienteDao.buscarPorNombre(termino);
+            const clientes = await clienteDao.buscarPorNombre(termino, {
+                sucursalId: req.query.sucursalId ?? null,
+            });
             return this.respuestaExito(res, clientes, 'Clientes encontrados');
         } catch (error) {
             return this.respuestaError(res, error);
@@ -127,7 +129,11 @@ export class AsistenciaController extends BaseController {
             const limite = Number(req.query.limite) || 20;
             const pagina = Number(req.query.pagina) || 1;
 
-            const resultado = await this.dao.obtenerHistorialPorCliente(clienteId, { limite, pagina });
+            const resultado = await this.dao.obtenerHistorialPorCliente(clienteId, {
+                limite,
+                pagina,
+                sucursalId: req.query.sucursalId ?? null,
+            });
             return this.respuestaExito(res, resultado, 'Historial obtenido exitosamente');
         } catch (error) {
             return this.respuestaError(res, error);
@@ -142,7 +148,9 @@ export class AsistenciaController extends BaseController {
     obtenerHoy = async (req, res) => {
         try {
             const fecha = req.query.fecha || null;
-            const asistencias = await this.dao.obtenerAsistenciasDelDia(fecha);
+            const asistencias = await this.dao.obtenerAsistenciasDelDia(fecha, {
+                sucursalId: req.query.sucursalId ?? null,
+            });
             return this.respuestaExito(res, {
                 total: asistencias.length,
                 asistencias

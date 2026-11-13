@@ -5,7 +5,7 @@ export class ClienteDao extends BaseDao {
         super('cliente');
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, _orderBy = undefined, _empresaId = undefined, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: {
                 deletedAt: null,
@@ -59,7 +59,7 @@ export class ClienteDao extends BaseDao {
      * contenga el término de búsqueda. Máximo 20 resultados.
      * @param {string} termino
      */
-    async buscarPorNombre(termino) {
+    async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: {
                 deletedAt: null,
