@@ -103,3 +103,85 @@ Si tú eres quien realiza modificaciones en el modelo de datos (`prisma/schema.p
   ```bash
   npx prisma validate
   ```
+
+
+---
+
+## 📱 6. Autenticación para Clientes Móviles y Nativos (Android / API REST)
+
+Para clientes móviles (Android) o clientes nativos donde el manejo de cookies HTTP no es idóneo, el backend expone un flujo basado en token de portador (`Authorization: Bearer <token>`).
+
+### 6.1 Inicio de Sesión Móvil (Login)
+* **Endpoint:** `POST /api/usuarios/login-movil` (o alias `POST /api/usuarios/login-mobile`)
+* **Headers:** `Content-Type: application/json`
+* **Cuerpo de la Petición (Request Body):**
+```json
+{
+  "email": "usuario@ejemplo.com",
+  "contrasenia": "passwordSegura123"
+}
+```
+
+* **Respuesta Exitosa (`200 OK`):**
+```json
+{
+  "data": {
+    "token": "d7a4f3b18c2e9...",
+    "usuario": {
+      "id": 1,
+      "nombre": "Juan Pérez",
+      "email": "usuario@ejemplo.com",
+      "rolId": 1
+    },
+    "expiraEn": "2026-11-14T19:30:00.000Z"
+  },
+  "responseFlag": 0,
+  "message": "Autenticación móvil exitosa",
+  "statusCode": 200
+}
+```
+
+* **Respuestas de Error:**
+  * **`400 Bad Request`**: Si falta `email` o `contrasenia` en el cuerpo.
+  * **`401 Unauthorized`**: Si las credenciales son incorrectas (`Credenciales inválidas`).
+
+### 6.2 Uso del Token en Peticiones Protegidas
+El cliente móvil debe incluir el token recibido en el header `Authorization` de todas las peticiones a endpoints protegidos:
+
+```http
+Authorization: Bearer <token>
+```
+
+*Ejemplo con cURL:*
+```bash
+curl -X GET http://localhost:3000/api/secciones/mis-secciones \
+  -H "Authorization: Bearer d7a4f3b18c2e9..."
+```
+
+> **Nota de Seguridad:** El token se almacena en la base de datos hasheado con SHA-256 en la tabla `tokens`. El backend valida el token aplicando el hash y comprobando su vigencia y estado de revocación.
+
+### 6.3 Cierre de Sesión (Logout y Revocación)
+* **Endpoint:** `POST /api/usuarios/logout` (o alias `POST /api/usuarios/logout-movil`)
+* **Headers:**
+```http
+Authorization: Bearer <token>
+```
+* **Respuesta Exitosa (`200 OK`):**
+```json
+{
+  "data": null,
+  "responseFlag": 0,
+  "message": "Sesion cerrada correctamente",
+  "statusCode": 200
+}
+```
+* **Comportamiento ante Token Revocado o Expirado:**
+  Una vez ejecutado el logout, el registro en la base de datos es marcado con `deleted_at = NOW()`. Si el cliente intenta realizar cualquier petición posterior utilizando ese mismo token, el servidor responderá automáticamente con:
+  ```json
+  {
+    "data": null,
+    "responseFlag": 1,
+    "message": "Token revocado",
+    "statusCode": 401
+  }
+  ```
