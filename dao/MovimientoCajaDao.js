@@ -27,18 +27,18 @@ export class MovimientoCajaDao extends BaseDao {
         });
     }
 
-    async getAll() {
+    async getAll(additionalWhere = {}, additionalOrderBy = [{ id: 'desc' }, { createdAt: 'desc' }], empresaId, sucursalId) {
         return this.prisma.movimientoCaja.findMany({
-            where: { deletedAt: null },
+            where: this.aplicarFiltrosContexto({ deletedAt: null, ...additionalWhere }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: [{ id: 'desc' }, { createdAt: 'desc' }],
+            orderBy: additionalOrderBy,
         });
     }
 
-    async getById(id) {
-        return this.prisma.movimientoCaja.findUnique({
-            where: { id, deletedAt: null },
+    async getById(id, empresaId, sucursalId) {
+        return this.prisma.movimientoCaja.findFirst({
+            where: this.aplicarFiltrosContexto({ id: Number(id), deletedAt: null }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
         });

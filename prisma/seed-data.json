@@ -79,6 +79,19 @@
             "Eliminar"
           ],
           "orden": 4
+        },
+        {
+          "nombre": "Sucursales",
+          "descripcion": "Gestión y administración de sucursales del gimnasio",
+          "imagenUrl": "https://images.unsplash.com/photo-1577495508048-b635879837f1?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ],
+          "orden": 5
         }
       ],
       "orden": 1

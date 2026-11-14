@@ -12,9 +12,9 @@ export class EmpleadoDao extends BaseDao {
         });
     }
 
-    async getAll() {
+    async getAll(additionalWhere = {}, additionalOrderBy = { nombre: 'asc' }, empresaId, sucursalId) {
         return this.prisma.empleado.findMany({
-            where: { deletedAt: null },
+            where: this.aplicarFiltrosContexto({ deletedAt: null, ...additionalWhere }, empresaId, sucursalId),
             omit: this.omit,
             include: {
                 puesto: { select: { id: true, nombre: true } },
@@ -22,13 +22,13 @@ export class EmpleadoDao extends BaseDao {
                 estadoEmpleado: { select: { id: true, nombre: true } },
                 usuario: { select: { id: true, nombre: true, email: true } },
             },
-            orderBy: { nombre: 'asc' },
+            orderBy: additionalOrderBy,
         });
     }
 
-    async getById(id) {
-        return this.prisma.empleado.findUnique({
-            where: { id, deletedAt: null },
+    async getById(id, empresaId, sucursalId) {
+        return this.prisma.empleado.findFirst({
+            where: this.aplicarFiltrosContexto({ id: Number(id), deletedAt: null }, empresaId, sucursalId),
             omit: this.omit,
             include: {
                 puesto: { select: { id: true, nombre: true } },
@@ -39,9 +39,9 @@ export class EmpleadoDao extends BaseDao {
         });
     }
 
-    async create(data) {
+    async create(data, empresaId, sucursalId) {
         return this.prisma.empleado.create({
-            data: {
+            data: this.aplicarDatosContexto({
                 puestoId: data.puestoId,
                 areaTrabajoId: data.areaTrabajoId,
                 estadoEmpleadoId: data.estadoEmpleadoId,
@@ -56,7 +56,7 @@ export class EmpleadoDao extends BaseDao {
                 fechaIngreso: data.fechaIngreso,
                 imagenUrl: data.imagenUrl || null,
                 imagenPublicId: data.imagenPublicId || null,
-            },
+            }, empresaId, sucursalId),
             omit: this.omit,
             include: {
                 puesto: { select: { id: true, nombre: true } },

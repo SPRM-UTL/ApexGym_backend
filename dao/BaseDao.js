@@ -3,6 +3,7 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
+import { contextStorage } from '../middleware/contextoMiddleware.js';
 
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
@@ -28,10 +29,25 @@ const MODELOS_SIN_EMPRESA = new Set([
     'usuarioPermiso',
 ]);
 
+const MODELOS_SIN_SUCURSAL = new Set([
+    'empresa',
+    'sucursal',
+    'usuario',
+    'token',
+    'seccion',
+    'modulo',
+    'accion',
+    'permiso',
+    'rol',
+    'rolPermiso',
+    'usuarioRol',
+    'usuarioPermiso',
+]);
+
 export class BaseDao {
     /**
      * @param {string} modelName - Nombre del modelo Prisma
-     * @param {object} [configuracion] - Opciones de configuración del DAO ({ omit, useEmpresa })
+     * @param {object} [configuracion] - Opciones de configuración del DAO ({ omit, useEmpresa, useSucursal })
      */
     constructor(modelName, configuracion = {}) {
         const normalizedModelName =
@@ -43,93 +59,145 @@ export class BaseDao {
         this.prisma = prisma;
         this.model = prisma[modelName] || prisma[normalizedModelName];
 
-        // Por defecto true en modelos operativos; false en EmpresaDao, catálogos RBAC globales y tablas pivote
+        // Por defecto true en modelos operativos; false en catálogos RBAC globales
         this.useEmpresa =
             configuracion.useEmpresa !== undefined
                 ? Boolean(configuracion.useEmpresa)
                 : !MODELOS_SIN_EMPRESA.has(normalizedModelName);
 
-        // Omisión automática de campos delicados / de auditoría (createdAt, updatedAt, deletedAt)
-        // para evitar descargar información innecesaria o sensible en las respuestas.
+        // Por defecto true en los 23 modelos operativos con sucursal; false en empresa, sucursal, usuario y RBAC
+        this.useSucursal =
+            configuracion.useSucursal !== undefined
+                ? Boolean(configuracion.useSucursal)
+                : !MODELOS_SIN_SUCURSAL.has(normalizedModelName);
+
+        // Omisión automática de campos delicados / auditoría
         this.omit = {
             createdAt: true,
             updatedAt: true,
             deletedAt: true,
-            ...(configuracion.omit || {})
+            ...(configuracion.omit || {}),
         };
     }
 
-    resolverEmpresaId(empresaId = 1) {
-        const parsed = Number(empresaId);
-        return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-    }
-
-    aplicarFiltroEmpresa(where = {}, empresaId = 1) {
-        if (!this.useEmpresa) {
-            return { ...where };
-        }
+    obtenerContextoActual() {
+        const store = contextStorage.getStore();
         return {
-            ...where,
-            empresaId: where?.empresaId ?? this.resolverEmpresaId(empresaId),
+            empresaId: store?.empresaId ?? 1,
+            sucursalId: store?.sucursalId ?? 1,
         };
     }
 
-    aplicarDatosEmpresa(data = {}, empresaId = 1) {
-        if (!this.useEmpresa || !data || typeof data !== 'object') {
+    resolverEmpresaId(empresaId) {
+        if (empresaId !== undefined && empresaId !== null) {
+            const parsed = Number(empresaId);
+            return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+        }
+        return this.obtenerContextoActual().empresaId;
+    }
+
+    resolverSucursalId(sucursalId) {
+        if (sucursalId === 'todas' || sucursalId === null) {
+            return null; // No filtrar por sucursal específica
+        }
+        if (sucursalId !== undefined) {
+            const parsed = Number(sucursalId);
+            return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+        }
+        const ctxSucursal = this.obtenerContextoActual().sucursalId;
+        return ctxSucursal !== null ? ctxSucursal : 1;
+    }
+
+    aplicarFiltrosContexto(where = {}, empresaId, sucursalId) {
+        const resultado = { ...where };
+
+        if (this.useEmpresa && resultado.empresaId === undefined) {
+            resultado.empresaId = this.resolverEmpresaId(empresaId);
+        }
+
+        if (this.useSucursal && resultado.sucursalId === undefined) {
+            const sId = this.resolverSucursalId(sucursalId);
+            if (sId !== null) {
+                resultado.sucursalId = sId;
+            }
+        }
+
+        return resultado;
+    }
+
+    // Alias retrocompatible
+    aplicarFiltroEmpresa(where = {}, empresaId, sucursalId) {
+        return this.aplicarFiltrosContexto(where, empresaId, sucursalId);
+    }
+
+    aplicarDatosContexto(data = {}, empresaId, sucursalId) {
+        if (!data || typeof data !== 'object') {
             return data;
         }
-        return {
-            ...data,
-            empresaId: data.empresaId ?? this.resolverEmpresaId(empresaId),
-        };
+        const resultado = { ...data };
+
+        if (this.useEmpresa && resultado.empresaId === undefined) {
+            resultado.empresaId = this.resolverEmpresaId(empresaId);
+        }
+
+        if (this.useSucursal && resultado.sucursalId === undefined) {
+            const sId = this.resolverSucursalId(sucursalId) ?? 1;
+            resultado.sucursalId = sId;
+        }
+
+        return resultado;
     }
 
-    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId = 1) {
+    // Alias retrocompatible
+    aplicarDatosEmpresa(data = {}, empresaId, sucursalId) {
+        return this.aplicarDatosContexto(data, empresaId, sucursalId);
+    }
+
+    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId, sucursalId) {
         return this.model.findMany({
-            where: this.aplicarFiltroEmpresa(
+            where: this.aplicarFiltrosContexto(
                 {
                     deletedAt: null,
                     ...additionalWhere,
                 },
-                empresaId
+                empresaId,
+                sucursalId
             ),
             orderBy: additionalOrderBy,
-            omit: this.omit
+            omit: this.omit,
         });
     }
 
-    async getById(id, empresaId = 1) {
-        return this.model.findUnique({
-            where: this.aplicarFiltroEmpresa(
+    async getById(id, empresaId, sucursalId) {
+        return this.model.findFirst({
+            where: this.aplicarFiltrosContexto(
                 {
                     id: Number(id),
                     deletedAt: null,
                 },
-                empresaId
+                empresaId,
+                sucursalId
             ),
-            omit: this.omit
+            omit: this.omit,
         });
     }
 
-    async create(data, empresaId = 1) {
+    async create(data, empresaId, sucursalId) {
         return this.model.create({
-            data: this.aplicarDatosEmpresa(data, empresaId),
-            omit: this.omit
+            data: this.aplicarDatosContexto(data, empresaId, sucursalId),
+            omit: this.omit,
         });
     }
 
-    async update(id, data, empresaId = 1) {
-        const payload =
-            this.useEmpresa && data && typeof data === 'object' && data.empresaId === undefined
-                ? { ...data, empresaId: this.resolverEmpresaId(empresaId) }
-                : data;
+    async update(id, data, empresaId, sucursalId) {
+        const payload = this.aplicarDatosContexto(data, empresaId, sucursalId);
 
         return this.model.update({
             where: {
                 id: Number(id),
             },
             data: payload,
-            omit: this.omit
+            omit: this.omit,
         });
     }
 

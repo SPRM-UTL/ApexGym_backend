@@ -28,18 +28,18 @@ export class CorteCajaDao extends BaseDao {
         });
     }
 
-    async getAll() {
+    async getAll(additionalWhere = {}, additionalOrderBy = [{ id: 'desc' }, { fechaCorte: 'desc' }], empresaId, sucursalId) {
         return this.prisma.corteCaja.findMany({
-            where: { deletedAt: null },
+            where: this.aplicarFiltrosContexto({ deletedAt: null, ...additionalWhere }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: [{ id: 'desc' }, { fechaCorte: 'desc' }],
+            orderBy: additionalOrderBy,
         });
     }
 
-    async getById(id) {
-        return this.prisma.corteCaja.findUnique({
-            where: { id, deletedAt: null },
+    async getById(id, empresaId, sucursalId) {
+        return this.prisma.corteCaja.findFirst({
+            where: this.aplicarFiltrosContexto({ id: Number(id), deletedAt: null }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
         });
