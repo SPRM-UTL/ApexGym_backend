@@ -40,19 +40,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', api);
 
 let handler = app;
+
 if (typeof WebSocketPair === 'undefined') {
     app.listen(port, () => {
         console.log(`Servidor corriendo en http://localhost:${port}`);
     });
-} else {
-    try {
-        const cloudflare = await import('cloudflare:node');
-        if (cloudflare?.httpServerHandler) {
-            handler = cloudflare.httpServerHandler(app);
-        }
-    } catch {
-        // Fallback en entornos donde cloudflare:node no esté disponible
-    }
 }
 
 export default handler;
