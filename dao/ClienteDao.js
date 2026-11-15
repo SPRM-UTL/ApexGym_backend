@@ -5,12 +5,13 @@ export class ClienteDao extends BaseDao {
         super('cliente');
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId, sucursalId) {
         return this.model.findMany({
-            where: {
+            where: this.aplicarFiltrosContexto({
                 deletedAt: null,
                 ...additionalWhere
-            },
+            }, empresaId, sucursalId),
+            orderBy: additionalOrderBy,
             include: {
                 estadoCliente: true
             },
@@ -18,12 +19,12 @@ export class ClienteDao extends BaseDao {
         });
     }
 
-    async getById(id) {
-        return this.model.findUnique({
-            where: {
-                id: id,
+    async getById(id, empresaId, sucursalId) {
+        return this.model.findFirst({
+            where: this.aplicarFiltrosContexto({
+                id: Number(id),
                 deletedAt: null,
-            },
+            }, empresaId, sucursalId),
             include: {
                 estadoCliente: true
             },
