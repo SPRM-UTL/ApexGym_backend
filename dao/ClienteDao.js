@@ -5,12 +5,13 @@ export class ClienteDao extends BaseDao {
         super('cliente');
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId, sucursalId) {
         return this.model.findMany({
-            where: {
+            where: this.aplicarFiltrosContexto({
                 deletedAt: null,
                 ...additionalWhere
-            },
+            }, empresaId, sucursalId),
+            orderBy: additionalOrderBy,
             include: {
                 estadoCliente: true
             },
@@ -18,12 +19,12 @@ export class ClienteDao extends BaseDao {
         });
     }
 
-    async getById(id) {
-        return this.model.findUnique({
-            where: {
-                id: id,
+    async getById(id, empresaId, sucursalId) {
+        return this.model.findFirst({
+            where: this.aplicarFiltrosContexto({
+                id: Number(id),
                 deletedAt: null,
-            },
+            }, empresaId, sucursalId),
             include: {
                 estadoCliente: true
             },
@@ -50,6 +51,28 @@ export class ClienteDao extends BaseDao {
                 correo: email,
                 deletedAt: null,
             },
+            omit: this.omit
+        });
+    }
+
+    /**
+     * Busca clientes activos cuyo nombre, apellido paterno o apellido materno
+     * contenga el término de búsqueda. Máximo 20 resultados.
+     * @param {string} termino
+     */
+    async buscarPorNombre(termino) {
+        return this.model.findMany({
+            where: {
+                deletedAt: null,
+                OR: [
+                    { nombre:          { contains: termino } },
+                    { apellidoPaterno: { contains: termino } },
+                    { apellidoMaterno: { contains: termino } },
+                ]
+            },
+            include: { estadoCliente: true },
+            orderBy: { nombre: 'asc' },
+            take: 20,
             omit: this.omit
         });
     }

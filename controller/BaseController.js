@@ -9,9 +9,57 @@ export class BaseController {
         this.dao = dao;
     }
 
+    /**
+     * Obtiene el empresaId del usuario autenticado con fallback seguro a 1
+     * para garantizar retrocompatibilidad total cuando no se envía en body/query.
+     */
+    obtenerEmpresaId(req) {
+        const id = Number(req?.user?.empresaId ?? req?.usuario?.empresaId ?? 1);
+        return Number.isInteger(id) && id > 0 ? id : 1;
+    }
+
+    /**
+     * Obtiene el sucursalId del header x-sucursal-id, query o usuario autenticado
+     * con fallback seguro a 1 para retrocompatibilidad total.
+     */
+    obtenerSucursalId(req) {
+        const raw =
+            req.headers['x-sucursal-id'] ??
+            req.query?.sucursalId ??
+            req?.user?.sucursalId ??
+            req?.usuario?.sucursalId;
+        if (raw === 'todas') return 'todas';
+        const parsed = Number(raw);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+    }
+
+    inyectarEmpresaEnDatos(req, data = {}) {
+        return this.inyectarContextoEnDatos(req, data);
+    }
+
+    inyectarContextoEnDatos(req, data = {}) {
+        if (!data || typeof data !== 'object') return data;
+        const empresaId = this.obtenerEmpresaId(req);
+        const sucursalId = this.obtenerSucursalId(req);
+        const resultado = { ...data };
+        if (this.dao?.useEmpresa && resultado.empresaId === undefined) {
+            resultado.empresaId = empresaId;
+        }
+        if (this.dao?.useSucursal && resultado.sucursalId === undefined && sucursalId !== 'todas') {
+            resultado.sucursalId = sucursalId;
+        }
+        return resultado;
+    }
+
     obtenerTodos = async (req, res) => {
         try {
-            const registros = await this.dao.getAll();
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursalId = this.obtenerSucursalId(req);
+            const filtroContexto = {};
+            if (this.dao?.useEmpresa) filtroContexto.empresaId = empresaId;
+            if (this.dao?.useSucursal && sucursalId !== 'todas') filtroContexto.sucursalId = sucursalId;
+
+            const registros = await this.dao.getAll(filtroContexto, { id: 'desc' }, empresaId, sucursalId);
             if (!registros) {
                 throw new Error("No se encontraron registros");
             }
@@ -29,7 +77,9 @@ export class BaseController {
             if (isNaN(id)) {
                 throw new Error("ID no válido");
             }
-            const registro = await this.dao.getById(id);
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursalId = this.obtenerSucursalId(req);
+            const registro = await this.dao.getById(id, empresaId, sucursalId);
             if (!registro) {
                 return this.respuestaNoEncontrado(res, "Registro no encontrado");
             }

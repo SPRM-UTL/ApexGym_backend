@@ -12,6 +12,30 @@ export class AsistenciaDao extends BaseDao {
         });
     }
 
+    // ─── Inclusión estándar para consultas ───────────────────────────────────
+    get #include() {
+        return {
+            cliente: {
+                select: {
+                    id: true,
+                    nombre: true,
+                    apellidoPaterno: true,
+                    apellidoMaterno: true,
+                    telefono: true,
+                    usuario: {
+                        select: { fotoUrl: true }
+                    }
+                }
+            },
+            clienteMembresia: {
+                include: {
+                    tipoMembresia: true,
+                    estadoMembresia: true
+                }
+            }
+        };
+    }
+
     /**
      * Valida si un socio tiene acceso permitido según su membresía y registra la asistencia
      * @param {Object} params
@@ -161,6 +185,69 @@ export class AsistenciaDao extends BaseDao {
         };
     }
 
+    async getAll(additionalWhere = {}) {
+        return this.model.findMany({
+            where: { deletedAt: null, ...additionalWhere },
+            include: this.#include,
+            orderBy: { fechaHora: 'desc' },
+            omit: this.omit
+        });
+    }
+
+    async getById(id) {
+        return this.model.findUnique({
+            where: { id: Number(id), deletedAt: null },
+            include: this.#include,
+            omit: this.omit
+        });
+    }
+
+    /**
+     * Retorna el listado histrico de entradas de un socio.
+     * @param {number} clienteId
+     * @param {{ limite?: number, pagina?: number }} opciones
+     */
+    async obtenerHistorialPorCliente(clienteId, { limite = 20, pagina = 1 } = {}) {
+        const skip = (pagina - 1) * limite;
+        const [registros, total] = await Promise.all([
+            this.model.findMany({
+                where: { clienteId: Number(clienteId), deletedAt: null },
+                include: this.#include,
+                orderBy: { fechaHora: 'desc' },
+                take: limite,
+                skip,
+                omit: this.omit
+            }),
+            this.model.count({
+                where: { clienteId: Number(clienteId), deletedAt: null }
+            })
+        ]);
+        return { registros, total, pagina, limite };
+    }
+
+    /**
+     * Consulta todos los accesos registrados en una fecha.
+     * Si no se pasa fecha usa el día de hoy.
+     * @param {Date|string} [fecha]
+     */
+    async obtenerAsistenciasDelDia(fecha) {
+        const dia = fecha ? new Date(fecha) : new Date();
+        const inicio = new Date(dia);
+        inicio.setHours(0, 0, 0, 0);
+        const fin = new Date(dia);
+        fin.setHours(23, 59, 59, 999);
+
+        return this.model.findMany({
+            where: {
+                deletedAt: null,
+                fechaHora: { gte: inicio, lte: fin }
+            },
+            include: this.#include,
+            orderBy: { fechaHora: 'desc' },
+            omit: this.omit
+        });
+    }
+
     /**
      * Registra una visita temporal (pase por día / visita externa)
      */
@@ -284,42 +371,6 @@ export class AsistenciaDao extends BaseDao {
                             estadoMembresia: true
                         }
                     }
-                }
-            })
-        ]);
-
-        return { total, registros };
-    }
-
-    /**
-     * Consulta el historial paginado de visitas
-     */
-    async getHistorialVisitas({ fechaInicio, fechaFin, tipoVisitaId, take = 50, skip = 0 }) {
-        const where = { deletedAt: null };
-
-        if (tipoVisitaId && !isNaN(Number(tipoVisitaId))) {
-            where.tipoVisitaId = Number(tipoVisitaId);
-        }
-
-        if (fechaInicio || fechaFin) {
-            where.fechaHora = {};
-            if (fechaInicio) where.fechaHora.gte = new Date(fechaInicio);
-            if (fechaFin) {
-                const fin = new Date(fechaFin);
-                fin.setHours(23, 59, 59, 999);
-                where.fechaHora.lte = fin;
-            }
-        }
-
-        const [total, registros] = await Promise.all([
-            prisma.visita.count({ where }),
-            prisma.visita.findMany({
-                where,
-                take: Number(take),
-                skip: Number(skip),
-                orderBy: { fechaHora: 'desc' },
-                include: {
-                    tipoVisita: true
                 }
             })
         ]);
