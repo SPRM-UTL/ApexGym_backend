@@ -24,12 +24,12 @@ export class AperturaCajaDao extends BaseDao {
         });
     }
 
-    async getAll() {
+    async getAll(additionalWhere = {}, additionalOrderBy = [{ id: 'desc' }, { fechaApertura: 'desc' }], empresaId, sucursalId) {
         return this.prisma.aperturaCaja.findMany({
-            where: { deletedAt: null },
+            where: this.aplicarFiltrosContexto({ deletedAt: null, ...additionalWhere }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: [{ id: 'desc' }, { fechaApertura: 'desc' }],
+            orderBy: additionalOrderBy,
         });
     }
 
@@ -41,10 +41,10 @@ export class AperturaCajaDao extends BaseDao {
             orderBy: [{ id: 'desc' }, { fechaApertura: 'desc' }],
         });
     }
-
-    async getById(id) {
-        return this.prisma.aperturaCaja.findUnique({
-            where: { id, deletedAt: null },
+    
+    async getById(id, empresaId, sucursalId) {
+        return this.prisma.aperturaCaja.findFirst({
+            where: this.aplicarFiltrosContexto({ id: Number(id), deletedAt: null }, empresaId, sucursalId),
             omit: this.omit,
             include: INCLUDE_DEFAULT,
         });

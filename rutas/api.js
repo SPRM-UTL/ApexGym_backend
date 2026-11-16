@@ -34,6 +34,7 @@ import { EmpresaController } from '../controller/EmpresaController.js';
 import { uploadImagen } from '../middleware/uploadMiddleware.js';
 import { VentaController } from '../controller/VentaController.js';
 import { DevolucionController } from '../controller/DevolucionController.js';
+import { SucursalController } from '../controller/SucursalController.js';
 import { AsistenciaController } from '../controller/AsistenciaController.js';
 import { VisitaController } from '../controller/VisitaController.js';
 
@@ -98,6 +99,8 @@ const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
 const empresaController = new EmpresaController();
 const empresaRoutes = express.Router();
+const sucursalController = new SucursalController();
+const sucursalRoutes = express.Router();
 const pagoController = new PagoController();
 const pagoRoutes = express.Router();
 const asistenciaController = new AsistenciaController();
@@ -1032,6 +1035,51 @@ empresaRoutes.put(
 
 router.use('/empresa', empresaRoutes);
 router.use('/empresas', empresaRoutes);
+
+// ── Rutas de Sucursales ──────────────────────────────────────────────────────
+sucursalRoutes.get(
+    '/actual',
+    autenticarUsuario,
+    sucursalController.obtenerActual.bind(sucursalController)
+);
+
+sucursalRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Listar'),
+    sucursalController.obtenerTodos.bind(sucursalController)
+);
+
+sucursalRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Listar'),
+    sucursalController.obtenerPorId.bind(sucursalController)
+);
+
+sucursalRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Crear'),
+    sucursalController.crear.bind(sucursalController)
+);
+
+sucursalRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Editar'),
+    sucursalController.actualizar.bind(sucursalController)
+);
+
+sucursalRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Eliminar'),
+    sucursalController.eliminar.bind(sucursalController)
+);
+
+router.use('/sucursal', sucursalRoutes);
+router.use('/sucursales', sucursalRoutes);
 
 // ── Rutas de Asistencias ────────────────────────────────────────────────────
 asistenciaRoutes.get(
