@@ -1,9 +1,18 @@
 import { productoDao } from "../dao/ProductoDao.js";
 import { BaseController } from "./BaseController.js";
 import {
-    eliminarImagenCloudinary,
-    guardarImagenServidor,
-} from "../utilidades/guardarImagen.js";
+    eliminarImagen,
+    obtenerImagen,
+} from "../middleware/uploadMiddleware.js";
+
+function normalizarBooleano(valor, valorPorDefecto) {
+    if (valor === undefined || valor === null || valor === '') {
+        return valorPorDefecto;
+    }
+    if (valor === true || valor === 'true') return true;
+    if (valor === false || valor === 'false') return false;
+    throw new Error('El campo disponibleCompra debe ser booleano');
+}
 
 function normalizarDescuentoPorcentaje(valor) {
     if (valor === undefined || valor === null || valor === '') {
@@ -48,12 +57,10 @@ export class ProductoController extends BaseController {
             stockActual,
             stockMinimo,
             disponibleCompra,
-            imagenUrl,
-            imagenPublicId,
         } = req.body;
+        const imagen = obtenerImagen('productos', req.file);
+        let imagenPersistida = false;
         try {
-            const imagen = imagenUrl ? await guardarImagenServidor(imagenUrl, 'productos') : null;
-
             const productoAgregado = await productoDao.create({
                 categoriaProductoId: Number(categoriaProductoId),
                 codigoBarras: codigoBarras || null,
@@ -64,13 +71,25 @@ export class ProductoController extends BaseController {
                 precioCompra: precioCompra ? parseFloat(precioCompra) : null,
                 stockActual: stockActual ? Number(stockActual) : 0,
                 stockMinimo: stockMinimo ? Number(stockMinimo) : 1,
-                disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
+                disponibleCompra: normalizarBooleano(disponibleCompra, true),
                 imagenUrl: imagen?.url ?? null,
-                imagenPublicId: imagen?.publicId ?? (imagenPublicId ? imagenPublicId.trim() : null),
+                imagenPublicId: imagen?.publicId ?? null,
             });
+            imagenPersistida = true;
             return this.respuestaExito(res, productoAgregado, "Producto añadido con éxito");
         } catch (error) {
-            return this.respuestaError(res, error);
+            let errorRespuesta = error;
+            if (imagen && !imagenPersistida) {
+                try {
+                    await eliminarImagen('productos', imagen);
+                } catch (errorLimpieza) {
+                    console.error('[Productos] No se pudo limpiar la imagen subida:', errorLimpieza);
+                    errorRespuesta = new Error(
+                        `${error instanceof Error ? error.message : String(error)}. No se pudo limpiar la imagen subida: ${errorLimpieza.message}`
+                    );
+                }
+            }
+            return this.respuestaError(res, errorRespuesta);
         }
     };
 
@@ -87,85 +106,85 @@ export class ProductoController extends BaseController {
             stockActual,
             stockMinimo,
             disponibleCompra,
-            imagenUrl,
-            imagenPublicId,
+            quitarImagen,
         } = req.body;
+        const imagenNueva = obtenerImagen('productos', req.file);
+        let imagenPersistida = false;
         try {
             const id = Number(productoId);
             const productoAnterior = await productoDao.getById(id, this.obtenerEmpresaId(req));
             if (!productoAnterior) {
+                if (imagenNueva) {
+                    try {
+                        await eliminarImagen('productos', imagenNueva);
+                    } catch (errorLimpieza) {
+                        console.error('[Productos] No se pudo limpiar la imagen del producto inexistente:', errorLimpieza);
+                        return this.respuestaError(
+                            res,
+                            new Error(`Producto no encontrado. No se pudo limpiar la nueva imagen: ${errorLimpieza.message}`)
+                        );
+                    }
+                }
                 return this.respuestaNoEncontrado(res, 'Producto no encontrado');
             }
 
-            let camposImagen = {};
-            let publicIdImagenNueva = productoAnterior.imagenPublicId;
-            let imagenSubida = null;
-            let imagenSeReemplazo = false;
-            if (imagenUrl === null || imagenUrl === '') {
-                camposImagen = { imagenUrl: null, imagenPublicId: null };
-                publicIdImagenNueva = null;
-                imagenSeReemplazo = true;
-            } else if (imagenUrl !== undefined) {
-                const imagen = await guardarImagenServidor(imagenUrl, 'productos');
-                camposImagen = { imagenUrl: imagen?.url ?? null };
-                const urlSinCambios = imagen?.url === productoAnterior.imagenUrl;
-                imagenSeReemplazo = !urlSinCambios;
-                if (imagen?.publicId) {
-                    imagenSubida = imagen;
-                    publicIdImagenNueva = imagen.publicId;
-                    camposImagen.imagenPublicId = imagen.publicId;
-                } else if (!urlSinCambios) {
-                    publicIdImagenNueva = imagenPublicId ? imagenPublicId.trim() : null;
-                    camposImagen.imagenPublicId = publicIdImagenNueva;
-                }
-            } else if (imagenPublicId !== undefined) {
-                camposImagen.imagenPublicId = imagenPublicId ? imagenPublicId.trim() : null;
-                publicIdImagenNueva = camposImagen.imagenPublicId;
-            }
+            const quitarImagenSolicitado = normalizarBooleano(quitarImagen, false);
+            const camposImagen = imagenNueva
+                ? { imagenUrl: imagenNueva.url, imagenPublicId: imagenNueva.publicId }
+                : quitarImagenSolicitado
+                    ? { imagenUrl: null, imagenPublicId: null }
+                    : {};
+            const cambioImagen = Boolean(imagenNueva) || quitarImagenSolicitado;
 
-            let productoEditado;
-            try {
-                productoEditado = await productoDao.update(id, {
-                    ...(categoriaProductoId && { categoriaProductoId: Number(categoriaProductoId) }),
-                    ...(codigoBarras !== undefined && { codigoBarras }),
-                    ...(nombre && { nombre }),
-                    ...(descripcion !== undefined && { descripcion }),
-                    ...(precioVenta !== undefined && { precioVenta: parseFloat(precioVenta) }),
-                    ...(descuentoPorcentaje !== undefined && {
-                        descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
-                    }),
-                    ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null }),
-                    ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
-                    ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),
-                    ...(disponibleCompra !== undefined && { disponibleCompra: Boolean(disponibleCompra) }),
-                    ...camposImagen,
-                });
-            } catch (error) {
-                if (imagenSubida?.publicId) {
-                    try {
-                        await eliminarImagenCloudinary(imagenSubida.publicId);
-                    } catch (errorLimpieza) {
-                        throw new Error(`${error.message}. No se pudo limpiar la nueva imagen de Cloudinary: ${errorLimpieza.message}`);
-                    }
-                }
-                throw error;
-            }
+            const productoEditado = await productoDao.update(id, {
+                ...(categoriaProductoId && { categoriaProductoId: Number(categoriaProductoId) }),
+                ...(codigoBarras !== undefined && { codigoBarras: codigoBarras || null }),
+                ...(nombre && { nombre }),
+                ...(descripcion !== undefined && { descripcion: descripcion || null }),
+                ...(precioVenta !== undefined && { precioVenta: parseFloat(precioVenta) }),
+                ...(descuentoPorcentaje !== undefined && {
+                    descuentoPorcentaje: normalizarDescuentoPorcentaje(descuentoPorcentaje),
+                }),
+                ...(precioCompra !== undefined && { precioCompra: precioCompra ? parseFloat(precioCompra) : null }),
+                ...(stockActual !== undefined && { stockActual: Number(stockActual) }),
+                ...(stockMinimo !== undefined && { stockMinimo: Number(stockMinimo) }),
+                ...(disponibleCompra !== undefined && {
+                    disponibleCompra: normalizarBooleano(disponibleCompra, true),
+                }),
+                ...camposImagen,
+            });
+            imagenPersistida = true;
 
-            const publicIdAnterior = productoAnterior.imagenPublicId;
-            if (imagenSeReemplazo && publicIdAnterior && publicIdAnterior !== publicIdImagenNueva) {
+            if (cambioImagen && (productoAnterior.imagenUrl || productoAnterior.imagenPublicId)) {
                 try {
-                    await eliminarImagenCloudinary(publicIdAnterior);
+                    await eliminarImagen('productos', {
+                        url: productoAnterior.imagenUrl,
+                        publicId: productoAnterior.imagenPublicId,
+                    });
                 } catch (error) {
-                    return this.respuestaError(
+                    console.error(`[Productos] No se pudo eliminar la imagen anterior del producto ${id}:`, error);
+                    return this.respuestaExito(
                         res,
-                        new Error(`Producto actualizado, pero no se pudo eliminar la imagen anterior de Cloudinary: ${error.message}`)
+                        productoEditado,
+                        `Producto actualizado, pero no se pudo eliminar la imagen anterior: ${error.message}`
                     );
                 }
             }
 
             return this.respuestaExito(res, productoEditado, "Producto editado con exito");
         } catch (error) {
-            return this.respuestaError(res, error);
+            let errorRespuesta = error;
+            if (imagenNueva && !imagenPersistida) {
+                try {
+                    await eliminarImagen('productos', imagenNueva);
+                } catch (errorLimpieza) {
+                    console.error('[Productos] No se pudo limpiar la nueva imagen subida:', errorLimpieza);
+                    errorRespuesta = new Error(
+                        `${error instanceof Error ? error.message : String(error)}. No se pudo limpiar la nueva imagen: ${errorLimpieza.message}`
+                    );
+                }
+            }
+            return this.respuestaError(res, errorRespuesta);
         }
     };
 

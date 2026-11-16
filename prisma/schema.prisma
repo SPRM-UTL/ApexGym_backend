@@ -644,6 +644,7 @@ model Venta {
   folioVenta          FolioVenta        @relation(fields: [folioVentaId], references: [id])
   detalleVenta        DetalleVenta[]
   devoluciones       Devolucion[]
+  transaccionesPago TransaccionPago[]
 
   @@index([empleadoId])
   @@index([usuarioId])
@@ -740,6 +741,7 @@ enum ProveedorPago {
 
 model TransaccionPago {
   id                Int                   @id @default(autoincrement())
+  ventaId           Int?                  @map("venta_id")
   empresaId         Int                   @default(1) @map("empresa_id")
   uuidIdempotencia  String                @unique @map("uuid_idempotencia") @db.VarChar(100)
   proveedor         ProveedorPago         @default(SANDBOX_SIMULADO)
@@ -758,7 +760,9 @@ model TransaccionPago {
   deletedAt         DateTime?             @map("deleted_at")
 
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  venta   Venta? @relation(fields: [ventaId], references: [id], onDelete: Restrict)
 
+  @@index([ventaId])
   @@index([empresaId, estado])
   @@map("transacciones_pagos")
 }

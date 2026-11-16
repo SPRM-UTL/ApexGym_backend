@@ -1,7 +1,7 @@
 import { usuarioDao } from "../dao/UsuarioDao.js";
 import { tokenDao } from "../dao/TokenDao.js";
 import { BaseController } from "./BaseController.js";
-import { eliminarArchivoSubido } from "../middleware/uploadMiddleware.js";
+import { obtenerImagen } from "../middleware/uploadMiddleware.js";
 import { usuarioService } from "../services/UsuarioService.js";
 
 export class UsuarioController extends BaseController {
@@ -61,9 +61,12 @@ export class UsuarioController extends BaseController {
     }
     registrarUsuario = async (req, res) => {
         try {
-
-            const fotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : null;
-            const nuevoUsuario = await usuarioService.registrarUsuario({ ...req.body, fotoUrl });
+            const imagen = obtenerImagen('usuarios', req.file);
+            const nuevoUsuario = await usuarioService.registrarUsuario({
+                ...req.body,
+                fotoUrl: imagen?.url ?? null,
+                imagenSubida: imagen,
+            });
 
             return this.respuestaExito(
                 res,
@@ -71,25 +74,18 @@ export class UsuarioController extends BaseController {
                 "Usuario registrado exitosamente"
             );
         } catch (error) {
-            if (fotoUrl) {
-                eliminarArchivoSubido(fotoUrl);
-            }
             return this.respuestaError(res, error);
         }
     }
 
     actualizarUsuario = async (req, res) => {
-        const nuevaFotoUrl = req.file
-                ? `/uploads/usuarios/${req.file.filename}`
-                : undefined;
-        console.log("Foto: " + nuevaFotoUrl);
         try {
-             
+            const nuevaImagen = obtenerImagen('usuarios', req.file);
             const nuevoUsuario = await usuarioService.actualizarUsuario(
                 req.body.id,
                 {
                     ...req.body,
-                    nuevaFotoUrl
+                    nuevaImagen,
                 }
             );
 
@@ -99,9 +95,6 @@ export class UsuarioController extends BaseController {
                 "Usuario actualizado exitosamente"
             );
         } catch (error) {
-            if (nuevaFotoUrl) {
-                eliminarArchivoSubido(nuevaFotoUrl);
-            }
             return this.respuestaError(res, error);
         }
     }

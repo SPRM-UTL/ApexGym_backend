@@ -31,7 +31,7 @@ import { ClienteMembresiaController } from '../controller/ClienteMembresiaContro
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
-import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+import { uploadImagen } from '../middleware/uploadMiddleware.js';
 import { VentaController } from '../controller/VentaController.js';
 import { DevolucionController } from '../controller/DevolucionController.js';
 import { AsistenciaController } from '../controller/AsistenciaController.js';
@@ -41,6 +41,10 @@ import { VisitaController } from '../controller/VisitaController.js';
 import { PagoController } from '../controller/PagoController.js';
 
 const router = express.Router();
+const uploadImagenUsuario = uploadImagen('usuarios', {
+    transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
+});
+const uploadImagenProducto = uploadImagen('productos');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -116,7 +120,7 @@ usuarioRoutes.post(
     '/registrarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Crear'),
-    uploadFotoUsuario,
+    uploadImagenUsuario,
     usuarioController.registrarUsuario.bind(usuarioController)
 );
 
@@ -124,7 +128,7 @@ usuarioRoutes.put(
     '/actualizarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Editar'),
-    uploadFotoUsuario,
+    uploadImagenUsuario,
     usuarioController.actualizarUsuario.bind(usuarioController)
 );
 
@@ -447,6 +451,7 @@ productoRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Crear'),
+    uploadImagenProducto,
     productoController.crear.bind(productoController)
 );
 
@@ -454,6 +459,7 @@ productoRoutes.put(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Editar'),
+    uploadImagenProducto,
     productoController.actualizar.bind(productoController)
 );
 

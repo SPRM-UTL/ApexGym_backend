@@ -12,7 +12,7 @@ export class ServicioController extends BaseController {
             const { nombre, descripcion, precio, estado, disponibleCompra, imagenUrl, imagenPublicId } = req.body;
             this.validar({ nombre, precio, estado });
 
-            const imagen = imagenUrl ? await guardarImagenServidor(imagenUrl, 'servicios') : null;
+            const rutaImagen = imagenUrl ? guardarImagenServidor(imagenUrl, 'servicios') : null;
 
             const servicioAgregado = await this.dao.create({
                 nombre: nombre.trim(),
@@ -20,7 +20,7 @@ export class ServicioController extends BaseController {
                 precio: Number(precio),
                 estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
                 disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
-                imagenUrl: imagen?.url ?? null,
+                imagenUrl: rutaImagen,
                 imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
             });
 
@@ -39,8 +39,8 @@ export class ServicioController extends BaseController {
             const { nombre, descripcion, precio, estado, disponibleCompra, imagenUrl, imagenPublicId } = req.body;
             this.validar({ nombre, precio, estado });
 
-            const imagen = imagenUrl !== undefined
-                ? await guardarImagenServidor(imagenUrl, 'servicios')
+            const rutaImagen = imagenUrl !== undefined
+                ? guardarImagenServidor(imagenUrl, 'servicios')
                 : undefined;
 
             const servicioActualizado = await this.dao.update(id, {
@@ -49,7 +49,7 @@ export class ServicioController extends BaseController {
                 precio: Number(precio),
                 estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
                 disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
-                ...(imagen !== undefined && { imagenUrl: imagen?.url ?? null }),
+                ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
                 ...(imagenPublicId !== undefined && { imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null }),
             });
 

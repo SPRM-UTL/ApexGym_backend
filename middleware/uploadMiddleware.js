@@ -8,18 +8,8 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
 const ES_CLOUDFLARE = process.env.CLOUDFLARE === 'true' || process.env.NODE_ENV === 'production';
 
-let DIRECTORIO_FOTOS_USUARIOS = '';
-let RAIZ_BACKEND = '';
-
-if (!ES_CLOUDFLARE) {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    RAIZ_BACKEND = path.resolve(__dirname, '..');
-    DIRECTORIO_FOTOS_USUARIOS = path.join(RAIZ_BACKEND, 'uploads', 'usuarios');
-
-    if (!fs.existsSync(DIRECTORIO_FOTOS_USUARIOS)) {
-        fs.mkdirSync(DIRECTORIO_FOTOS_USUARIOS, { recursive: true });
-    }
-}
+const RAIZ_BACKEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DIRECTORIO_IMAGENES = path.join(RAIZ_BACKEND, 'uploads');
 
 // Configurar Cloudinary para producción/contenedores
 if (ES_CLOUDFLARE) {
@@ -45,39 +35,13 @@ const EXTENSION_POR_MIME = {
     'image/webp': '.webp',
 };
 
-// Storage: Cloudinary en producción (contenedores/Cloudflare), disco local en desarrollo
-const storage = ES_CLOUDFLARE
-    ? new CloudinaryStorage({
-        cloudinary: cloudinary,
-        params: async (_req, file) => {
-            const extOriginal = path.extname(file.originalname || '').toLowerCase();
-            const ext = extOriginal || EXTENSION_POR_MIME[file.mimetype] || '.jpg';
-            const publicId = `apexgym/usuarios/${crypto.randomUUID()}`;
-            return {
-                folder: 'apexgym/usuarios',
-                public_id: publicId,
-                resource_type: 'image',
-                allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                transformation: [
-                    { width: 800, height: 800, crop: 'limit', quality: 'auto:good' },
-                ],
-            };
-        },
-    })
-    : multer.diskStorage({
-        destination: (_req, _file, cb) => {
-            if (!fs.existsSync(DIRECTORIO_FOTOS_USUARIOS)) {
-                fs.mkdirSync(DIRECTORIO_FOTOS_USUARIOS, { recursive: true });
-            }
-            cb(null, DIRECTORIO_FOTOS_USUARIOS);
-        },
-        filename: (_req, file, cb) => {
-            const extOriginal = path.extname(file.originalname || '').toLowerCase();
-            const ext = extOriginal || EXTENSION_POR_MIME[file.mimetype] || '.jpg';
-            const nombreArchivo = `${crypto.randomUUID()}${ext}`;
-            cb(null, nombreArchivo);
-        },
-    });
+const TRANSFORMACION_POR_DEFECTO = [
+    { width: 1200, height: 1200, crop: 'limit', quality: 'auto:good' },
+];
+
+function esModuloValido(modulo) {
+    return typeof modulo === 'string' && /^[a-z0-9_-]+$/i.test(modulo);
+}
 
 const fileFilter = (_req, file, cb) => {
     if (MIME_PERMITIDOS.has(file.mimetype)) {
@@ -87,42 +51,118 @@ const fileFilter = (_req, file, cb) => {
     }
 };
 
-export const uploadFotoUsuario = multer({
-    storage,
-    fileFilter,
-    limits: {
-        fileSize: 5 * 1024 * 1024, // 5 MB
-    },
-}).single('foto');
-
-export async function eliminarArchivoSubido(rutaRelativa) {
+function crearStorageImagen(modulo, transformation) {
+    const carpetaCloudinary = `apexgym/${modulo}`;
     if (ES_CLOUDFLARE) {
-        // En producción (Cloudflare/contenedores) usar Cloudinary
-        if (!rutaRelativa || typeof rutaRelativa !== 'string') return;
-        // rutaRelativa en Cloudinary será el public_id o la URL completa
-        const publicId = extraerPublicIdDeCloudinary(rutaRelativa);
-        if (publicId) {
-            try {
-                await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
-            } catch {
-                // Ignorar errores al eliminar archivo antiguo
-            }
+        return new CloudinaryStorage({
+            cloudinary,
+            params: async () => ({
+                folder: carpetaCloudinary,
+                public_id: crypto.randomUUID(),
+                resource_type: 'image',
+                allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                ...(transformation ? { transformation } : {}),
+            }),
+        });
+    }
+
+    const directorioLocal = path.join(DIRECTORIO_IMAGENES, modulo);
+    return multer.diskStorage({
+        destination: (_req, _file, cb) => {
+            fs.mkdirSync(directorioLocal, { recursive: true });
+            cb(null, directorioLocal);
+        },
+        filename: (_req, file, cb) => {
+            const extOriginal = path.extname(file.originalname || '').toLowerCase();
+            const ext = extOriginal || EXTENSION_POR_MIME[file.mimetype] || '.jpg';
+            cb(null, `${crypto.randomUUID()}${ext}`);
+        },
+    });
+}
+
+function crearUploadImagen(modulo, campo, transformation) {
+    return multer({
+        storage: crearStorageImagen(modulo, transformation),
+        fileFilter,
+        limits: { fileSize: 5 * 1024 * 1024 },
+    }).single(campo);
+}
+
+export function uploadImagen(
+    modulo,
+    { campo = 'imagen', transformation = TRANSFORMACION_POR_DEFECTO } = {}
+) {
+    if (!esModuloValido(modulo)) {
+        throw new Error('El módulo de almacenamiento de imágenes no es válido');
+    }
+
+    return crearUploadImagen(modulo, campo, transformation);
+}
+
+export function obtenerImagen(modulo, archivo) {
+    if (!archivo) return null;
+    if (!esModuloValido(modulo)) {
+        throw new Error('El módulo de almacenamiento de imágenes no es válido');
+    }
+
+    if (ES_CLOUDFLARE) {
+        return { url: archivo.path, publicId: archivo.filename };
+    }
+
+    return { url: `/uploads/${modulo}/${archivo.filename}`, publicId: null };
+}
+
+export async function eliminarImagen(modulo, referencia = {}) {
+    const { url, publicId } = referencia || {};
+    if (!esModuloValido(modulo)) {
+        throw new Error('El módulo de almacenamiento de imágenes no es válido');
+    }
+
+    if (ES_CLOUDFLARE) {
+        const id = publicId || extraerPublicIdDeCloudinary(url, modulo);
+        if (!id) return;
+        if (!esPublicIdDelModulo(id, modulo)) {
+            throw new Error(`El identificador de imagen no pertenece al módulo ${modulo}`);
+        }
+
+        const resultado = await cloudinary.uploader.destroy(id, {
+            resource_type: 'image',
+            invalidate: true,
+        });
+        if (resultado.result !== 'ok' && resultado.result !== 'not found') {
+            throw new Error(`Cloudinary no pudo eliminar la imagen (${resultado.result || 'sin resultado'})`);
         }
         return;
     }
 
-    if (!rutaRelativa || typeof rutaRelativa !== 'string') return;
-    const rutaLimpia = rutaRelativa.replace(/^\/+/, '');
-    if (!rutaLimpia.startsWith('uploads/')) return;
+    if (typeof url !== 'string') return;
+    const rutaRelativaPermitida = [
+        `/uploads/${modulo}/`,
+        `/imagenes/${modulo}/`,
+    ].find((prefijo) => url.startsWith(prefijo));
+    if (!rutaRelativaPermitida) return;
 
-    const rutaAbsoluta = path.join(RAIZ_BACKEND, rutaLimpia);
-    if (fs.existsSync(rutaAbsoluta)) {
-        try {
-            fs.unlinkSync(rutaAbsoluta);
-        } catch {
-            // Ignorar errores al eliminar archivo antiguo
-        }
+    const nombreArchivo = path.basename(url.split('?')[0]);
+    if (!nombreArchivo || nombreArchivo !== url.split('?')[0].split('/').pop()) {
+        throw new Error('La ruta de la imagen no es válida');
     }
+
+    const directorioImagen = url.startsWith(`/uploads/${modulo}/`)
+        ? path.join(DIRECTORIO_IMAGENES, modulo)
+        : path.join(RAIZ_BACKEND, 'public', 'imagenes', modulo);
+    const rutaArchivo = path.join(directorioImagen, nombreArchivo);
+    if (fs.existsSync(rutaArchivo)) {
+        fs.unlinkSync(rutaArchivo);
+    }
+}
+
+function esPublicIdDelModulo(publicId, modulo) {
+    const partes = publicId.split('/');
+    while (partes[0] === 'apexgym' && partes[1] === modulo) {
+        partes.splice(0, 2);
+    }
+    return partes.length === 1
+        && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(partes[0]);
 }
 
 /**
@@ -131,20 +171,28 @@ export async function eliminarArchivoSubido(rutaRelativa) {
  * - "https://res.cloudinary.com/demo/image/upload/v123/apexgym/usuarios/abc123.jpg" -> "apexgym/usuarios/abc123"
  * - "apexgym/usuarios/abc123" -> "apexgym/usuarios/abc123"
  */
-function extraerPublicIdDeCloudinary(input) {
-    if (!input || typeof input !== 'string') return null;
-    
-    // Si ya es un public_id simple (sin URL)
-    if (!input.includes('cloudinary.com') && !input.includes('http')) {
-        // Remover extensión si la tiene
-        return input.replace(/\.[^.]+$/, '');
+function extraerPublicIdDeCloudinary(input, modulo) {
+    if (typeof input !== 'string') return null;
+
+    let ruta;
+    try {
+        ruta = new URL(input).pathname;
+    } catch {
+        return null;
     }
-    
-    // Extraer de URL de Cloudinary
-    const match = input.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
-    if (match) {
-        return match[1];
+
+    if (!ruta.startsWith('/')) return null;
+    const indiceUpload = ruta.indexOf('/upload/');
+    if (indiceUpload < 0) return null;
+
+    let recurso = ruta.slice(indiceUpload + '/upload/'.length);
+    const prefijoModulo = `apexgym/${modulo}/`;
+    const indiceModulo = recurso.indexOf(prefijoModulo);
+    if (indiceModulo >= 0) {
+        recurso = recurso.slice(indiceModulo);
+    } else {
+        recurso = recurso.split('/').pop();
     }
-    
-    return null;
+
+    return recurso.replace(/\.[^/.]+$/, '');
 }
