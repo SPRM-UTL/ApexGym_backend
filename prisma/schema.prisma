@@ -121,7 +121,6 @@ model Usuario {
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
-  cliente         Cliente?
 
   @@map("usuarios")
 }
@@ -150,7 +149,6 @@ model Seccion {
   id             Int       @id @default(autoincrement())
   nombre         String    @unique @db.VarChar(100)
   descripcion    String?   @db.Text
-  orden          Int       @default(0)
   imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
   imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -167,7 +165,6 @@ model Modulo {
   seccionId      Int       @map("seccion_id")
   nombre         String    @db.VarChar(100)
   descripcion    String?   @db.Text
-  orden          Int       @default(0)
   imagenUrl      String?   @map("imagen_url") @db.VarChar(500)
   imagenPublicId String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -471,7 +468,6 @@ model Cliente {
   usuario       Usuario?           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   estadoCliente EstadoCliente      @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
-  asistencias   Asistencia[]       // Relación bidireccional agregada
 
   @@map("clientes")
 }
@@ -495,7 +491,6 @@ model ClienteMembresia {
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
   estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
-  asistencias     Asistencia[]    // Relación bidireccional agregada
 
   @@map("clientes_membresias")
 }
@@ -610,7 +605,6 @@ model MovimientoCaja {
   monto          Decimal   @db.Decimal(10, 2)
   concepto       String    @db.VarChar(255)
   estado         String    @default("PENDIENTE") @db.VarChar(20)
-  desglose       String?   @db.Text
   observaciones  String?   @db.Text
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")

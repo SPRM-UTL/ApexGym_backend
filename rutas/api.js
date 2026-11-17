@@ -33,8 +33,6 @@ import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
 import { SucursalController } from '../controller/SucursalController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
-import { AsistenciaController } from '../controller/AsistenciaController.js';
-import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
@@ -457,11 +455,6 @@ productoRoutes.delete(
     productoController.eliminar.bind(productoController)
 );
 
-productoRoutes.get(
-    '/productosClientes/traer',
-    productoController.getProductosCliente.bind(productoController)
-);
-
 // ── Rutas de Apertura de Caja ────────────────────────────────────────────────
 aperturaCajaRoutes.get(
     '/',
@@ -536,12 +529,6 @@ movimientoCajaRoutes.put(
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Editar'),
     movimientoCajaController.actualizar.bind(movimientoCajaController)
-);
-movimientoCajaRoutes.post(
-    '/:id/validar',
-    autenticarUsuario,
-    verificarPermiso('Movimientos de Caja', 'Editar'),
-    movimientoCajaController.validar.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.put(
     '/:id/validar',
@@ -664,21 +651,6 @@ clienteRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Clientes', 'Eliminar'),
     clienteController.eliminar.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/registrar',
-    clienteController.registrar.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/verificarCorreo',
-    clienteController.verificarCorreo.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/verificarCredenciales',
-    clienteController.verificarCredenciales.bind(clienteController)
 );
 
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
@@ -1066,8 +1038,6 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
-router.use('/asistencias', asistenciaRoutes);
-router.use('/visitas', visitaRoutes);
 
 // ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
