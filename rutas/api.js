@@ -101,6 +101,8 @@ const visitaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
+usuarioRoutes.post('/login-movil', usuarioController.loginMovil.bind(usuarioController));
+usuarioRoutes.post('/login-mobile', usuarioController.loginMovil.bind(usuarioController));
 
 // ── Rutas protegidas (autenticación + permiso específico) ───────────────────
 usuarioRoutes.get(
@@ -135,6 +137,11 @@ usuarioRoutes.delete(
 
 usuarioRoutes.post(
     '/logout',
+    autenticarUsuario,
+    usuarioController.logout.bind(usuarioController)
+);
+usuarioRoutes.post(
+    '/logout-movil',
     autenticarUsuario,
     usuarioController.logout.bind(usuarioController)
 );
