@@ -1,4 +1,8 @@
 import { BaseDao } from "./BaseDao.js";
+import {
+    ESTADOS_ACTIVOS_CATALOGO,
+    normalizarEstadoCatalogo,
+} from "../utils/constantes.js";
 
 export class ServicioDao extends BaseDao {
     constructor() {
@@ -14,13 +18,17 @@ export class ServicioDao extends BaseDao {
     }
 
     async getAll(additionalWhere = {}) {
-        return this.model.findMany({
+        const registros = await this.model.findMany({
             where: {
                 deletedAt: null,
                 ...additionalWhere,
             },
             omit: this.omit,
         });
+        return registros.map((registro) => ({
+            ...registro,
+            estado: normalizarEstadoCatalogo(registro.estado),
+        }));
     }
 
     async obtenerCatalogoPaginado({ termino, pagina, limite, orden }) {
@@ -43,6 +51,22 @@ export class ServicioDao extends BaseDao {
         ]);
 
         return { registros, total, pagina, limite };
+    }
+
+    async obtenerDisponiblesParaVenta(empresaId, sucursalId) {
+        const registros = await this.model.findMany({
+            where: this.aplicarFiltrosContexto({
+                deletedAt: null,
+                estado: { in: ESTADOS_ACTIVOS_CATALOGO },
+                disponibleCompra: true,
+            }, empresaId, sucursalId),
+            orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+            omit: this.omit,
+        });
+        return registros.map((registro) => ({
+            ...registro,
+            estado: normalizarEstadoCatalogo(registro.estado),
+        }));
     }
 }
 

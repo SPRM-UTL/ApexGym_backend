@@ -1,7 +1,7 @@
 import { BaseDao } from "./BaseDao.js";
 //dependecia que nos permite hacer movimientos y redondeo de dinero
 import currency from "currency.js";
-import { TASA_IVA } from "../utils/constantes.js";
+import { ESTADOS_ACTIVOS_CATALOGO, TASA_IVA } from "../utils/constantes.js";
 import { pagoService, PROVEEDOR_POR_CODIGO_METODO } from "../services/PagoService.js";
 
 const ESTADO_CAJA = { ABIERTA: "ABIERTA", CERRADA: "CERRADA" };
@@ -13,6 +13,12 @@ const ETIQUETAS_ESTADO_DEVOLUCION = {
     DEVUELTA_TOTALMENTE: 'Devuelta totalmente',
 };
 
+function crearErrorArticuloNoDisponible(mensaje) {
+    const error = new Error(mensaje);
+    error.status = 400;
+    return error;
+}
+
 export class VentaDao extends BaseDao {
     constructor() {
         super(
@@ -22,7 +28,6 @@ export class VentaDao extends BaseDao {
                     createdAt : true,
                     updatedAt : true,
                     deletedAt : true,
-                    metodoPagoLegacy: true,
                 }
             }
         );
@@ -401,7 +406,6 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
             total: true,
             estado: true,
             metodoPagoId: true,
-            metodoPagoLegacy: true,
             metodoPago: {
                 select: {
                     id: true,
@@ -423,8 +427,7 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
     for (const venta of ventas) {
         const totalItem = currency(venta.total);
         const esCancelada = ['cancelada', 'cancelado'].includes(String(venta.estado ?? '').trim().toLowerCase());
-        const esEfectivo = venta.metodoPago?.codigo === 'EFECTIVO'
-            || (!venta.metodoPago && String(venta.metodoPagoLegacy ?? '').trim().toLowerCase() === 'efectivo');
+        const esEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
 
         if (esCancelada) {
             totalVentasCanceladas = totalVentasCanceladas.add(totalItem);
@@ -564,7 +567,12 @@ async create(data) {
 
         const detalles = await this.prepararDetalles(
             tx,
-            detalleVenta
+            detalleVenta,
+            [],
+            {
+                empresaId: Number(cajaAbierta.empresaId),
+                sucursalId: Number(cajaAbierta.sucursalId),
+            }
         );
 
         const { subtotal, total } = this.calcularTotal(detalles);
@@ -648,7 +656,12 @@ async update(id, data) {
                 id: ventaId,
                 deletedAt: null,
             },
-            select: { aperturaCajaId: true },
+            select: {
+                aperturaCajaId: true,
+                aperturaCaja: {
+                    select: { empresaId: true, sucursalId: true },
+                },
+            },
         });
 
         if (!referenciaVenta) {
@@ -722,7 +735,15 @@ async update(id, data) {
                 descripcion: d.descripcion,
             }));
 
-        const detalles = await this.prepararDetalles(tx, items, venta.detalleVenta);
+        const detalles = await this.prepararDetalles(
+            tx,
+            items,
+            venta.detalleVenta,
+            {
+                empresaId: referenciaVenta.aperturaCaja.empresaId,
+                sucursalId: referenciaVenta.aperturaCaja.sucursalId,
+            }
+        );
 
         const { subtotal, total } = this.calcularTotal(
             detalles,
@@ -826,8 +847,7 @@ async cancel(id, motivoCancelacion) {
 
         await this.ajustarStock(tx, venta.detalleVenta, []);
 
-        const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO'
-            || (!venta.metodoPago && String(venta.metodoPagoLegacy ?? '').trim().toLowerCase() === 'efectivo');
+        const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
 
         if (esPagoEfectivo) {
             await tx.movimientoCaja.create({
@@ -955,7 +975,7 @@ validarDetalles(detalleVenta) {
     }
 
 
-async prepararDetalles(tx, items, detallesViejos = []) {
+async prepararDetalles(tx, items, detallesViejos = [], contexto = {}) {
     const detalles = [];
 
     const detallesAnteriores = new Map(
@@ -992,13 +1012,17 @@ async prepararDetalles(tx, items, detallesViejos = []) {
                 registro = await tx.producto.findFirst({
                     where: {
                         id: productoId,
-                        deletedAt: null
-                    }
+                        empresaId: contexto.empresaId,
+                        sucursalId: contexto.sucursalId,
+                        estado: { in: ESTADOS_ACTIVOS_CATALOGO },
+                        disponibleCompra: true,
+                        deletedAt: null,
+                    },
                 });
 
                 if (!registro) {
-                    throw new Error(
-                        `El producto ${productoId} no existe o está eliminado`
+                    throw crearErrorArticuloNoDisponible(
+                        `El producto ${productoId} no existe, está inactivo o no está disponible para venta`
                     );
                 }
 
@@ -1030,13 +1054,20 @@ async prepararDetalles(tx, items, detallesViejos = []) {
                     "el servicio"
                 );
 
-                registro = await tx.servicio.findUnique({
-                    where: { id: servicioId }
+                registro = await tx.servicio.findFirst({
+                    where: {
+                        id: servicioId,
+                        empresaId: contexto.empresaId,
+                        sucursalId: contexto.sucursalId,
+                        estado: { in: ESTADOS_ACTIVOS_CATALOGO },
+                        disponibleCompra: true,
+                        deletedAt: null,
+                    },
                 });
 
                 if (!registro) {
-                    throw new Error(
-                        `El servicio ${servicioId} no existe`
+                    throw crearErrorArticuloNoDisponible(
+                        `El servicio ${servicioId} no existe, está inactivo o no está disponible para venta`
                     );
                 }
 
@@ -1051,13 +1082,19 @@ async prepararDetalles(tx, items, detallesViejos = []) {
                     "el tipo de membresía"
                 );
 
-                registro = await tx.tipoMembresia.findUnique({
-                    where: { id: tipoMembresiaId }
+                registro = await tx.tipoMembresia.findFirst({
+                    where: {
+                        id: tipoMembresiaId,
+                        empresaId: contexto.empresaId,
+                        sucursalId: contexto.sucursalId,
+                        estado: { in: ESTADOS_ACTIVOS_CATALOGO },
+                        deletedAt: null,
+                    },
                 });
 
                 if (!registro) {
-                    throw new Error(
-                        `El tipo de membresía ${tipoMembresiaId} no existe`
+                    throw crearErrorArticuloNoDisponible(
+                        `El tipo de membresía ${tipoMembresiaId} no existe o está inactivo`
                     );
                 }
 

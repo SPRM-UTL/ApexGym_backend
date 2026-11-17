@@ -160,6 +160,14 @@ export class VentaController extends BaseController {
                 'Venta actualizada correctamente'
             );
         } catch (error) {
+            if ([400, 409].includes(error.status)) {
+                return res.status(error.status).json(new ResponseModel(
+                    null,
+                    1,
+                    error.message,
+                    error.status
+                ));
+            }
             return this.respuestaError(res, error);
         }
     };

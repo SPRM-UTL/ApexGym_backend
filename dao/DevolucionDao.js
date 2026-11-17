@@ -28,7 +28,6 @@ async function obtenerVentaElegible(tx, idVenta) {
             estado: true,
             total: true,
             metodoPagoId: true,
-            metodoPagoLegacy: true,
             folioVentaId: true,
         },
     });
@@ -47,20 +46,6 @@ async function obtenerVentaElegible(tx, idVenta) {
             where: { id: venta.metodoPagoId },
             select: { id: true, codigo: true, nombre: true },
         });
-    } else {
-        const metodoLegacy = String(venta.metodoPagoLegacy ?? '').trim();
-        const codigoLegacy = metodoLegacy.toUpperCase();
-        if (metodoLegacy) {
-            metodoPago = await tx.metodoPago.findFirst({
-                where: {
-                    OR: [
-                        { codigo: codigoLegacy },
-                        { nombre: metodoLegacy },
-                    ],
-                },
-                select: { id: true, codigo: true, nombre: true },
-            });
-        }
     }
     if (!metodoPago) {
         throw crearError('No se pudo identificar el método de pago original de la venta');
@@ -325,9 +310,7 @@ export async function crearDevolucion(
             }
         }
 
-        const esPagoEfectivo = String(metodoPago.codigo ?? '').trim().toUpperCase() === 'EFECTIVO'
-            || (venta.metodoPagoId === null
-                && String(venta.metodoPagoLegacy ?? '').trim().toLowerCase() === 'efectivo');
+        const esPagoEfectivo = String(metodoPago.codigo ?? '').trim().toUpperCase() === 'EFECTIVO';
         if (esPagoEfectivo) {
             await tx.movimientoCaja.create({
                 data: {

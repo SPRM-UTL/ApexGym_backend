@@ -678,7 +678,7 @@ model Producto {
   precioCompra        Float?    @map("precio_compra")
   stockActual         Int       @default(0) @map("stock_actual")
   stockMinimo         Int       @default(1) @map("stock_minimo")
-  estado              String    @default("activo") @db.VarChar(30)
+  estado              String    @default("ACTIVO") @db.VarChar(30)
   imagenUrl           String?   @map("imagen_url") @db.LongText
   imagenPublicId      String?   @map("imagen_public_id") @db.VarChar(255)
   createdAt           DateTime  @default(now()) @map("created_at")
@@ -712,7 +712,6 @@ model Venta {
   cambio              Float?
   subtotal            Float             @default(0)
   descuento           Float             @default(0)
-  metodoPagoLegacy    String            @default("efectivo") @map("metodo_pago") @db.VarChar(30)
   estado              String            @default("completado") @db.VarChar(30)
   motivoCancelacion   String?           @map("motivo_cancelacion") @db.VarChar(500)
   
@@ -789,7 +788,7 @@ model Servicio {
   nombre           String    @unique @db.VarChar(100)
   descripcion      String?   @db.VarChar(200)
   precio           Decimal   @default(0) @db.Decimal(10, 2)
-  estado           String    @default("activo") @db.VarChar(50)
+  estado           String    @default("ACTIVO") @db.VarChar(50)
   disponibleCompra Boolean   @default(false) @map("disponible_compra")
   imagenUrl        String?   @map("imagen_url") @db.LongText
   imagenPublicId   String?   @map("imagen_public_id") @db.VarChar(255)

@@ -438,6 +438,12 @@ CategoriaProductoRoutes.delete(
 );
 //------Productos ------------------
 productoRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    productoController.obtenerDisponiblesParaVenta.bind(productoController)
+);
+productoRoutes.get(
     '/catalogo',
     autenticarUsuario,
     verificarPermiso('Productos','Listar'),
@@ -737,6 +743,12 @@ estadoMembresiaRoutes.delete(
 
 // ── Rutas de Tipos de Membresía ──────────────────────────────────────────────
 tipoMembresiaRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.get(
     '/catalogo',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Listar'),
@@ -897,60 +909,66 @@ metodoPagoRoutes.delete(
 ventaRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas' , 'Listar'),
+    verificarPermiso('Ventas', 'Listar'),
     ventaController.obtenerTodos.bind(ventaController)
 )
 
 ventaRoutes.get(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas', 'Listar'),
+    verificarPermiso('Ventas', 'Listar'),
     ventaController.obtenerPorId.bind(ventaController)
 )
 
 ventaRoutes.get(
     '/:id/devoluciones/disponibilidad',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas', 'Listar'),
+    verificarPermiso('Ventas', 'Listar'),
     devolucionController.obtenerDisponibilidad.bind(devolucionController)
 )
 
 ventaRoutes.post(
     '/:id/devoluciones/previsualizar',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas', 'Crear'),
+    verificarPermiso('Ventas', 'Crear'),
     devolucionController.previsualizar.bind(devolucionController)
 )
 
 ventaRoutes.post(
     '/:id/devoluciones',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas', 'Crear'),
+    verificarPermiso('Ventas', 'Crear'),
     devolucionController.crear.bind(devolucionController)
 )
 
 ventaRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas' , 'Crear'),
+    verificarPermiso('Ventas', 'Crear'),
     ventaController.create.bind(ventaController)
 )
 
 ventaRoutes.post(
     '/:id/cancelar',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas', 'Eliminar'),
+    verificarPermiso('Ventas', 'Eliminar'),
     ventaController.cancel.bind(ventaController)
 )
 
 ventaRoutes.put(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Registro de ventas' , 'Editar'),
+    verificarPermiso('Ventas', 'Editar'),
     ventaController.update.bind(ventaController)
 )
 
 //---Rutas Servicios-------------------------
+servicioRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    servicioController.obtenerDisponiblesParaVenta.bind(servicioController)
+);
 servicioRoutes.get(
     '/catalogo',
     autenticarUsuario,

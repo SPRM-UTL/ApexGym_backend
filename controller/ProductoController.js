@@ -1,5 +1,9 @@
 import { productoDao } from "../dao/ProductoDao.js";
 import { BaseController } from "./BaseController.js";
+import { ResponseModel } from "../modelos/ResponseModel.js";
+import {
+    validarEstadoCatalogo,
+} from "../utils/constantes.js";
 import {
     eliminarImagen,
     obtenerImagen,
@@ -57,6 +61,7 @@ export class ProductoController extends BaseController {
             stockActual,
             stockMinimo,
             disponibleCompra,
+            estado,
         } = req.body;
         const imagen = obtenerImagen('productos', req.file);
         let imagenPersistida = false;
@@ -72,6 +77,7 @@ export class ProductoController extends BaseController {
                 stockActual: stockActual ? Number(stockActual) : 0,
                 stockMinimo: stockMinimo ? Number(stockMinimo) : 1,
                 disponibleCompra: normalizarBooleano(disponibleCompra, true),
+                estado: validarEstadoCatalogo(estado),
                 imagenUrl: imagen?.url ?? null,
                 imagenPublicId: imagen?.publicId ?? null,
             });
@@ -106,6 +112,7 @@ export class ProductoController extends BaseController {
             stockActual,
             stockMinimo,
             disponibleCompra,
+            estado,
             quitarImagen,
         } = req.body;
         const imagenNueva = obtenerImagen('productos', req.file);
@@ -151,6 +158,7 @@ export class ProductoController extends BaseController {
                 ...(disponibleCompra !== undefined && {
                     disponibleCompra: normalizarBooleano(disponibleCompra, true),
                 }),
+                ...(estado !== undefined && { estado: validarEstadoCatalogo(estado) }),
                 ...camposImagen,
             });
             imagenPersistida = true;
@@ -198,12 +206,26 @@ export class ProductoController extends BaseController {
         }
     };
 
-    getProductosCliente = async (req, res) => {
+    obtenerDisponiblesParaVenta = async (req, res) => {
         try {
-            const productos = await productoDao.getAll({ disponibleCompra: true });
-            return this.respuestaExito(res, productos, "Productos cargados con exito");
+            const sucursalId = this.obtenerSucursalId(req);
+            if (sucursalId === 'todas') {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'Selecciona una sucursal específica para consultar productos de venta',
+                    400
+                ));
+            }
+            const productos = await productoDao.obtenerDisponiblesParaVenta(
+                this.obtenerEmpresaId(req),
+                sucursalId
+            );
+            return this.respuestaExito(res, productos, "Productos disponibles para venta cargados correctamente");
         } catch (error) {
             return this.respuestaError(res, error);
         }
     };
+
+    getProductosCliente = async (req, res) => this.obtenerDisponiblesParaVenta(req, res);
 }

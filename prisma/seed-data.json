@@ -249,13 +249,6 @@
             "Editar",
             "Eliminar"
           ]
-        },
-        {
-          "nombre": "Registro de ventas",
-          "descripcion": "Gestión de ventas",
-          "imagenUrl": null,
-          "imagenPublicId": null,
-          "acciones": ["Listar", "Crear", "Editar", "Eliminar"]
         }
       ]
     },
@@ -594,29 +587,7 @@
         }
       ],
       "orden": 6
-    },
-    {
-      "nombre": "Ventas",
-      "descripcion": "Módulo de ventas",
-      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
-      "imagenPublicId": null,
-      "modulos": [
-        {
-          "nombre": "Registro de ventas",
-          "descripcion": "Gestión de ventas",
-          "imagenUrl": null,
-          "imagenPublicId": null,
-          "acciones": [
-            "Listar",
-            "Crear",
-            "Editar",
-            "Eliminar"
-          ]
-        }
-      ],
-      "orden": 7
     }
-    
   ],
   
   
@@ -694,13 +665,13 @@
       { "nombre": "Ropa", "descripcion": "Playeras y shorts del gimnasio", "estado": "activo" }
     ],
     "productos": [
-      { "categoria": "Suplementos", "codigoBarras": "7501234567001", "nombre": "Proteína whey 1 kg", "descripcion": "Proteína de suero sabor vainilla", "precioVenta": 899, "precioCompra": 620, "stockActual": 12, "stockMinimo": 3, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Suplementos", "codigoBarras": "7501234567002", "nombre": "Creatina monohidratada 300 g", "descripcion": "Creatina en polvo sin sabor", "precioVenta": 450, "precioCompra": 280, "stockActual": 8, "stockMinimo": 2, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Bebidas", "codigoBarras": "7501234567003", "nombre": "Agua natural 600 ml", "descripcion": "Agua embotellada", "precioVenta": 20, "precioCompra": 8, "stockActual": 48, "stockMinimo": 12, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Bebidas", "codigoBarras": "7501234567004", "nombre": "Bebida isotónica 500 ml", "descripcion": "Bebida para reposición de electrolitos", "precioVenta": 35, "precioCompra": 18, "stockActual": 4, "stockMinimo": 6, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Accesorios", "codigoBarras": "7501234567005", "nombre": "Toalla Apex", "descripcion": "Toalla de entrenamiento", "precioVenta": 180, "precioCompra": 95, "stockActual": 15, "stockMinimo": 4, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Accesorios", "codigoBarras": "7501234567006", "nombre": "Guantes de entrenamiento", "descripcion": "Guantes con muñequera", "precioVenta": 320, "precioCompra": 170, "stockActual": 2, "stockMinimo": 3, "estado": "activo", "disponibleCompra": false },
-      { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "activo", "disponibleCompra": false }
+      { "categoria": "Suplementos", "codigoBarras": "7501234567001", "nombre": "Proteína whey 1 kg", "descripcion": "Proteína de suero sabor vainilla", "precioVenta": 899, "precioCompra": 620, "stockActual": 12, "stockMinimo": 3, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Suplementos", "codigoBarras": "7501234567002", "nombre": "Creatina monohidratada 300 g", "descripcion": "Creatina en polvo sin sabor", "precioVenta": 450, "precioCompra": 280, "stockActual": 8, "stockMinimo": 2, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567003", "nombre": "Agua natural 600 ml", "descripcion": "Agua embotellada", "precioVenta": 20, "precioCompra": 8, "stockActual": 48, "stockMinimo": 12, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567004", "nombre": "Bebida isotónica 500 ml", "descripcion": "Bebida para reposición de electrolitos", "precioVenta": 35, "precioCompra": 18, "stockActual": 4, "stockMinimo": 6, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567005", "nombre": "Toalla Apex", "descripcion": "Toalla de entrenamiento", "precioVenta": 180, "precioCompra": 95, "stockActual": 15, "stockMinimo": 4, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567006", "nombre": "Guantes de entrenamiento", "descripcion": "Guantes con muñequera", "precioVenta": 320, "precioCompra": 170, "stockActual": 2, "stockMinimo": 3, "estado": "ACTIVO", "disponibleCompra": false },
+      { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "ACTIVO", "disponibleCompra": false }
     ],
     "metodosPago": [
       { "nombre": "Efectivo", "codigo": "EFECTIVO", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
