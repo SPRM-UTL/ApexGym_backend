@@ -68,7 +68,6 @@ export class SeccionDao extends BaseDao {
                 id: true,
                 nombre: true,
                 descripcion: true,
-                orden: true,
                 imagenUrl: true,
                 modulos: {
                     where: {
@@ -79,20 +78,13 @@ export class SeccionDao extends BaseDao {
                         id: true,
                         nombre: true,
                         descripcion: true,
-                        orden: true,
                         imagenUrl: true,
                         imagenPublicId: true,
                     },
-                    orderBy: [
-                        { orden: "asc" },
-                        { nombre: "asc" },
-                    ],
+                    orderBy: { nombre: "asc" },
                 },
             },
-            orderBy: [
-                { orden: "asc" },
-                { nombre: "asc" },
-            ],
+            orderBy: { nombre: "asc" },
         });
 
         return secciones;

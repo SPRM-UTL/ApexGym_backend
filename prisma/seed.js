@@ -58,11 +58,38 @@ const upsertEmpresaDefault = async () => {
     return empresa;
 };
 
+const upsertSucursalDefault = async () => {
+    const sucursal = await prisma.sucursal.upsert({
+        where: { id: 1 },
+        update: {
+            nombre: 'Sucursal Matriz',
+            empresaId: 1,
+            activo: true,
+            deletedAt: null,
+        },
+        create: {
+            id: 1,
+            empresaId: 1,
+            nombre: 'Sucursal Matriz',
+            codigo: 'MATRIZ-01',
+            direccion: 'Av. Principal #100, Col. Centro',
+            ciudad: 'León',
+            estado: 'Guanajuato',
+            codigoPostal: '37000',
+            telefono: '477-123-4567',
+            email: 'matriz@apexgym.com',
+            activo: true,
+        },
+    });
+
+    console.log(`Sucursal por defecto asegurada: [id=${sucursal.id}] ${sucursal.nombre}`);
+    return sucursal;
+};
+
 const upsertSeccion = (seccion) => prisma.seccion.upsert({
     where: { nombre: seccion.nombre },
     update: {
         descripcion: seccion.descripcion,
-        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
         deletedAt: null,
@@ -70,7 +97,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
     create: {
         nombre: seccion.nombre,
         descripcion: seccion.descripcion,
-        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
     },
@@ -87,7 +113,6 @@ const upsertModulo = async (seccionId, modulo) => {
             data: {
                 seccionId,
                 descripcion: modulo.descripcion,
-                orden: modulo.orden ?? 0,
                 imagenUrl: modulo.imagenUrl,
                 imagenPublicId: modulo.imagenPublicId,
                 deletedAt: null,
@@ -100,7 +125,6 @@ const upsertModulo = async (seccionId, modulo) => {
             seccionId,
             nombre: modulo.nombre,
             descripcion: modulo.descripcion,
-            orden: modulo.orden ?? 0,
             imagenUrl: modulo.imagenUrl,
             imagenPublicId: modulo.imagenPublicId,
         },
@@ -483,6 +507,9 @@ async function main() {
 
     // 1. UPSERT OBLIGATORIO DE LA EMPRESA PRINCIPAL (id = 1)
     await upsertEmpresaDefault();
+
+    // 1.1 UPSERT OBLIGATORIO DE LA SUCURSAL PRINCIPAL (id = 1)
+    await upsertSucursalDefault();
 
     const defaultUser = await crearUsuarioDefault();
 

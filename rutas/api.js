@@ -31,9 +31,8 @@ import { ClienteMembresiaController } from '../controller/ClienteMembresiaContro
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
+import { SucursalController } from '../controller/SucursalController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
-import { AsistenciaController } from '../controller/AsistenciaController.js';
-import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
@@ -89,6 +88,8 @@ const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
 const empresaController = new EmpresaController();
 const empresaRoutes = express.Router();
+const sucursalController = new SucursalController();
+const sucursalRoutes = express.Router();
 const pagoController = new PagoController();
 const pagoRoutes = express.Router();
 const asistenciaController = new AsistenciaController();
@@ -98,6 +99,8 @@ const visitaRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
+usuarioRoutes.post('/login-movil', usuarioController.loginMovil.bind(usuarioController));
+usuarioRoutes.post('/login-mobile', usuarioController.loginMovil.bind(usuarioController));
 
 // ── Rutas protegidas (autenticación + permiso específico) ───────────────────
 usuarioRoutes.get(
@@ -132,6 +135,11 @@ usuarioRoutes.delete(
 
 usuarioRoutes.post(
     '/logout',
+    autenticarUsuario,
+    usuarioController.logout.bind(usuarioController)
+);
+usuarioRoutes.post(
+    '/logout-movil',
     autenticarUsuario,
     usuarioController.logout.bind(usuarioController)
 );
@@ -449,11 +457,6 @@ productoRoutes.delete(
     productoController.eliminar.bind(productoController)
 );
 
-productoRoutes.get(
-    '/productosClientes/traer',
-    productoController.getProductosCliente.bind(productoController)
-);
-
 // ── Rutas de Apertura de Caja ────────────────────────────────────────────────
 aperturaCajaRoutes.get(
     '/',
@@ -528,12 +531,6 @@ movimientoCajaRoutes.put(
     autenticarUsuario,
     verificarPermiso('Movimientos de Caja', 'Editar'),
     movimientoCajaController.actualizar.bind(movimientoCajaController)
-);
-movimientoCajaRoutes.post(
-    '/:id/validar',
-    autenticarUsuario,
-    verificarPermiso('Movimientos de Caja', 'Editar'),
-    movimientoCajaController.validar.bind(movimientoCajaController)
 );
 movimientoCajaRoutes.put(
     '/:id/validar',
@@ -656,21 +653,6 @@ clienteRoutes.delete(
     autenticarUsuario,
     verificarPermiso('Clientes', 'Eliminar'),
     clienteController.eliminar.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/registrar',
-    clienteController.registrar.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/verificarCorreo',
-    clienteController.verificarCorreo.bind(clienteController)
-);
-
-clienteRoutes.post(
-    '/verificarCredenciales',
-    clienteController.verificarCredenciales.bind(clienteController)
 );
 
 // ── Rutas de Estados de Membresía ────────────────────────────────────────────
@@ -925,6 +907,51 @@ empresaRoutes.put(
 router.use('/empresa', empresaRoutes);
 router.use('/empresas', empresaRoutes);
 
+// ── Rutas de Sucursales ──────────────────────────────────────────────────────
+sucursalRoutes.get(
+    '/actual',
+    autenticarUsuario,
+    sucursalController.obtenerActual.bind(sucursalController)
+);
+
+sucursalRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Listar'),
+    sucursalController.obtenerTodos.bind(sucursalController)
+);
+
+sucursalRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Listar'),
+    sucursalController.obtenerPorId.bind(sucursalController)
+);
+
+sucursalRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Crear'),
+    sucursalController.crear.bind(sucursalController)
+);
+
+sucursalRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Editar'),
+    sucursalController.actualizar.bind(sucursalController)
+);
+
+sucursalRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Eliminar'),
+    sucursalController.eliminar.bind(sucursalController)
+);
+
+router.use('/sucursal', sucursalRoutes);
+router.use('/sucursales', sucursalRoutes);
+
 // ── Rutas de Asistencias ────────────────────────────────────────────────────
 asistenciaRoutes.get(
     '/',
@@ -1034,8 +1061,6 @@ router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
-router.use('/asistencias', asistenciaRoutes);
-router.use('/visitas', visitaRoutes);
 
 // ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));

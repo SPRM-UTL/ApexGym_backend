@@ -38,8 +38,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 1
+          ]
         },
         {
           "nombre": "Configuración del Sistema",
@@ -51,8 +50,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 2
+          ]
         },
         {
           "nombre": "Administración de roles",
@@ -79,9 +77,21 @@
             "Eliminar"
           ],
           "orden": 4
+        },
+        {
+          "nombre": "Sucursales",
+          "descripcion": "Gestión y administración de sucursales del gimnasio",
+          "imagenUrl": "https://images.unsplash.com/photo-1577495508048-b635879837f1?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ],
+          "orden": 5
         }
-      ],
-      "orden": 1
+      ]
     },
     {
       "nombre": "Gestión de Clientes",
@@ -166,8 +176,7 @@
           ],
           "orden": 6
         }
-      ],
-      "orden": 2
+      ]
     },
     {
       "nombre": "Ventas y Caja",
@@ -185,8 +194,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 1
+          ]
         },
         {
           "nombre": "Apertura de Caja",
@@ -198,8 +206,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 2
+          ]
         },
         {
           "nombre": "Movimientos de Caja",
@@ -211,8 +218,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 3
+          ]
         },
         {
           "nombre": "Corte de Caja",
@@ -224,8 +230,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 4
+          ]
         },
         {
           "nombre": "Metodos de Pago",
@@ -237,8 +242,7 @@
             "Crear",
             "Editar",
             "Eliminar"
-          ],
-          "orden": 5
+          ]
         },
         {
           "nombre": "Servicios",
@@ -405,8 +409,163 @@
             "Eliminar"
           ]
         }
-      ],
-      "orden": 7
+      ]
+    },
+    {
+      "nombre": "Empleados",
+      "descripcion": "Gestión de personal, puestos, áreas y estados laborales",
+      "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Áreas de Trabajo",
+          "descripcion": "Gestión de áreas de trabajo",
+          "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Puestos",
+          "descripcion": "Gestión de puestos de trabajo",
+          "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Empleado",
+          "descripcion": "Gestión de estados de empleados",
+          "imagenUrl": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Empleados",
+          "descripcion": "Gestión de la información del personal",
+          "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Inventario",
+      "descripcion": "Gestión de productos y categorías",
+      "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Categorías de Productos",
+          "descripcion": "Administración de categorías de productos",
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Productos",
+          "descripcion": "Administración de productos",
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Gestión de Clientes",
+      "descripcion": "Módulos operativos de clientes",
+      "imagenUrl": "https://img.magnific.com/foto-gratis/vista-superior-hombre-negocios-oficina-corporativa-sentado-escritorio-escribiendo-computadora-portatil-trabajando-estadisticas-financieras-estrategia-comercial_482257-2145.jpg?t=st=1790441722~exp=1790445322~hmac=2c124143aedb69b4d577484d6e0fe21bee725fe5539f78a920d9290276c234d1&w=1060",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Clientes",
+          "descripcion": "Administración de clientes del gimnasio",
+          "imagenUrl": "https://img.freepik.com/foto-gratis/joven-atractiva-haciendo-ejercicio-gimnasio_1139-715.jpg",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Cliente",
+          "descripcion": "Catálogo de estados de clientes",
+          "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Tipos de Membresía",
+          "descripcion": "Planes de membresía disponibles",
+          "imagenUrl": "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Membresía",
+          "descripcion": "Catálogo de estados de membresía",
+          "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Tipos de Visita",
+          "descripcion": "Catálogo de accesos temporales",
+          "imagenUrl": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
     }
   ],
   "usuarios": [

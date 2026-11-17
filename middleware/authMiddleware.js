@@ -60,6 +60,7 @@ export const autenticarUsuario = async (req, res, next) => {
             empresaId: resultado.token.usuario?.empresaId ?? 1,
         };
 
+        req.token = token;
         req.usuario = usuarioAutenticado;
         req.user = usuarioAutenticado;
 
