@@ -80,7 +80,12 @@ export class ServicioController extends BaseController {
 
     getServiciosCliente = async (req, res) => {
         try {
-            const servicios = await servicioDao.getAll({ disponibleCompra: true });
+            const servicios = await servicioDao.getAll(
+                { disponibleCompra: true },
+                { id: 'desc' },
+                this.obtenerEmpresaId(req),
+                { sucursalId: req.query.sucursalId ?? null }
+            );
             return this.respuestaExito(res, servicios, "Servicios cargados con exito");
         } catch (error) {
             return this.respuestaError(res, error);

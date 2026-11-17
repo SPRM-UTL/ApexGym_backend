@@ -63,7 +63,12 @@ export class TipoMembresiaController extends BaseController {
 
     getTiposMembresiaCliente = async (req, res) => {
         try {
-            const todos = await this.dao.getAll();
+            const todos = await this.dao.getAll(
+                {},
+                { id: 'desc' },
+                this.obtenerEmpresaId(req),
+                { sucursalId: req.query.sucursalId ?? null }
+            );
             const activos = (todos || [])
                 .filter((item) => (item.estado || '').toUpperCase() === 'ACTIVO')
                 .sort((a, b) => Number(a.precio) - Number(b.precio));

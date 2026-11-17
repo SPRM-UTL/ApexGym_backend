@@ -31,6 +31,23 @@ export class ClienteDao extends BaseDao {
             omit: this.omit
         });
     }
+
+    async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
+        return this.model.findMany({
+            where: {
+                deletedAt: null,
+                OR: [
+                    { nombre:          { contains: termino } },
+                    { apellidoPaterno: { contains: termino } },
+                    { apellidoMaterno: { contains: termino } },
+                ]
+            },
+            include: { estadoCliente: true },
+            orderBy: { nombre: 'asc' },
+            take: 20,
+            omit: this.omit
+        });
+    }
 }
 
 export const clienteDao = new ClienteDao();
