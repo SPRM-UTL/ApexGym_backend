@@ -2,10 +2,49 @@ import { usuarioDao } from "../dao/UsuarioDao.js";
 import { tokenDao } from "../dao/TokenDao.js";
 import { BaseController } from "./BaseController.js";
 import { eliminarArchivoSubido } from "../middleware/uploadMiddleware.js";
+import { usuarioService } from "../services/UsuarioService.js";
+import { ResponseModel } from "../modelos/ResponseModel.js";
 
 export class UsuarioController extends BaseController {
     constructor() {
         super(usuarioDao);
+    }
+
+    loginMovil = async (req, res) => {
+        try {
+            const { email, contrasenia } = req.body;
+            if (!email || !contrasenia) {
+                const response = new ResponseModel(null, 1, "Email y contraseña requeridos", 400);
+                return res.status(400).json(response);
+            }
+
+            const { usuario, token } = await usuarioService.verificarCredenciales({ email, contrasenia });
+            if (!usuario) {
+                const response = new ResponseModel(null, 1, "Credenciales inválidas", 401);
+                return res.status(401).json(response);
+            }
+
+            // Calcular fecha y hora de expiración en formato ISO 8601
+            const tiempoVidaSegundos = token.registro?.tiempoVida ?? 86400;
+            const fechaCreacion = new Date(token.registro?.createdAt || Date.now()).getTime();
+            const expiraEn = new Date(fechaCreacion + tiempoVidaSegundos * 1000).toISOString();
+
+            return this.respuestaExito(
+                res,
+                {
+                    token: token.token,
+                    usuario,
+                    expiraEn
+                },
+                "Autenticación móvil exitosa"
+            );
+        } catch (error) {
+            if (error.message === "Credenciales inválidas") {
+                const response = new ResponseModel(null, 1, error.message, 401);
+                return res.status(401).json(response);
+            }
+            return this.respuestaError(res, error);
+        }
     }
 
     verificarCredenciales = async (req, res) => {
@@ -36,7 +75,6 @@ export class UsuarioController extends BaseController {
             }
             res.cookie('token', token.token, opcionesCookies)
             return this.respuestaExito(
-                
                 res,
                 {
                     usuario
@@ -48,9 +86,20 @@ export class UsuarioController extends BaseController {
         }
     }
 
-    logout = async (req, res )=>{
-        try{
-            const tokenStr = req.cookies?.token;
+    logout = async (req, res) => {
+        try {
+            // Resolver token desde req.token (inyectado por middleware), cookies o header Authorization
+            let token = req.token || req.cookies?.token;
+            if (!token && req.headers?.authorization) {
+                const partes = req.headers.authorization.split(" ");
+                if (partes.length === 2 && partes[0] === "Bearer") {
+                    token = partes[1];
+                }
+            }
+
+            if (token) {
+                await usuarioService.cerrarSesion(token);
+            }
 
             if(tokenStr){
                 await tokenDao.revocarToken(tokenStr);
@@ -58,26 +107,28 @@ export class UsuarioController extends BaseController {
             }
             res.clearCookie('token',{
                 httpOnly: true,
-                secure: process.env.NODE_ENV,
+                secure: process.env.NODE_ENV === 'production',
                 sameSite: 'strict'
-            })
-            return this.respuestaExito(res,null,"Sesion cerrada correctamente")
-            
-        }catch(error){
-            return this.respuestaError(res,error)
+            });
+
+            return this.respuestaExito(res, null, "Sesion cerrada correctamente");
+
+        } catch (error) {
+            return this.respuestaError(res, error);
         }
     }
-    registrarUsuario = async (req, res) => {
-        const { nombre, email, contrasenia, rolId } = req.body;
-        const fotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : null;
 
+    registrarUsuario = async (req, res) => {
+        let fotoUrl = null;
         try {
-            const datos = { nombre, email, contrasenia, rolId };
-            if (fotoUrl) {
-                datos.fotoUrl = fotoUrl;
-            }
-            const nuevoUsuario = await usuarioDao.create(datos);
-            return this.respuestaExito(res, nuevoUsuario, "Usuario registrado exitosamente");
+            fotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : null;
+            const nuevoUsuario = await usuarioService.registrarUsuario({ ...req.body, fotoUrl });
+
+            return this.respuestaExito(
+                res,
+                nuevoUsuario,
+                "Usuario registrado exitosamente"
+            );
         } catch (error) {
             if (fotoUrl) {
                 eliminarArchivoSubido(fotoUrl);
@@ -87,8 +138,10 @@ export class UsuarioController extends BaseController {
     }
     
     actualizarUsuario = async (req, res) => {
-        const { id, nombre, email, contrasenia, rolId } = req.body;
-        const nuevaFotoUrl = req.file ? `/uploads/usuarios/${req.file.filename}` : undefined;
+        const nuevaFotoUrl = req.file
+            ? `/uploads/usuarios/${req.file.filename}`
+            : undefined;
+        console.log("Foto: " + nuevaFotoUrl);
 
         try {
             const usuarioId = Number(id);
@@ -124,4 +177,3 @@ export class UsuarioController extends BaseController {
         }
     }
 }
-

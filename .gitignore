@@ -28,11 +28,13 @@ public/uploads/
 .vs/
 
 # Migraciones locales/copias; mantener prisma/migrations versionado
-prisma/migrations/
-public/uploads/.vs/ 
+!prisma/migrations/
+!prisma/migrations/**
+public/uploads/.vs/
+/prisma/migrations
 
-migrations/
-backend/migrations/
+/migrations/
+/backend/migrations/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/

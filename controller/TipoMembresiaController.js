@@ -60,6 +60,18 @@ export class TipoMembresiaController extends BaseController {
         if (precio === undefined || precio === null) throw new Error('El precio es requerido');
         if (!estado?.trim()) throw new Error('El estado es requerido');
     }
+
+    getTiposMembresiaCliente = async (req, res) => {
+        try {
+            const todos = await this.dao.getAll();
+            const activos = (todos || [])
+                .filter((item) => (item.estado || '').toUpperCase() === 'ACTIVO')
+                .sort((a, b) => Number(a.precio) - Number(b.precio));
+            return this.respuestaExito(res, activos, 'Planes de membresía cargados con éxito');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
 }
 
 export const tipoMembresiaController = new TipoMembresiaController();
