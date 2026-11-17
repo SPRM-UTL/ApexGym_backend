@@ -319,7 +319,7 @@ async function sembrarEjemplos(ejemplos) {
     }
 
     for (const item of ejemplos.metodosPago ?? []) {
-        const data = tomar(item, ['descripcion', 'estado']);
+        const data = tomar(item, ['codigo', 'descripcion', 'estado']);
         await prisma.metodoPago.upsert({
             where: { nombre: item.nombre },
             update: { ...data, deletedAt: null },

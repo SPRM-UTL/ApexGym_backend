@@ -1,6 +1,7 @@
 import { BaseController } from './BaseController.js';
 import { transaccionPagoDao } from '../dao/TransaccionPagoDao.js';
 import { pagoService } from '../services/PagoService.js';
+import { ResponseModel } from '../modelos/ResponseModel.js';
 
 export class PagoController extends BaseController {
     constructor() {
@@ -82,6 +83,9 @@ export class PagoController extends BaseController {
             const resultado = await pagoService.reembolsar(id, motivo, empresaId);
             return this.respuestaExito(res, resultado, resultado.mensaje, this.statusOk);
         } catch (error) {
+            if (error.status === 409) {
+                return res.status(409).json(new ResponseModel(null, 1, error.message, 409));
+            }
             return this.respuestaError(res, error);
         }
     };

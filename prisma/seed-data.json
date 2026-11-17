@@ -703,9 +703,9 @@
       { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "activo", "disponibleCompra": false }
     ],
     "metodosPago": [
-      { "nombre": "Efectivo", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
-      { "nombre": "Tarjeta", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
-      { "nombre": "Transferencia", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
+      { "nombre": "Efectivo", "codigo": "EFECTIVO", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
+      { "nombre": "Tarjeta", "codigo": "TARJETA", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
+      { "nombre": "Transferencia", "codigo": "TRANSFERENCIA", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
     ],
     "servicios": [
       { "nombre": "Evaluación física", "descripcion": "Medición inicial de composición corporal", "precio": "150.00", "estado": "ACTIVO", "disponibleCompra": true },

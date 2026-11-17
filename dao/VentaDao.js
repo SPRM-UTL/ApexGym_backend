@@ -1,7 +1,8 @@
 import { BaseDao } from "./BaseDao.js";
 //dependecia que nos permite hacer movimientos y redondeo de dinero
 import currency from "currency.js";
-import { TASA_IVA } from "../utilidades/constantes.js";
+import { TASA_IVA } from "../utils/constantes.js";
+import { pagoService, PROVEEDOR_POR_CODIGO_METODO } from "../services/PagoService.js";
 
 const ESTADO_CAJA = { ABIERTA: "ABIERTA", CERRADA: "CERRADA" };
 const ESTADO_VENTA = { COMPLETADA : "completada" , CANCELADA : "cancelada"}
@@ -234,6 +235,18 @@ async getById(id, clientOrEmpresaId = 1) {
                     id: true,
                     nombre: true,
                     codigo: true,
+                },
+            },
+            transaccionesPago: {
+                where: { deletedAt: null },
+                select: {
+                    id: true,
+                    proveedor: true,
+                    estado: true,
+                    folioVoucher: true,
+                    referenciaExterna: true,
+                    monto: true,
+                    metadatos: true,
                 },
             },
             devoluciones: {
@@ -482,6 +495,7 @@ async create(data) {
         subtotal: subtotalEnviado,
         total: totalEnviado,
         montoRecibido: montoRecibidoEnviado,
+        pago = {},
         ...restoDatos
     } = data;
 
@@ -495,6 +509,11 @@ async create(data) {
     const idUsuario = this.validarId(usuarioId, 'el usuario autenticado');
 
     this.validarDetalles(detalleVenta);
+    if (pago !== null && (typeof pago !== 'object' || Array.isArray(pago))) {
+        const error = new Error('Los datos del cobro deben enviarse como un objeto');
+        error.status = 400;
+        throw error;
+    }
 
     return this.prisma.$transaction(async (tx) => {
         const empleado = await tx.empleado.findFirst({
@@ -528,7 +547,8 @@ async create(data) {
 
         // Bloquear la fila de apertura para serializar con corte de caja
         const aperturasBloqueadas = await tx.$queryRaw`
-            SELECT id, estado, empleado_id AS empleadoId
+            SELECT id, estado, empleado_id AS empleadoId,
+                   empresa_id AS empresaId, sucursal_id AS sucursalId
             FROM aperturas_caja
             WHERE id = ${aperturaCajaId} AND deleted_at IS NULL
             FOR UPDATE
@@ -578,6 +598,26 @@ async create(data) {
             },
             include : {folioVenta : true}
         });
+
+        const proveedor = Object.prototype.hasOwnProperty.call(
+            PROVEEDOR_POR_CODIGO_METODO,
+            metodoPago.codigo
+        )
+            ? PROVEEDOR_POR_CODIGO_METODO[metodoPago.codigo]
+            : null;
+        if (proveedor) {
+            await pagoService.registrarCobroVenta(tx, {
+                ...pago,
+                empresaId: Number(cajaAbierta.empresaId),
+                sucursalId: Number(cajaAbierta.sucursalId),
+                ventaId: nuevaVenta.id,
+                folioVenta: nuevaVenta.folioVenta.id,
+                proveedor,
+                monto: total,
+                efectivoRecibido: montoRecibido,
+                cambio,
+            });
+        }
 
         await this.ajustarStock(tx, [], detalles);
 

@@ -1,6 +1,6 @@
 import currency from 'currency.js';
 import { prisma } from './BaseDao.js';
-import { TASA_IVA } from '../utilidades/constantes.js';
+import { TASA_IVA } from '../utils/constantes.js';
 
 
 function crearError(mensaje, status = 400, code) {

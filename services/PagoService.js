@@ -2,6 +2,80 @@ import 'dotenv/config';
 import crypto from 'crypto';
 import { transaccionPagoDao } from '../dao/TransaccionPagoDao.js';
 
+const TIPOS_TARJETA_VALIDOS = new Set(['CREDITO', 'DEBITO']);
+const MARCAS_TARJETA_VALIDAS = new Set(['VISA', 'MASTERCARD', 'AMEX', 'CARNET', 'OTRA']);
+export const PROVEEDOR_POR_CODIGO_METODO = Object.freeze({
+    EFECTIVO: 'EFECTIVO',
+    TARJETA: 'TERMINAL_MANUAL',
+});
+
+function crearErrorPago(mensaje, status = 400) {
+    const error = new Error(mensaje);
+    error.status = status;
+    return error;
+}
+
+function normalizarValorTarjeta(valor) {
+    return typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+}
+
+export function resolverCobroPresencial({
+    proveedor,
+    monto,
+    efectivoRecibido = null,
+    folioVoucher = null,
+    tipoTarjeta = null,
+    marcaTarjeta = null,
+    ultimosDigitos = null,
+    exigirDatosCompletos = false,
+}) {
+    if (proveedor === 'EFECTIVO') {
+        const recibido = efectivoRecibido === null || efectivoRecibido === undefined
+            ? null
+            : Number(efectivoRecibido);
+        if (exigirDatosCompletos
+            && (recibido === null || efectivoRecibido === '' || !Number.isFinite(recibido)
+                || recibido < 0 || (monto > 0 && recibido === 0))) {
+            throw crearErrorPago('Para registrar un cobro en efectivo se requiere un monto recibido válido.');
+        }
+        if (recibido !== null && recibido < monto) {
+            throw crearErrorPago(`Efectivo insuficiente: Se entregaron $${recibido.toFixed(2)} MXN pero el monto es $${monto.toFixed(2)} MXN.`);
+        }
+        return {
+            estado: 'APROBADO',
+            referenciaExterna: `EFECTIVO_${Date.now()}`,
+        };
+    }
+
+    if (proveedor === 'TERMINAL_MANUAL') {
+        if (typeof folioVoucher !== 'string' || !folioVoucher.trim()) {
+            throw crearErrorPago('Para cobros en terminal física manual se requiere el folio/autorización del voucher.');
+        }
+
+        if (exigirDatosCompletos) {
+            if (folioVoucher.trim().length > 100) {
+                throw crearErrorPago('El folio del voucher no puede exceder 100 caracteres.');
+            }
+            if (!TIPOS_TARJETA_VALIDOS.has(normalizarValorTarjeta(tipoTarjeta))) {
+                throw crearErrorPago('El tipo de tarjeta debe ser CREDITO o DEBITO.');
+            }
+            if (!MARCAS_TARJETA_VALIDAS.has(normalizarValorTarjeta(marcaTarjeta))) {
+                throw crearErrorPago('La marca de tarjeta no es válida.');
+            }
+            if (!/^\d{4}$/.test(String(ultimosDigitos ?? ''))) {
+                throw crearErrorPago('Los últimos dígitos de la tarjeta deben ser exactamente cuatro números.');
+            }
+        }
+
+        return {
+            estado: 'APROBADO',
+            referenciaExterna: `TERM_MANUAL_${folioVoucher.trim()}`,
+        };
+    }
+
+    throw crearErrorPago('El proveedor no corresponde a un método de pago presencial.');
+}
+
 export class PagoService {
     constructor() {
         this.driver = (process.env.PAGOS_DRIVER || 'sandbox').toLowerCase();
@@ -104,19 +178,17 @@ export class PagoService {
         let urlCheckout = null;
 
         // 4. Procesamiento según método de pago
-        if (proveedor === 'EFECTIVO') {
-            const efectivoRecibido = metadatos?.efectivoRecibido !== undefined ? Number(metadatos.efectivoRecibido) : null;
-            if (efectivoRecibido !== null && efectivoRecibido < montoNumerico) {
-                throw new Error(`Efectivo insuficiente: Se entregaron $${efectivoRecibido.toFixed(2)} MXN pero el monto es $${montoNumerico.toFixed(2)} MXN.`);
-            }
-            estadoInicial = 'APROBADO';
-            referenciaExterna = `EFECTIVO_${Date.now()}`;
-        } else if (proveedor === 'TERMINAL_MANUAL') {
-            if (!folioVoucher || !folioVoucher.trim()) {
-                throw new Error('Para cobros en terminal física manual se requiere el folio/autorización del voucher.');
-            }
-            estadoInicial = 'APROBADO';
-            referenciaExterna = `TERM_MANUAL_${folioVoucher.trim()}`;
+        if (proveedor === 'EFECTIVO' || proveedor === 'TERMINAL_MANUAL') {
+            const cobroPresencial = resolverCobroPresencial({
+                proveedor,
+                monto: montoNumerico,
+                efectivoRecibido: metadatos?.efectivoRecibido !== undefined
+                    ? Number(metadatos.efectivoRecibido)
+                    : null,
+                folioVoucher,
+            });
+            estadoInicial = cobroPresencial.estado;
+            referenciaExterna = cobroPresencial.referenciaExterna;
         } else {
             // Cobro Digital / En Línea: verificar si existe Access Token de Mercado Pago
             const tokenMercadoPago = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
@@ -289,6 +361,94 @@ export class PagoService {
         }
     }
 
+    async registrarCobroVenta(tx, {
+        empresaId,
+        sucursalId,
+        ventaId,
+        folioVenta,
+        proveedor,
+        monto,
+        efectivoRecibido = null,
+        cambio = 0,
+        folioVoucher = null,
+        tipoTarjeta = null,
+        marcaTarjeta = null,
+        ultimosDigitos = null,
+    }) {
+        if (!tx?.transaccionPago) {
+            throw crearErrorPago('Se requiere la transacción de base de datos de la venta.');
+        }
+
+        for (const [nombre, valor] of Object.entries({ empresaId, sucursalId, ventaId })) {
+            if (!Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
+                throw crearErrorPago(`El identificador de ${nombre} no es válido.`);
+            }
+        }
+
+        const montoNumerico = Number(monto);
+        if (!Number.isFinite(montoNumerico) || montoNumerico < 0) {
+            throw crearErrorPago('El monto del cobro no es válido.');
+        }
+        const cobro = resolverCobroPresencial({
+            proveedor,
+            monto: montoNumerico,
+            efectivoRecibido,
+            folioVoucher,
+            tipoTarjeta,
+            marcaTarjeta,
+            ultimosDigitos,
+            exigirDatosCompletos: true,
+        });
+
+        const voucher = proveedor === 'TERMINAL_MANUAL' ? folioVoucher.trim() : null;
+        if (voucher) {
+            const existente = await tx.transaccionPago.findFirst({
+                where: {
+                    empresaId: Number(empresaId),
+                    proveedor,
+                    folioVoucher: voucher,
+                },
+                select: { id: true },
+            });
+            if (existente) {
+                throw crearErrorPago(`El folio ${voucher} ya fue registrado en otra transacción.`, 409);
+            }
+        }
+
+        try {
+            return await tx.transaccionPago.create({
+                data: {
+                    ventaId: Number(ventaId),
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    uuidIdempotencia: this.generarIdempotenciaKey(),
+                    proveedor,
+                    referenciaExterna: cobro.referenciaExterna,
+                    monto: montoNumerico,
+                    moneda: 'MXN',
+                    estado: cobro.estado,
+                    concepto: `Venta folio ${folioVenta}`,
+                    folioVoucher: voucher,
+                    metadatos: proveedor === 'EFECTIVO'
+                        ? {
+                              efectivoRecibido: Number(efectivoRecibido),
+                              cambio: Number(cambio),
+                          }
+                        : {
+                              tipoTarjeta: normalizarValorTarjeta(tipoTarjeta),
+                              marcaTarjeta: normalizarValorTarjeta(marcaTarjeta),
+                              ultimosDigitos: String(ultimosDigitos),
+                          },
+                },
+            });
+        } catch (error) {
+            if (voucher && error?.code === 'P2002') {
+                throw crearErrorPago(`El folio ${voucher} ya fue registrado en otra transacción.`, 409);
+            }
+            throw error;
+        }
+    }
+
     /**
      * Simula la resolución asíncrona de un pago (Aprobado / Rechazado).
      */
@@ -328,6 +488,13 @@ export class PagoService {
         const transaccion = await transaccionPagoDao.getById(id, empresaId);
         if (!transaccion) {
             throw new Error('La transacción no existe.');
+        }
+
+        if (transaccion.ventaId !== null && transaccion.ventaId !== undefined) {
+            throw crearErrorPago(
+                'Las transacciones asociadas a una venta deben reembolsarse mediante la cancelación o devolución de la venta.',
+                409
+            );
         }
 
         if (transaccion.estado !== 'APROBADO') {

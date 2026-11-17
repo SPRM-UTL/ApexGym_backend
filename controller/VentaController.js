@@ -90,6 +90,7 @@ export class VentaController extends BaseController {
                 total: this.leerMonto(total, 'total'),
                 montoRecibido: montoRecibido === undefined ? undefined : this.leerMonto(montoRecibido, 'monto recibido'),
                 detalleVenta: this.normalizarDetalles(detalleVenta),
+                pago: req.body.pago,
             });
 
             return this.respuestaExito(
@@ -101,6 +102,14 @@ export class VentaController extends BaseController {
             if (error.code === 'APERTURA_CAJA_CERRADA') {
                 return res.status(error.status).json(new ResponseModel(
                     { code: error.code },
+                    1,
+                    error.message,
+                    error.status
+                ));
+            }
+            if ([400, 409].includes(error.status)) {
+                return res.status(error.status).json(new ResponseModel(
+                    null,
                     1,
                     error.message,
                     error.status

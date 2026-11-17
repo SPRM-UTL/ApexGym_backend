@@ -1,6 +1,6 @@
 import { servicioDao } from "../dao/ServicioDao.js";
 import { BaseController } from "./BaseController.js";
-import { guardarImagenServidor } from "../utilidades/guardarImagen.js";
+import { guardarImagenServidor } from "../utils/guardarImagen.js";
 
 export class ServicioController extends BaseController {
     constructor() {
