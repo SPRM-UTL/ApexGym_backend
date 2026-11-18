@@ -80,11 +80,30 @@ export class PermisoDao extends BaseDao {
      * @param {string} metodo  - Ej: "GET"
      */
     async tienePermiso(usuarioId, modulo, accion, metodo) {
+        if (await this.esCliente(usuarioId)) {
+            return false;
+        }
+
         const claves = await this.obtenerPermisosEfectivos(usuarioId);
         return (
             claves.has(`${modulo}|${accion}|${metodo}`) ||
             claves.has(`${String(modulo).toLowerCase()}|${String(accion).toLowerCase()}|${String(metodo).toUpperCase()}`)
         );
+    }
+
+    async esCliente(usuarioId) {
+        const asignacion = await prisma.usuarioRol.findFirst({
+            where: {
+                usuarioId,
+                deletedAt: null,
+                rol: {
+                    nombre: 'Cliente',
+                    deletedAt: null,
+                },
+            },
+            select: { usuarioId: true },
+        });
+        return Boolean(asignacion);
     }
 }
 

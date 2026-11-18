@@ -14,12 +14,13 @@ export class ProductoDao extends BaseDao {
         );
     }
     // Sobrescribimos getAll para incluir los datos basicos de la categoria
-  async getAll(additionalWhere = {}) {
+  async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId, sucursalId) {
     return this.model.findMany({
-      where: {
+      where: this.aplicarFiltrosContexto({
         deletedAt: null,
         ...additionalWhere,
-      },
+      }, empresaId, sucursalId),
+      orderBy: additionalOrderBy,
       include: {
         categoria: {
           select: {

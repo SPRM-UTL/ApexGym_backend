@@ -5,12 +5,13 @@ export class ClienteDao extends BaseDao {
         super('cliente');
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, additionalOrderBy = { id: 'desc' }, empresaId, sucursalId) {
         return this.model.findMany({
-            where: {
+            where: this.aplicarFiltrosContexto({
                 deletedAt: null,
                 ...additionalWhere
-            },
+            }, empresaId, sucursalId),
+            orderBy: additionalOrderBy,
             include: {
                 estadoCliente: true
             },
@@ -18,48 +19,20 @@ export class ClienteDao extends BaseDao {
         });
     }
 
-    async getById(id) {
-        return this.model.findUnique({
-            where: {
-                id: id,
-                deletedAt: null,
-            },
-            include: {
-                estadoCliente: true
-            },
-            omit: this.omit
-        });
-    }
-    
-    async getByUser(id) {
-        return this.model.findUnique({
-            where: {
-                usuarioId: id,
-                deletedAt: null,
-            },
-            include: {
-                estadoCliente: true
-            },
-            omit: this.omit
-        });
-    }
-
-    async getByEmail(email) {
+    async getById(id, empresaId, sucursalId) {
         return this.model.findFirst({
-            where: {
-                correo: email,
+            where: this.aplicarFiltrosContexto({
+                id: Number(id),
                 deletedAt: null,
+            }, empresaId, sucursalId),
+            include: {
+                estadoCliente: true
             },
             omit: this.omit
         });
     }
 
-    /**
-     * Busca clientes activos cuyo nombre, apellido paterno o apellido materno
-     * contenga el término de búsqueda. Máximo 20 resultados.
-     * @param {string} termino
-     */
-    async buscarPorNombre(termino) {
+    async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: {
                 deletedAt: null,

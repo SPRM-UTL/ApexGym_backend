@@ -9,7 +9,7 @@ export class UsuarioService {
     }
 
     verificarCredenciales = async (data) => {
-        const { email, contrasenia } = data;
+        const { email, contrasenia, checkbox } = data;
 
         const usuario = await this.dao.getByCredenciales(email, contrasenia);
 
@@ -21,7 +21,8 @@ export class UsuarioService {
 
         return {
             usuario,
-            token
+            token,
+            checkbox
         };
     };
 
