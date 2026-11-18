@@ -138,8 +138,8 @@ export class PagoService {
         if (!this.mpAccessToken) {
             throw crearErrorPago('Configura MP_ACCESS_TOKEN con un token de prueba de Mercado Pago.', 503);
         }
-        if (!this.mpAccessToken.startsWith('TEST-')) {
-            throw crearErrorPago('El checkout de ventas solo acepta un token de prueba TEST- de Mercado Pago.', 503);
+        if (!this.mpAccessToken.startsWith('TEST-') && !this.mpAccessToken.startsWith('APP_USR-')) {
+            throw crearErrorPago('El Access Token de Mercado Pago debe comenzar con TEST- o APP_USR-.', 503);
         }
     }
 
