@@ -33,6 +33,8 @@ import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
 import { SucursalController } from '../controller/SucursalController.js';
 import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
+import { AsistenciaController } from '../controller/AsistenciaController.js';
+import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';

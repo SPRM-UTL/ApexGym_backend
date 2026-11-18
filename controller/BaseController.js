@@ -90,6 +90,7 @@ export class BaseController {
     }
 
     respuestaError(res, error) {
+        console.error(`[${this.constructor.name} Error]:`, error);
         const response = new ResponseModel(null, 1, error.message || 'Error interno del servidor', this.statusError);
         return res.status(this.statusError).json(response);
     }

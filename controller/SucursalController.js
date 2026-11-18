@@ -27,12 +27,7 @@ export class SucursalController extends BaseController {
             payload.empresaId = empresaId;
 
             const nueva = await this.dao.create(payload, empresaId);
-            return res.status(201).json({
-                data: nueva,
-                status: 0,
-                mensaje: 'Sucursal registrada correctamente',
-                code: 201,
-            });
+            return this.respuestaExito(res, nueva, 'Sucursal registrada correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }

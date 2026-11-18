@@ -75,7 +75,7 @@ model Sucursal {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
 
   areasTrabajo           AreaTrabajo[]
   cajas                  Caja[]
@@ -101,10 +101,9 @@ model Sucursal {
   asistencias            Asistencia[]
   visitas                Visita[]
 
-  @@map("sucursales")
   @@index([empresaId], map: "idx_sucursales_empresa_id")
+  @@map("sucursales")
 }
-
 
 model Usuario {
   id              Int              @id @default(autoincrement())
@@ -121,6 +120,7 @@ model Usuario {
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
+  cliente         Cliente?
 
   @@map("usuarios")
 }
@@ -189,8 +189,8 @@ model AreaTrabajo {
   deletedAt   DateTime? @map("deleted_at")
 
   empresa        Empresa         @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId     Int             @default(1) @map("sucursal_id")
+  sucursal       Sucursal        @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   tiposActividad TipoActividad[]
   puestos        Puesto[]
   empleados      Empleado[]
@@ -209,8 +209,8 @@ model Caja {
   deletedAt DateTime? @map("deleted_at")
 
   empresa       Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId    Int            @default(1) @map("sucursal_id")
+  sucursal      Sucursal       @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   aperturasCaja AperturaCaja[]
 
   @@map("cajas")
@@ -229,8 +229,8 @@ model Puesto {
   deletedAt     DateTime? @map("deleted_at")
 
   empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId  Int         @default(1) @map("sucursal_id")
+  sucursal    Sucursal    @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   areaTrabajo AreaTrabajo @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
   empleados   Empleado[]
 
@@ -246,10 +246,10 @@ model EstadoEmpleado {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  empleados Empleado[]
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursalId Int        @default(1) @map("sucursal_id")
+  sucursal   Sucursal   @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  empleados  Empleado[]
 
   @@map("estados_empleados")
 }
@@ -276,8 +276,8 @@ model Empleado {
   deletedAt        DateTime? @map("deleted_at")
 
   empresa        Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId     Int            @default(1) @map("sucursal_id")
+  sucursal       Sucursal       @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   puesto         Puesto         @relation(fields: [puestoId], references: [id], onDelete: Cascade)
   areaTrabajo    AreaTrabajo    @relation(fields: [areaTrabajoId], references: [id], onDelete: Cascade)
   estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
@@ -302,8 +302,8 @@ model TipoActividad {
   deletedAt     DateTime? @map("deleted_at")
 
   empresa     Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId  Int          @default(1) @map("sucursal_id")
+  sucursal    Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   areaTrabajo AreaTrabajo? @relation(fields: [areaTrabajoId], references: [id], onDelete: SetNull)
 
   @@map("tipos_actividades")
@@ -320,7 +320,7 @@ model ConfiguracionSistema {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
 
@@ -434,10 +434,10 @@ model EstadoCliente {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  clientes Cliente[]
+  empresa    Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursalId Int       @default(1) @map("sucursal_id")
+  sucursal   Sucursal  @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  clientes   Cliente[]
 
   @@map("estados_clientes")
 }
@@ -463,11 +463,12 @@ model Cliente {
 
   usuarioId     Int?               @unique @map("usuario_id")
   empresa       Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId    Int                @default(1) @map("sucursal_id")
+  sucursal      Sucursal           @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   usuario       Usuario?           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   estadoCliente EstadoCliente      @relation(fields: [estadoClienteId], references: [id], onDelete: Restrict)
   membresias    ClienteMembresia[]
+  asistencias   Asistencia[]
 
   @@map("clientes")
 }
@@ -486,11 +487,12 @@ model ClienteMembresia {
   deletedAt            DateTime? @map("deleted_at")
 
   empresa         Empresa         @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId      Int             @default(1) @map("sucursal_id")
+  sucursal        Sucursal        @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   tipoMembresia   TipoMembresia   @relation(fields: [tipoMembresiaId], references: [id], onDelete: Restrict)
   estadoMembresia EstadoMembresia @relation(fields: [estadoMembresiaId], references: [id], onDelete: Restrict)
+  asistencias     Asistencia[]
 
   @@map("clientes_membresias")
 }
@@ -506,8 +508,8 @@ model EstadoMembresia {
   deletedAt   DateTime? @map("deleted_at")
 
   empresa            Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId         Int                @default(1) @map("sucursal_id")
+  sucursal           Sucursal           @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   clientesMembresias ClienteMembresia[]
 
   @@map("estados_membresias")
@@ -526,8 +528,8 @@ model TipoMembresia {
   deletedAt    DateTime? @map("deleted_at")
 
   empresa            Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId         Int                @default(1) @map("sucursal_id")
+  sucursal           Sucursal           @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   clientesMembresias ClienteMembresia[]
 
   @@map("tipos_membresias")
@@ -544,28 +546,28 @@ model TipoVisita {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  visitas Visita[]
+  visitas    Visita[]
 
   @@map("tipos_visitas")
 }
 
 model CategoriaProducto {
-  id          Int        @id @default(autoincrement())
-  empresaId   Int        @default(1) @map("empresa_id")
-  nombre      String     @unique @db.VarChar(100)
-  descripcion String?    @db.Text
-  estado      String     @default("activo") @db.VarChar(30)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  deletedAt   DateTime?  @map("deleted_at")
+  id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @db.Text
+  estado      String    @default("activo") @db.VarChar(30)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
-  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  productos Producto[]
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursalId Int        @default(1) @map("sucursal_id")
+  sucursal   Sucursal   @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  productos  Producto[]
 
   @@map("categoria_productos")
 }
@@ -584,11 +586,11 @@ model AperturaCaja {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  caja     Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  caja       Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
+  empleado   Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
   movimientos MovimientoCaja[]
   cortes      CorteCaja[]
@@ -611,8 +613,8 @@ model MovimientoCaja {
   deletedAt      DateTime? @map("deleted_at")
 
   empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId   Int          @default(1) @map("sucursal_id")
+  sucursal     Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
@@ -641,8 +643,8 @@ model CorteCaja {
   deletedAt           DateTime? @map("deleted_at")
 
   empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId   Int          @default(1) @map("sucursal_id")
+  sucursal     Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
@@ -668,10 +670,10 @@ model Producto {
   deletedAt           DateTime? @map("deleted_at")
   disponibleCompra    Boolean   @default(false) @map("disponible_compra")
 
-  empresa   Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  categoria CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
+  empresa    Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursalId Int               @default(1) @map("sucursal_id")
+  sucursal   Sucursal          @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  categoria  CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
 
   @@map("producto")
 }
@@ -686,7 +688,7 @@ model MetodoPago {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
 
@@ -707,7 +709,7 @@ model Servicio {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
 
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
 
@@ -750,7 +752,7 @@ model TransaccionPago {
   updatedAt         DateTime              @updatedAt @map("updated_at")
   deletedAt         DateTime?             @map("deleted_at")
 
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
 
@@ -770,8 +772,8 @@ model Asistencia {
   deletedAt          DateTime? @map("deleted_at")
 
   empresa          Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId       Int               @default(1) @map("sucursal_id")
+  sucursal         Sucursal          @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   cliente          Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   clienteMembresia ClienteMembresia? @relation(fields: [clienteMembresiaId], references: [id], onDelete: SetNull)
 
@@ -791,10 +793,9 @@ model Visita {
   deletedAt       DateTime? @map("deleted_at")
 
   empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId Int        @default(1) @map("sucursal_id")
+  sucursal   Sucursal   @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   tipoVisita TipoVisita @relation(fields: [tipoVisitaId], references: [id], onDelete: Restrict)
 
   @@map("visitas")
 }
-
