@@ -583,7 +583,6 @@ model AperturaCaja {
   cajaId         Int       @map("caja_id")
   empleadoId     Int       @map("empleado_id")
   montoInicial   Decimal   @map("monto_inicial") @db.Decimal(10, 2)
-  usaMovimientosCobro Boolean @default(false) @map("usa_movimientos_cobro")
   fechaApertura  DateTime  @map("fecha_apertura")
   estado         String    @default("ABIERTA") @db.VarChar(20)
   desgloseInicio String?   @map("desglose_inicio") @db.Text
@@ -617,6 +616,7 @@ model MovimientoCaja {
   concepto       String    @db.VarChar(255)
   estado         String    @default("PENDIENTE") @db.VarChar(20)
   observaciones  String?   @db.Text
+  afectaEfectivo Boolean   @default(true) @map("afecta_efectivo")
   ventaId        Int?      @map("venta_id")
   transaccionPagoId Int?   @map("transaccion_pago_id")
   createdAt      DateTime  @default(now()) @map("created_at")

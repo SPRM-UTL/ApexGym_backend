@@ -3,7 +3,7 @@ import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 import currency from 'currency.js';
 import { ventaDao } from '../dao/VentaDao.js';
-import { calcularEfectivoEsperado } from '../utils/calcularEfectivoCaja.js';
+import { calcularEfectivoEsperado, obtenerTotalesMovimientos } from '../utils/calcularEfectivoCaja.js';
 
 export class CorteCajaController extends BaseController {
     constructor() {
@@ -41,32 +41,13 @@ export class CorteCajaController extends BaseController {
                 throw new Error(`No se puede realizar el corte de caja: existen ${movimientosPendientes} movimiento(s) pendientes de validar en este turno. Valide todos los movimientos antes de cerrar la caja.`);
             }
 
-            // Sumar movimientos ENTRADA y SALIDA de esta apertura
-            const [sumaEntradas, sumaSalidas] = await Promise.all([
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-            ]);
-
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-            const montoInicial = Number(apertura.montoInicial);
-            const efectivoEsperado = montoInicial + totalEntradas - totalSalidas;
-            const diferencia = Number(efectivoContado) - efectivoEsperado;
-
             // Crear el corte y cerrar la apertura en una transacción
             const resultado = await prisma.$transaction(async (tx) => {
                 // 1. Bloquear la fila de la apertura para serializar con ventas y otros cortes
                 const aperturas = await tx.$queryRaw`
                     SELECT id, estado, monto_inicial AS montoInicial,
                            desglose_inicio AS desgloseInicio,
-                           empleado_id AS empleadoId,
-                           usa_movimientos_cobro AS usaMovimientosCobro
+                           empleado_id AS empleadoId
                     FROM aperturas_caja
                     WHERE id = ${Number(aperturaCajaId)} AND deleted_at IS NULL
                     FOR UPDATE
@@ -75,11 +56,6 @@ export class CorteCajaController extends BaseController {
                 if (!apertura) throw new Error('La apertura de caja especificada no existe');
                 if (apertura.estado !== 'ABIERTA') {
                     throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
-                }
-                if (!(apertura.usaMovimientosCobro === true || Number(apertura.usaMovimientosCobro) === 1)) {
-                    const error = new Error('La apertura debe migrarse al registro de movimientos antes de realizar el corte.');
-                    error.status = 409;
-                    throw error;
                 }
 
                 await ventaDao.expirarPagosPendientesEnApertura(
@@ -114,19 +90,13 @@ export class CorteCajaController extends BaseController {
 
                 // 3. Sumar movimientos, ventas y devoluciones de esta apertura
                 const [
-                    sumaEntradas,
-                    sumaSalidas,
+                    totalesGenerales,
+                    totalesEfectivo,
                     resumenVentas,
                     sumaDevoluciones,
                 ] = await Promise.all([
-                    tx.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                    tx.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
+                    obtenerTotalesMovimientos({ aperturaCajaId: Number(aperturaCajaId), client: tx }),
+                    obtenerTotalesMovimientos({ aperturaCajaId: Number(aperturaCajaId), soloEfectivo: true, client: tx }),
                     ventaDao.obtenerResumenVentasPorApertura(Number(aperturaCajaId), tx),
                     tx.devolucion.aggregate({
                         where: { aperturaCajaId: Number(aperturaCajaId) },
@@ -134,15 +104,15 @@ export class CorteCajaController extends BaseController {
                     }),
                 ]);
 
-                const totalEntradas = currency(String(sumaEntradas._sum.monto ?? 0)).value;
-                const totalSalidas = currency(String(sumaSalidas._sum.monto ?? 0)).value;
+                const totalEntradas = totalesGenerales.totalEntradas;
+                const totalSalidas = totalesGenerales.totalSalidas;
                 const totalDevoluciones = currency(String(sumaDevoluciones._sum.monto ?? 0)).value;
                 const montoInicial = currency(String(apertura.montoInicial ?? 0)).value;
 
                 const efectivoEsperado = calcularEfectivoEsperado({
                     montoInicial,
-                    totalEntradas,
-                    totalSalidas,
+                    totalEntradas: totalesEfectivo.totalEntradas,
+                    totalSalidas: totalesEfectivo.totalSalidas,
                 });
 
                 const diferencia = currency(Number(efectivoContado)).subtract(efectivoEsperado).value;

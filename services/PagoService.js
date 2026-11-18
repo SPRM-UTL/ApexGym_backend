@@ -413,6 +413,66 @@ export class PagoService {
         }
     }
 
+    async registrarMovimientoCobro(tx, {
+        empresaId,
+        sucursalId,
+        aperturaCajaId,
+        empleadoId,
+        ventaId,
+        transaccionPagoId = null,
+        monto,
+        concepto = null,
+        proveedor = 'EFECTIVO',
+    }) {
+        if (!tx?.movimientoCaja) {
+            throw crearErrorPago('Se requiere la transacción de base de datos para registrar el movimiento de caja.');
+        }
+
+        for (const [nombre, valor] of Object.entries({ aperturaCajaId, empleadoId })) {
+            if (!Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
+                throw crearErrorPago(`El identificador de ${nombre} no es válido.`);
+            }
+        }
+
+        const montoNumerico = Number(monto);
+        if (!Number.isFinite(montoNumerico) || montoNumerico <= 0) {
+            return null;
+        }
+
+        if (transaccionPagoId) {
+            const existente = await tx.movimientoCaja.findFirst({
+                where: {
+                    transaccionPagoId: Number(transaccionPagoId),
+                    origen: 'COBRO_VENTA',
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+            if (existente) {
+                return existente;
+            }
+        }
+
+        const esEfectivo = proveedor === 'EFECTIVO';
+
+        return tx.movimientoCaja.create({
+            data: {
+                empresaId: Number(empresaId),
+                sucursalId: Number(sucursalId),
+                aperturaCajaId: Number(aperturaCajaId),
+                empleadoId: Number(empleadoId),
+                tipo: 'ENTRADA',
+                origen: 'COBRO_VENTA',
+                monto: montoNumerico,
+                concepto: concepto || `Cobro de venta (${proveedor})`,
+                estado: 'VALIDADO',
+                afectaEfectivo: esEfectivo,
+                ventaId: ventaId ? Number(ventaId) : null,
+                transaccionPagoId: transaccionPagoId ? Number(transaccionPagoId) : null,
+            },
+        });
+    }
+
     async registrarCobroVenta(tx, {
         empresaId,
         sucursalId,
@@ -496,27 +556,17 @@ export class PagoService {
                 },
             });
 
-            if (proveedor === 'EFECTIVO' && montoNumerico > 0) {
-                for (const [nombre, valor] of Object.entries({ aperturaCajaId, empleadoId })) {
-                    if (!Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
-                        throw crearErrorPago(`El identificador de ${nombre} no es válido.`);
-                    }
-                }
-
-                await tx.movimientoCaja.create({
-                    data: {
-                        empresaId: Number(empresaId),
-                        sucursalId: Number(sucursalId),
-                        aperturaCajaId: Number(aperturaCajaId),
-                        empleadoId: Number(empleadoId),
-                        tipo: 'ENTRADA',
-                        origen: 'COBRO_VENTA',
-                        monto: montoNumerico,
-                        concepto: `Cobro en efectivo de venta folio ${folioVenta}`,
-                        estado: 'VALIDADO',
-                        ventaId: Number(ventaId),
-                        transaccionPagoId: transaccion.id,
-                    },
+            if (montoNumerico > 0 && cobro.estado === 'APROBADO') {
+                await this.registrarMovimientoCobro(tx, {
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    aperturaCajaId: Number(aperturaCajaId),
+                    empleadoId: Number(empleadoId),
+                    ventaId: Number(ventaId),
+                    transaccionPagoId: transaccion.id,
+                    monto: montoNumerico,
+                    concepto: `Cobro ${proveedor === 'EFECTIVO' ? 'en efectivo' : 'con tarjeta'} de venta folio ${folioVenta}`,
+                    proveedor,
                 });
             }
 

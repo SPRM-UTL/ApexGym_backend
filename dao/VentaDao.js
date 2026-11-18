@@ -707,6 +707,19 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
                 where: { id: venta.id },
                 data: { estado: ESTADO_VENTA.COMPLETADA },
             });
+            if (referenciaVenta.aperturaCajaId) {
+                await pagoService.registrarMovimientoCobro(tx, {
+                    empresaId: Number(transaccion.empresaId),
+                    sucursalId: Number(transaccion.sucursalId),
+                    aperturaCajaId: Number(referenciaVenta.aperturaCajaId),
+                    empleadoId: Number(venta.empleadoId),
+                    ventaId: Number(venta.id),
+                    transaccionPagoId: transaccion.id,
+                    monto: Number(transaccion.monto),
+                    concepto: `Cobro Mercado Pago de venta #${venta.id}`,
+                    proveedor: 'MERCADO_PAGO',
+                });
+            }
             return { procesado: true, estado: 'APROBADO' };
         }
 
@@ -802,7 +815,6 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
         transacciones: m.transacciones,
     }));
 
-    const totalVentasEfectivoBruto = totalVentasEfectivo.add(totalVentasEfectivoCanceladas);
     const promedioVentas = cantidadVentas > 0
         ? currency(totalVentas.value / cantidadVentas).value
         : 0;
@@ -818,7 +830,6 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
         totalVentasCanceladas: totalVentasCanceladas.value,
         cantidadVentasCanceladas,
         totalVentasEfectivoCanceladas: totalVentasEfectivoCanceladas.value,
-        totalVentasEfectivoBruto: totalVentasEfectivoBruto.value,
     };
 }
 
@@ -941,8 +952,7 @@ async create(data) {
         // Bloquear la fila de apertura para serializar con corte de caja
         const aperturasBloqueadas = await tx.$queryRaw`
             SELECT id, estado, empleado_id AS empleadoId,
-                   empresa_id AS empresaId, sucursal_id AS sucursalId,
-                   usa_movimientos_cobro AS usaMovimientosCobro
+                   empresa_id AS empresaId, sucursal_id AS sucursalId
             FROM aperturas_caja
             WHERE id = ${aperturaCajaId} AND deleted_at IS NULL
             FOR UPDATE
@@ -952,12 +962,6 @@ async create(data) {
         if (!cajaAbierta || cajaAbierta.estado !== ESTADO_CAJA.ABIERTA || Number(cajaAbierta.empleadoId) !== Number(empleado.id)) {
             const error = new Error('La apertura de caja no está disponible');
             error.code = 'APERTURA_CAJA_CERRADA';
-            error.status = 409;
-            throw error;
-        }
-        if (!(cajaAbierta.usaMovimientosCobro === true || Number(cajaAbierta.usaMovimientosCobro) === 1)) {
-            const error = new Error('La apertura debe migrarse al registro de movimientos antes de registrar ventas.');
-            error.code = 'APERTURA_REQUIERE_MOVIMIENTOS';
             error.status = 409;
             throw error;
         }
@@ -1158,11 +1162,19 @@ async cancel(id, motivoCancelacion) {
         await this.ajustarStock(tx, venta.detalleVenta, []);
 
         const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
+        const ventaFueCompletada = ['completada', 'completado'].includes(String(venta.estado ?? '').toLowerCase());
 
-        if (esPagoEfectivo) {
-            const transaccionEfectivo = venta.transaccionesPago.find(
-                (transaccion) => transaccion.proveedor === 'EFECTIVO'
+        if (ventaFueCompletada) {
+            const transaccionAprobada = venta.transaccionesPago.find(
+                (transaccion) => transaccion.estado === 'APROBADO' || transaccion.deletedAt === null
             );
+            if (transaccionAprobada && transaccionAprobada.estado !== 'REEMBOLSADO') {
+                await tx.transaccionPago.update({
+                    where: { id: transaccionAprobada.id },
+                    data: { estado: 'REEMBOLSADO' },
+                });
+            }
+
             await tx.movimientoCaja.create({
                 data: {
                     empresaId: Number(caja.empresaId),
@@ -1172,10 +1184,11 @@ async cancel(id, motivoCancelacion) {
                     tipo: 'SALIDA',
                     origen: 'CANCELACION',
                     monto: venta.total,
-                    concepto: `Cancelación de venta folio ${venta.folioVenta.id}`,
-                    estado: 'PENDIENTE',
+                    concepto: `Cancelación de venta folio ${venta.folioVenta?.id ?? venta.id} (${venta.metodoPago?.nombre || (esPagoEfectivo ? 'Efectivo' : 'Tarjeta')})`,
+                    estado: 'VALIDADO',
+                    afectaEfectivo: esPagoEfectivo,
                     ventaId: venta.id,
-                    transaccionPagoId: transaccionEfectivo?.id,
+                    transaccionPagoId: transaccionAprobada?.id ?? null,
                 },
             });
         }

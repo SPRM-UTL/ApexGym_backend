@@ -38,7 +38,6 @@ export class AperturaCajaController extends BaseController {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
-                usaMovimientosCobro: true,
                 fechaApertura: procesarFechaApertura(fechaApertura),
                 estado: 'ABIERTA',
                 desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || null),

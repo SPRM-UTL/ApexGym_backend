@@ -312,23 +312,22 @@ export async function crearDevolucion(
         }
 
         const esPagoEfectivo = String(metodoPago.codigo ?? '').trim().toUpperCase() === 'EFECTIVO';
-        if (esPagoEfectivo) {
-            await tx.movimientoCaja.create({
-                data: {
-                    empresaId: Number(apertura.empresaId),
-                    sucursalId: Number(apertura.sucursalId),
-                    aperturaCajaId: idApertura,
-                    empleadoId: Number(apertura.empleadoId),
-                    tipo: 'SALIDA',
-                    origen: 'DEVOLUCION',
-                    monto: calculo.montoTotal,
-                    concepto: `Devolución de venta folio ${venta.folioVentaId}`,
-                    estado: 'PENDIENTE',
-                    ventaId: idVenta,
-                    devolucionId: devolucion.id,
-                },
-            });
-        }
+        await tx.movimientoCaja.create({
+            data: {
+                empresaId: Number(apertura.empresaId),
+                sucursalId: Number(apertura.sucursalId),
+                aperturaCajaId: idApertura,
+                empleadoId: Number(apertura.empleadoId),
+                tipo: 'SALIDA',
+                origen: 'DEVOLUCION',
+                monto: calculo.montoTotal,
+                concepto: `Devolución de venta folio ${venta.folioVentaId} (${metodoPago.nombre || metodoPago.codigo})`,
+                estado: 'VALIDADO',
+                afectaEfectivo: esPagoEfectivo,
+                ventaId: idVenta,
+                devolucionId: devolucion.id,
+            },
+        });
 
         const devolucionRegistrada = await tx.devolucion.findUnique({
             where: { id: devolucion.id },

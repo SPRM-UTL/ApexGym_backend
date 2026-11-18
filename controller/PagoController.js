@@ -16,7 +16,6 @@ export class PagoController extends BaseController {
         try {
             const empresaId = this.obtenerEmpresaId(req);
             const contexto = { sucursalId: req.query?.sucursalId ?? null };
-            await pagoService.sincronizarConMercadoPago(empresaId).catch(() => {});
             const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
             const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId, contexto);
             return this.respuestaExito(res, registros || [], "Registros obtenidos exitosamente");
