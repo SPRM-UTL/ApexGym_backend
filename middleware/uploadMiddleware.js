@@ -12,7 +12,7 @@ let DIRECTORIO_FOTOS_USUARIOS = '';
 let RAIZ_BACKEND = '';
 
 if (!ES_CLOUDFLARE) {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const __dirname = import.meta.url ? path.dirname(fileURLToPath(import.meta.url)) : process.cwd();
     RAIZ_BACKEND = path.resolve(__dirname, '..');
     DIRECTORIO_FOTOS_USUARIOS = path.join(RAIZ_BACKEND, 'uploads', 'usuarios');
 

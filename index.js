@@ -7,8 +7,8 @@ import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 import { contextoMiddleware } from './middleware/contextoMiddleware.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = import.meta.url ? fileURLToPath(import.meta.url) : '';
+const __dirname = __filename ? path.dirname(__filename) : process.cwd();
 const app = express();
 const port = process.env.PORT || 3000;
 

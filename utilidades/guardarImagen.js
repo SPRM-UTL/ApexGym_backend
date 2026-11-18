@@ -24,8 +24,8 @@ export function guardarImagenServidor(imagenData, modulo = 'general') {
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Calcular __dirname en tiempo de ejecución para compatibilidad con Cloudflare Workers
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
+    const __filename = import.meta.url ? fileURLToPath(import.meta.url) : '';
+    const __dirname = __filename ? path.dirname(__filename) : process.cwd();
 
     const carpetaModulo = path.join(__dirname, '../public/imagenes', modulo);
     if (!fs.existsSync(carpetaModulo)) {
