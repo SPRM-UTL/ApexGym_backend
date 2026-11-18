@@ -217,11 +217,13 @@ export class ProductoController extends BaseController {
                     400
                 ));
             }
-            const productos = await productoDao.obtenerDisponiblesParaVenta(
+            const productos = await productoDao.getAll(
+                { disponibleCompra: true },
+                { id: 'desc' },
                 this.obtenerEmpresaId(req),
-                sucursalId
+                { sucursalId: req.query.sucursalId ?? null }
             );
-            return this.respuestaExito(res, productos, "Productos disponibles para venta cargados correctamente");
+            return this.respuestaExito(res, productos, "Productos cargados con exito");
         } catch (error) {
             return this.respuestaError(res, error);
         }

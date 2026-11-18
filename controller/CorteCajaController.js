@@ -1,9 +1,3 @@
-/**
- * Issue: Control Operativo de Caja, Auditoria Contable y Reporte de Corte en PDF #85
- * Subtareas:
- * - [CAJA-01] Backend: Bloqueo de modificacion y eliminacion de cortes de caja por auditoria contable
- * - [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja
- */
 import { corteCajaDao } from '../dao/CorteCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
@@ -17,13 +11,9 @@ export class CorteCajaController extends BaseController {
     }
 
     /**
-     * POST /cortes-caja
-     * [CAJA-03] Backend: Validacion obligatoria de movimientos antes de autorizar corte de caja #88
-     * - Bloqueo de fila de apertura (SELECT ... FOR UPDATE) para serializar con ventas y cortes.
-     * - Consulta si existen movimientos en estado diferente a VALIDADO para la apertura activa.
-     * - Calcula totales de movimientos y ventas usando ventaDao.obtenerResumenVentasPorApertura y currency.js.
-     * - Guarda los totales de ventas y devoluciones en el registro del corte.
-     * - Cambia el estado de la apertura a CERRADA dentro de la misma transacción atómica.
+     * POST /
+     * Crea el corte de caja calculando totales de movimientos automáticamente
+     * y cambia el estado de la apertura a CERRADA.
      */
     crear = async (req, res) => {
         try {
@@ -31,7 +21,45 @@ export class CorteCajaController extends BaseController {
 
             this.validarCampos({ aperturaCajaId, empleadoId, efectivoContado, observaciones });
 
-            // Crear el corte y cerrar la apertura dentro de una sola transacción
+            // Obtener la apertura con su monto inicial
+            const apertura = await prisma.aperturaCaja.findUnique({
+                where: { id: Number(aperturaCajaId), deletedAt: null },
+            });
+            if (!apertura) throw new Error('La apertura de caja especificada no existe');
+            if (apertura.estado !== 'ABIERTA')
+                throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
+
+            // Verificar que no existan movimientos pendientes de validar
+            const movimientosPendientes = await prisma.movimientoCaja.count({
+                where: {
+                    aperturaCajaId: Number(aperturaCajaId),
+                    estado: { not: 'VALIDADO' },
+                    deletedAt: null,
+                },
+            });
+            if (movimientosPendientes > 0) {
+                throw new Error(`No se puede realizar el corte de caja: existen ${movimientosPendientes} movimiento(s) pendientes de validar en este turno. Valide todos los movimientos antes de cerrar la caja.`);
+            }
+
+            // Sumar movimientos ENTRADA y SALIDA de esta apertura
+            const [sumaEntradas, sumaSalidas] = await Promise.all([
+                prisma.movimientoCaja.aggregate({
+                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
+                    _sum: { monto: true },
+                }),
+                prisma.movimientoCaja.aggregate({
+                    where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
+                    _sum: { monto: true },
+                }),
+            ]);
+
+            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
+            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
+            const montoInicial = Number(apertura.montoInicial);
+            const efectivoEsperado = montoInicial + totalEntradas - totalSalidas;
+            const diferencia = Number(efectivoContado) - efectivoEsperado;
+
+            // Crear el corte y cerrar la apertura en una transacción
             const resultado = await prisma.$transaction(async (tx) => {
                 // 1. Bloquear la fila de la apertura para serializar con ventas y otros cortes
                 const aperturas = await tx.$queryRaw`
@@ -211,20 +239,10 @@ export class CorteCajaController extends BaseController {
         }
     };
 
-    /**
-     * PUT /cortes-caja/:id
-     * [CAJA-01] Bloqueo de modificación por auditoría contable y control fiscal.
-     * Los registros de corte de caja son inmutables una vez creados para proteger el histórico contable.
-     */
     actualizar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser modificados por políticas de control y auditoría contable'));
     };
 
-    /**
-     * DELETE /cortes-caja/:id
-     * [CAJA-01] Bloqueo de eliminación por auditoría contable y control fiscal.
-     * Prohíbe la eliminación física o lógica de cortes para garantizar la integridad contable.
-     */
     eliminar = async (req, res) => {
         return this.respuestaError(res, new Error('Los cortes de caja no pueden ser eliminados por políticas de control y auditoría contable'));
     };
@@ -267,8 +285,8 @@ export class CorteCajaController extends BaseController {
             throw new Error('El efectivo contado es requerido');
         if (Number(efectivoContado) < 0)
             throw new Error('El efectivo contado debe ser mayor o igual a 0');
-        if (Number(efectivoContado) > 200000)
-            throw new Error('El efectivo contado físico no puede exceder el límite de $200,000.00');
+        if (Number(efectivoContado) > 99999999.99)
+            throw new Error('El efectivo contado no puede exceder $99,999,999.99');
         if (observaciones && observaciones.trim().length > 500)
             throw new Error('Las observaciones no pueden exceder 500 caracteres');
     }

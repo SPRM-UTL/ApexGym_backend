@@ -29,7 +29,7 @@ export class AsistenciaDao extends BaseDao {
         };
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, _orderBy = undefined, _empresaId = undefined, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: { deletedAt: null, ...additionalWhere },
             include: this.#include,
@@ -51,7 +51,7 @@ export class AsistenciaDao extends BaseDao {
      * @param {number} clienteId
      * @param {{ limite?: number, pagina?: number }} opciones
      */
-    async obtenerHistorialPorCliente(clienteId, { limite = 20, pagina = 1 } = {}) {
+    async obtenerHistorialPorCliente(clienteId, { limite = 20, pagina = 1, sucursalId: _sucursalId = null } = {}) {
         const skip = (pagina - 1) * limite;
         const [registros, total] = await Promise.all([
             this.model.findMany({
@@ -74,7 +74,7 @@ export class AsistenciaDao extends BaseDao {
      * Si no se pasa fecha usa el día de hoy.
      * @param {Date|string} [fecha]
      */
-    async obtenerAsistenciasDelDia(fecha) {
+    async obtenerAsistenciasDelDia(fecha, { sucursalId: _sucursalId = null } = {}) {
         const dia = fecha ? new Date(fecha) : new Date();
         const inicio = new Date(dia);
         inicio.setHours(0, 0, 0, 0);

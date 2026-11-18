@@ -15,8 +15,10 @@ export class PagoController extends BaseController {
     obtenerTodos = async (req, res) => {
         try {
             const empresaId = this.obtenerEmpresaId(req);
+            const contexto = { sucursalId: req.query?.sucursalId ?? null };
+            await pagoService.sincronizarConMercadoPago(empresaId).catch(() => {});
             const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
-            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId);
+            const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId, contexto);
             return this.respuestaExito(res, registros || [], "Registros obtenidos exitosamente");
         } catch (error) {
             return this.respuestaError(res, error);

@@ -64,20 +64,56 @@ export class VisitaController extends BaseController {
     obtenerTodos = async (req, res) => {
         try {
             const { fechaInicio, fechaFin } = req.query;
+            const contexto = { sucursalId: req.query.sucursalId ?? null };
 
             let visitas;
             if (fechaInicio && fechaFin) {
-                visitas = await this.dao.obtenerVisitasPorPeriodo(fechaInicio, fechaFin);
+                visitas = await this.dao.obtenerVisitasPorPeriodo(fechaInicio, fechaFin, contexto);
             } else if (fechaInicio) {
                 // Solo fecha inicio → busca ese día
-                visitas = await this.dao.obtenerVisitasPorPeriodo(fechaInicio, fechaInicio);
+                visitas = await this.dao.obtenerVisitasPorPeriodo(fechaInicio, fechaInicio, contexto);
             } else {
                 // Sin filtro → todo el día de hoy por defecto
                 const hoy = new Date().toISOString().split('T')[0];
-                visitas = await this.dao.obtenerVisitasPorPeriodo(hoy, hoy);
+                visitas = await this.dao.obtenerVisitasPorPeriodo(hoy, hoy, contexto);
             }
 
             return this.respuestaExito(res, visitas, 'Visitas obtenidas exitosamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    /**
+     * PUT /api/visitas/:id
+     * Actualiza los datos operativos de una visita existente.
+     */
+    actualizar = async (req, res) => {
+        try {
+            const id = Number(req.params.id);
+            if (!Number.isInteger(id) || id <= 0) throw new Error('ID de visita no válido');
+
+            const visitaActual = await this.dao.getById(id);
+            if (!visitaActual) return this.respuestaNoEncontrado(res, 'Visita no encontrada');
+
+            const data = {};
+            if (req.body.nombreVisitante !== undefined) {
+                if (!req.body.nombreVisitante?.trim()) throw new Error('El nombre del visitante es requerido');
+                data.nombreVisitante = req.body.nombreVisitante.trim();
+            }
+            if (req.body.tipoVisitaId !== undefined) {
+                const tipoVisita = await tipoVisitaDao.getById(Number(req.body.tipoVisitaId));
+                if (!tipoVisita) throw new Error('El tipo de visita especificado no existe');
+                data.tipoVisitaId = tipoVisita.id;
+                data.costo = tipoVisita.costo;
+            }
+            if (req.body.observaciones !== undefined) {
+                data.observaciones = req.body.observaciones?.trim() || null;
+            }
+
+            await this.dao.update(id, data, this.obtenerEmpresaId(req));
+            const visita = await this.dao.getById(id);
+            return this.respuestaExito(res, visita, 'Visita actualizada correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }

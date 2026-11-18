@@ -60,6 +60,7 @@ export const autenticarUsuario = async (req, res, next) => {
             empresaId: resultado.token.usuario?.empresaId ?? 1,
         };
 
+        req.token = token;
         req.usuario = usuarioAutenticado;
         req.user = usuarioAutenticado;
 
@@ -115,6 +116,28 @@ export const verificarPermiso = (modulo, accion) => async (req, res, next) => {
 
         console.error("Error al verificar permiso:", error);
         const response = new ResponseModel(null, 1, error.message || "Error al verificar permisos", 500);
+        return res.status(500).json(response);
+    }
+};
+
+/** Restringe rutas autenticadas que no usan permisos granulares a cuentas de empleado. */
+export const verificarEmpleado = async (req, res, next) => {
+    try {
+        const usuarioId = req.usuario?.id ?? req.user?.id;
+        if (!usuarioId) {
+            const response = new ResponseModel(null, 1, "Usuario no autenticado", 401);
+            return res.status(401).json(response);
+        }
+
+        if (await permisoDao.esCliente(usuarioId)) {
+            const response = new ResponseModel(null, 1, "Acceso reservado para empleados", 403);
+            return res.status(403).json(response);
+        }
+
+        return next();
+    } catch (error) {
+        console.error("Error al verificar el rol del usuario:", error);
+        const response = new ResponseModel(null, 1, error.message || "Error al verificar el rol", 500);
         return res.status(500).json(response);
     }
 };

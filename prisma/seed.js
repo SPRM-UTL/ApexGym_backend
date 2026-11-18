@@ -289,7 +289,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
     where: { nombre: seccion.nombre },
     update: {
         descripcion: seccion.descripcion,
-        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
         deletedAt: null,
@@ -297,7 +296,6 @@ const upsertSeccion = (seccion) => prisma.seccion.upsert({
     create: {
         nombre: seccion.nombre,
         descripcion: seccion.descripcion,
-        orden: seccion.orden ?? 0,
         imagenUrl: seccion.imagenUrl,
         imagenPublicId: seccion.imagenPublicId,
     },
@@ -314,7 +312,6 @@ const upsertModulo = async (seccionId, modulo) => {
             data: {
                 seccionId,
                 descripcion: modulo.descripcion,
-                orden: modulo.orden ?? 0,
                 imagenUrl: modulo.imagenUrl,
                 imagenPublicId: modulo.imagenPublicId,
                 deletedAt: null,
@@ -327,7 +324,6 @@ const upsertModulo = async (seccionId, modulo) => {
             seccionId,
             nombre: modulo.nombre,
             descripcion: modulo.descripcion,
-            orden: modulo.orden ?? 0,
             imagenUrl: modulo.imagenUrl,
             imagenPublicId: modulo.imagenPublicId,
         },

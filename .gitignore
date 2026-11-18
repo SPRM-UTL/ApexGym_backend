@@ -3,14 +3,9 @@ node_modules/
 
 # Variables de entorno y secretos
 .env
-.env.*
-!.env.example
 
-# Directorios de herramientas de IA, agentes y editores
+# Directorios de herramientas de IA y editores
 .agents/
-agents/
-.agent/
-agent/
 .claude/
 .cursor/
 .devin/
@@ -50,20 +45,8 @@ prisma/migrations/**
 prisma/migrations/
 prisma/migrations/**
 
-# Archivos de imágenes subidas, capturas y multimedia
-.user_uploaded/
-media_*
-*.png
-*.jpg
-*.jpeg
-*.webp
-*.gif
-
-# Visual Studio y Editores
+# Visual Studio
 .vs/
-.vscode/*
-!.vscode/extensions.json
-.idea/
 
 # Copias locales de migraciones
 public/uploads/.vs/ 
@@ -84,11 +67,16 @@ backend/migrations/
 # Migraciones locales/copias; mantener prisma/migrations versionado
 !prisma/migrations/
 !prisma/migrations/**
-public/uploads/.vs/ 
+public/uploads/.vs/
+/prisma/migrations
 
 /migrations/
 /backend/migrations/
 /prisma/migrations-copy/
 /migrations-copy/
 /backend/migrations-copy/
-/prisma/migrations
+
+# Directorios de imágenes
+/public/imagenes/
+/imagenes/
+/usuarios/

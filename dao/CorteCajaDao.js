@@ -51,7 +51,7 @@ export class CorteCajaDao extends BaseDao {
             where: { aperturaCajaId, deletedAt: null },
             omit: this.omit,
             include: INCLUDE_DEFAULT,
-            orderBy: [{ id: 'desc' }, { fechaCorte: 'desc' }],
+            orderBy: { fechaCorte: 'desc' },
         });
     }
 }

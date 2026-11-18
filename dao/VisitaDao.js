@@ -10,7 +10,7 @@ export class VisitaDao extends BaseDao {
         return { tipoVisita: true };
     }
 
-    async getAll(additionalWhere = {}) {
+    async getAll(additionalWhere = {}, _orderBy = undefined, _empresaId = undefined, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: { deletedAt: null, ...additionalWhere },
             include: this.#include,
@@ -32,7 +32,7 @@ export class VisitaDao extends BaseDao {
      * @param {Date|string} fechaInicio
      * @param {Date|string} fechaFin
      */
-    async obtenerVisitasPorPeriodo(fechaInicio, fechaFin) {
+    async obtenerVisitasPorPeriodo(fechaInicio, fechaFin, { sucursalId: _sucursalId = null } = {}) {
         const inicio = new Date(fechaInicio);
         inicio.setHours(0, 0, 0, 0);
         const fin = new Date(fechaFin);

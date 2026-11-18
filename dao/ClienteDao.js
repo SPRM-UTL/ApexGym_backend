@@ -31,19 +31,6 @@ export class ClienteDao extends BaseDao {
             omit: this.omit
         });
     }
-    
-    async getByUser(id) {
-        return this.model.findUnique({
-            where: {
-                usuarioId: id,
-                deletedAt: null,
-            },
-            include: {
-                estadoCliente: true
-            },
-            omit: this.omit
-        });
-    }
 
     async getByEmail(email) {
         return this.model.findFirst({
@@ -93,7 +80,7 @@ export class ClienteDao extends BaseDao {
      * contenga el término de búsqueda. Máximo 20 resultados.
      * @param {string} termino
      */
-    async buscarPorNombre(termino) {
+    async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
         return this.model.findMany({
             where: {
                 deletedAt: null,
