@@ -13,3 +13,8 @@ CLOUDFLARE=true
 CLOUDINARY_CLOUD_NAME="sprm_images"
 CLOUDINARY_API_KEY="939581637956146"
 CLOUDINARY_API_SECRET="8JePAoiHksmkb43DLlgO_5mEOes"
+
+#Registrarse como desarrollador y crear una api de tipo checkout para los cobros en linea de mercado pago
+#Necesita metodo https por lo que sujiero usar en produccion
+MP_ACCESS_TOKEN="APP_USR-322858"
+MP_ACCESS_KEY="APP_USR-1c30a16b-363f"

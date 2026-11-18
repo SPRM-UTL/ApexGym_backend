@@ -10,9 +10,10 @@ export const PROVEEDOR_POR_CODIGO_METODO = Object.freeze({
     TRANSFERENCIA: 'TRANSFERENCIA',
 });
 
-function crearErrorPago(mensaje, status = 400) {
+function crearErrorPago(mensaje, status = 400, code = null) {
     const error = new Error(mensaje);
     error.status = status;
+    if (code) error.code = code;
     return error;
 }
 
@@ -114,7 +115,6 @@ export class PagoService {
         this.env = env;
         this.fetch = fetchImpl;
         this.clock = clock;
-        this.driver = (env.PAGOS_DRIVER || 'sandbox').toLowerCase();
         this.mpAccessToken = env.MP_ACCESS_TOKEN?.trim() || null;
         this.frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
         this.mpWebhookSecret = env.MP_WEBHOOK_SECRET?.trim() || null;
@@ -148,277 +148,6 @@ export class PagoService {
      */
     generarIdempotenciaKey() {
         return crypto.randomUUID();
-    }
-
-    /**
-     * Crea una intención o preferencia de cobro respetando idempotencia.
-     */
-    async crearCobro({
-        empresaId = 1,
-        concepto,
-        monto,
-        correoCliente = null,
-        uuidIdempotencia = null,
-        proveedor = 'SANDBOX_SIMULADO',
-        folioVoucher = null,
-        tipoTarjeta = null,
-        marcaTarjeta = null,
-        ultimosDigitos = null,
-        metadatos = null,
-    }) {
-        if (!concepto || typeof concepto !== 'string' || !concepto.trim()) {
-            throw new Error('El concepto del pago es obligatorio.');
-        }
-
-        const montoNumerico = Number(monto);
-        if (!Number.isFinite(montoNumerico) || montoNumerico <= 0) {
-            throw new Error('El monto debe ser un valor numérico mayor a cero.');
-        }
-
-        const llaveIdempotencia = uuidIdempotencia?.trim() || this.generarIdempotenciaKey();
-
-        // 1. Verificación de Idempotencia: evitar doble cobro si el cliente reintenta
-        const existente = await transaccionPagoDao.buscarPorIdempotencia(llaveIdempotencia, empresaId);
-        if (existente) {
-            return {
-                idempotente: true,
-                mensaje: 'Transacción recuperada por llave de idempotencia (sin doble cobro)',
-                transaccion: existente,
-                urlCheckout: existente.urlCheckout,
-            };
-        }
-
-        // 2. Verificación estricta de Voucher físico: un voucher no puede registrarse dos veces
-        if (proveedor === 'TERMINAL_MANUAL' && folioVoucher && folioVoucher.trim()) {
-            const voucherExistente = await transaccionPagoDao.model.findFirst({
-                where: {
-                    empresaId,
-                    folioVoucher: folioVoucher.trim(),
-                    deletedAt: null,
-                },
-                orderBy: { id: 'desc' },
-            });
-
-            if (voucherExistente) {
-                return {
-                    idempotente: true,
-                    mensaje: `El folio ${folioVoucher.trim()} ya fue registrado en la transacción #${voucherExistente.id}`,
-                    transaccion: voucherExistente,
-                };
-            }
-        }
-
-        // 3. Ventana de protección anti-doble clic rápido (Deduplicación por huella en los últimos 8 segundos)
-        const ventanaSeguridad = new Date(Date.now() - 8000);
-        const transaccionReciente = await transaccionPagoDao.model.findFirst({
-            where: {
-                empresaId,
-                concepto: concepto.trim(),
-                monto: montoNumerico,
-                proveedor,
-                createdAt: {
-                    gte: ventanaSeguridad,
-                },
-                deletedAt: null,
-            },
-            orderBy: { id: 'desc' },
-        });
-
-        if (transaccionReciente) {
-            return {
-                idempotente: true,
-                mensaje: `Se detectó un cobro idéntico en curso. Se recuperó la transacción #${transaccionReciente.id} para evitar duplicados`,
-                transaccion: transaccionReciente,
-                urlCheckout: transaccionReciente.urlCheckout,
-            };
-        }
-
-        let estadoInicial = 'PENDIENTE';
-        let referenciaExterna = null;
-        let urlCheckout = null;
-
-        // 4. Procesamiento según método de pago
-        if (proveedor === 'EFECTIVO' || proveedor === 'TERMINAL_MANUAL') {
-            const cobroPresencial = resolverCobroPresencial({
-                proveedor,
-                monto: montoNumerico,
-                efectivoRecibido: metadatos?.efectivoRecibido !== undefined
-                    ? Number(metadatos.efectivoRecibido)
-                    : null,
-                folioVoucher,
-            });
-            estadoInicial = cobroPresencial.estado;
-            referenciaExterna = cobroPresencial.referenciaExterna;
-        } else {
-            // Cobro Digital / En Línea: verificar si existe Access Token de Mercado Pago
-            const tokenMercadoPago = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
-            const tieneTokenMercadoPago = Boolean(tokenMercadoPago && tokenMercadoPago.length > 20);
-
-            if (tieneTokenMercadoPago) {
-                proveedor = 'MERCADO_PAGO';
-                try {
-                    const preferenceBody = {
-                        items: [
-                            {
-                                id: `apex_${Date.now()}`,
-                                title: concepto.trim(),
-                                quantity: 1,
-                                currency_id: 'MXN',
-                                unit_price: montoNumerico,
-                            },
-                        ],
-                        ...(correoCliente?.trim()
-                            ? {
-                                  payer: {
-                                      email: correoCliente.trim(),
-                                  },
-                              }
-                            : {}),
-                        back_urls: {
-                            success: `${this.frontendUrl}/pagos-experimentacion?estado=aprobado`,
-                            failure: `${this.frontendUrl}/pagos-experimentacion?estado=fallido`,
-                            pending: `${this.frontendUrl}/pagos-experimentacion?estado=pendiente`,
-                        },
-                        external_reference: llaveIdempotencia,
-                        statement_descriptor: 'APEXGYM',
-                    };
-
-                    // auto_return solo es válido en Mercado Pago con dominios HTTPS públicos; en localhost se omite para evitar error 400
-                    if (this.frontendUrl.startsWith('https://')) {
-                        preferenceBody.auto_return = 'approved';
-                    }
-
-                    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${tokenMercadoPago}`,
-                            'Content-Type': 'application/json',
-                            'X-Idempotency-Key': llaveIdempotencia,
-                        },
-                        body: JSON.stringify(preferenceBody),
-                    });
-
-                    const mpData = await mpResponse.json();
-                    if (mpResponse.ok && (mpData.init_point || mpData.sandbox_init_point)) {
-                        referenciaExterna = mpData.id;
-                        urlCheckout = mpData.init_point || mpData.sandbox_init_point;
-                        estadoInicial = 'PENDIENTE';
-                    } else {
-                        console.error('Error al generar preferencia en Mercado Pago:', mpData);
-                        referenciaExterna = `FALLBACK_MP_${Date.now()}`;
-                        urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
-                    }
-                } catch (mpErr) {
-                    console.error('Fallo de conexión con API de Mercado Pago:', mpErr);
-                    referenciaExterna = `ERROR_MP_${Date.now()}`;
-                    urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
-                }
-            } else {
-                // Modo Sandbox Simulado local por defecto
-                referenciaExterna = `SANDBOX_REF_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-                urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
-            }
-        }
-
-        const metadatosGuardados = {
-            ...(metadatos || {}),
-            ...(tipoTarjeta ? { tipoTarjeta } : {}),
-            ...(marcaTarjeta ? { marcaTarjeta } : {}),
-            ...(ultimosDigitos ? { ultimosDigitos } : {}),
-            pasarelaReal: Boolean(this.mpAccessToken && this.mpAccessToken.length > 20),
-        };
-
-        try {
-            const nuevaTransaccion = await transaccionPagoDao.create({
-                empresaId,
-                uuidIdempotencia: llaveIdempotencia,
-                proveedor,
-                referenciaExterna,
-                monto: montoNumerico,
-                moneda: 'MXN',
-                estado: estadoInicial,
-                concepto: concepto.trim(),
-                correoCliente: correoCliente?.trim() || null,
-                folioVoucher: folioVoucher?.trim() || null,
-                urlCheckout,
-                metadatos: metadatosGuardados,
-            });
-
-            // Auto-registro en Caja Activa si el cobro se liquidó en Efectivo físico
-            if (proveedor === 'EFECTIVO' && estadoInicial === 'APROBADO') {
-                try {
-                    let aperturaActiva = null;
-                    if (metadatos?.aperturaCajaId) {
-                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                            where: {
-                                id: Number(metadatos.aperturaCajaId),
-                                empresaId,
-                                estado: 'ABIERTA',
-                                deletedAt: null,
-                            },
-                        });
-                    }
-                    if (!aperturaActiva) {
-                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                            where: {
-                                empresaId,
-                                estado: 'ABIERTA',
-                                deletedAt: null,
-                            },
-                            orderBy: { id: 'desc' },
-                        });
-                    }
-
-                    if (aperturaActiva) {
-                        const movimiento = await transaccionPagoDao.prisma.movimientoCaja.create({
-                            data: {
-                                empresaId,
-                                aperturaCajaId: aperturaActiva.id,
-                                empleadoId: aperturaActiva.empleadoId,
-                                tipo: 'ENTRADA',
-                                monto: montoNumerico,
-                                concepto: `Cobro de Venta / Membresía - Transacción #${nuevaTransaccion.id}`,
-                                estado: 'VALIDADO',
-                                observaciones: `Registro automático generado por cobro en mostrador (Transacción #${nuevaTransaccion.id})`,
-                            },
-                        });
-
-                        await transaccionPagoDao.prisma.transaccionPago.update({
-                            where: { id: nuevaTransaccion.id },
-                            data: {
-                                metadatos: {
-                                    ...metadatosGuardados,
-                                    movimientoCajaId: movimiento.id,
-                                    aperturaCajaId: aperturaActiva.id,
-                                },
-                            },
-                        });
-                    }
-                } catch (movErr) {
-                    console.error('No se pudo registrar el movimiento automático de caja para el pago en efectivo:', movErr);
-                }
-            }
-
-            return {
-                idempotente: false,
-                mensaje: estadoInicial === 'APROBADO' ? 'Pago procesado de inmediato' : 'Orden de cobro generada en espera de confirmación',
-                transaccion: nuevaTransaccion,
-                urlCheckout,
-            };
-        } catch (error) {
-            if (error?.code === 'P2002' || error?.message?.includes('uuid_idempotencia')) {
-                const transaccionExistente = await transaccionPagoDao.buscarPorIdempotencia(llaveIdempotencia, empresaId);
-                if (transaccionExistente) {
-                    return {
-                        idempotente: true,
-                        mensaje: 'Transacción recuperada por llave de idempotencia (concurrencia prevenida)',
-                        transaccion: transaccionExistente,
-                        urlCheckout: transaccionExistente.urlCheckout,
-                    };
-                }
-            }
-            throw error;
-        }
     }
 
     async registrarMovimientoCobro(tx, {
@@ -713,9 +442,10 @@ export class PagoService {
             }
 
             this.validarConfiguracionSandbox();
-            const urlRetorno = new URL('/registro-de-ventas', this.frontendUrl);
+            const urlRetorno = new URL('/registro-de-ventas/nueva', this.frontendUrl);
             urlRetorno.searchParams.set('ventaId', String(ventaId));
             urlRetorno.searchParams.set('mp_return', '1');
+
             const preferenceBody = {
                 items: [{
                     id: `venta_${ventaId}`,
@@ -725,32 +455,32 @@ export class PagoService {
                     unit_price: Number(transaccion.monto),
                 }],
                 external_reference: transaccion.uuidIdempotencia,
+                statement_descriptor: 'APEXGYM',
                 back_urls: {
                     success: urlRetorno.toString(),
                     failure: urlRetorno.toString(),
                     pending: urlRetorno.toString(),
                 },
-                expires: true,
-                expiration_date_from: this.clock().toISOString(),
-                expiration_date_to: venceEn.toISOString(),
-                statement_descriptor: 'APEXGYM',
             };
+
+            if (urlRetorno.protocol === 'https:') {
+                preferenceBody.auto_return = 'approved';
+            }
             if (transaccion.correoCliente) {
                 preferenceBody.payer = { email: transaccion.correoCliente };
             }
 
-            const notificationUrl = this.env.MP_NOTIFICATION_URL?.trim();
-            if (notificationUrl) {
-                let urlNotificacion;
+            const rawNotificationUrl = this.env.MP_NOTIFICATION_URL?.trim()
+                || (urlRetorno.protocol === 'https:' ? `${urlRetorno.origin}/api/pagos/webhook` : null);
+            if (rawNotificationUrl) {
                 try {
-                    urlNotificacion = new URL(notificationUrl);
+                    const urlNotificacion = new URL(rawNotificationUrl);
+                    if (urlNotificacion.protocol === 'https:') {
+                        preferenceBody.notification_url = urlNotificacion.toString();
+                    }
                 } catch {
-                    throw crearErrorPago('MP_NOTIFICATION_URL no es una URL válida.', 503);
+                    // Ignorar si URL de notificación no es válida
                 }
-                if (urlNotificacion.protocol !== 'https:') {
-                    throw crearErrorPago('MP_NOTIFICATION_URL debe ser una URL HTTPS pública.', 503);
-                }
-                preferenceBody.notification_url = urlNotificacion.toString();
             }
 
             let response;
@@ -769,16 +499,17 @@ export class PagoService {
             }
 
             const mpData = await response.json().catch(() => null);
-            if (!response.ok || !mpData?.sandbox_init_point || !mpData?.id) {
+            const checkoutUrl = mpData?.init_point || mpData?.sandbox_init_point;
+            if (!response.ok || !checkoutUrl || !mpData?.id) {
                 const detalle = mpData?.message || mpData?.error || `HTTP ${response.status}`;
-                throw crearErrorPago(`Mercado Pago no pudo crear el checkout sandbox: ${detalle}`, 502);
+                throw crearErrorPago(`Mercado Pago no pudo crear el checkout: ${detalle}`, 502);
             }
 
             await transaccionPagoDao.model.update({
                 where: { id: transaccion.id },
                 data: {
                     referenciaExterna: String(mpData.id),
-                    urlCheckout: mpData.sandbox_init_point,
+                    urlCheckout: checkoutUrl,
                     metadatos: {
                         ...(transaccion.metadatos ?? {}),
                         sandbox: true,
@@ -793,7 +524,7 @@ export class PagoService {
 
             return {
                 estado: transaccion.estado,
-                urlCheckout: mpData.sandbox_init_point,
+                urlCheckout: checkoutUrl,
                 venceEn: venceEn.toISOString(),
             };
         }
@@ -820,167 +551,114 @@ export class PagoService {
             return pago;
         }
 
+    async buscarPagoMercadoPagoPorReferencia(externalReference) {
+        this.validarConfiguracionSandbox();
+        if (!externalReference) return null;
+
+        let response;
+        try {
+            response = await this.fetch(
+                `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}`,
+                { headers: { Authorization: `Bearer ${this.mpAccessToken}` } }
+            );
+        } catch {
+            return null;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(data?.results) || data.results.length === 0) {
+            return null;
+        }
+
+        const pagos = data.results.sort((a, b) => new Date(b.date_created) - new Date(a.date_created));
+        return pagos[0] ?? null;
+    }
+
     async consultarEstadoVenta(ventaId, empresaId, paymentId = null) {
+        const { ventaDao } = await import('../dao/VentaDao.js');
+
+        let transaccion = await transaccionPagoDao.model.findFirst({
+            where: {
+                ventaId: Number(ventaId),
+                empresaId: Number(empresaId),
+                proveedor: 'MERCADO_PAGO',
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                uuidIdempotencia: true,
+                estado: true,
+                monto: true,
+                urlCheckout: true,
+                metadatos: true,
+            },
+        });
+        if (!transaccion) {
+            throw crearErrorPago('No se encontró el pago digital de esta venta.', 404);
+        }
+
+        if (transaccion.estado === 'PENDIENTE') {
+            let paymentData = null;
             if (paymentId) {
-                const paymentData = await this.obtenerPagoMercadoPago(paymentId);
-                const { ventaDao } = await import('../dao/VentaDao.js');
+                paymentData = await this.obtenerPagoMercadoPago(paymentId).catch(() => null);
+            } else if (transaccion.uuidIdempotencia) {
+                paymentData = await this.buscarPagoMercadoPagoPorReferencia(transaccion.uuidIdempotencia);
+            }
+
+            if (paymentData) {
                 await ventaDao.resolverPagoMercadoPago(paymentData, Number(empresaId));
+                transaccion = await transaccionPagoDao.model.findFirst({
+                    where: { id: transaccion.id },
+                    select: {
+                        id: true,
+                        uuidIdempotencia: true,
+                        estado: true,
+                        monto: true,
+                        urlCheckout: true,
+                        metadatos: true,
+                    },
+                });
             } else {
-                const { ventaDao } = await import('../dao/VentaDao.js');
                 await ventaDao.expirarVentasDigitalesPendientes(Number(ventaId));
             }
-
-            const transaccion = await transaccionPagoDao.model.findFirst({
-                where: {
-                    ventaId: Number(ventaId),
-                    empresaId: Number(empresaId),
-                    proveedor: 'MERCADO_PAGO',
-                    deletedAt: null,
-                },
-                select: {
-                    estado: true,
-                    monto: true,
-                    urlCheckout: true,
-                    metadatos: true,
-                },
-            });
-            if (!transaccion) {
-                throw crearErrorPago('No se encontró el pago digital de esta venta.', 404);
-            }
-
-            const venta = await transaccionPagoDao.prisma.venta.findFirst({
-                where: { id: Number(ventaId), deletedAt: null },
-                select: { id: true, estado: true, motivoCancelacion: true },
-            });
-            if (!venta) throw crearErrorPago('La venta no existe.', 404);
-
-            return {
-                venta,
-                pago: {
-                    estado: transaccion.estado,
-                    monto: Number(transaccion.monto),
-                    urlCheckout: transaccion.urlCheckout,
-                    venceEn: transaccion.metadatos?.expiresAt ?? null,
-                    requiereReembolsoManual: transaccion.metadatos?.requiereReembolsoManual === true,
-                },
-            };
         }
 
-    /**
-     * Simula la resolución asíncrona de un pago (Aprobado / Rechazado).
-     */
-    async simularResolucion(id, nuevoEstado, empresaId = 1) {
-        const estadosValidos = ['APROBADO', 'RECHAZADO', 'EXPIRADO'];
-        if (!estadosValidos.includes(nuevoEstado)) {
-            throw new Error(`Estado no válido para simulación. Válidos: ${estadosValidos.join(', ')}`);
-        }
-
-        const transaccion = await transaccionPagoDao.getById(id, empresaId);
-        if (!transaccion) {
-            throw new Error('La transacción de pago no existe.');
-        }
-
-        if (transaccion.estado === 'REEMBOLSADO') {
-            throw new Error('No se puede cambiar el estado de una transacción ya reembolsada.');
-        }
-
-        const datosRespuesta = {
-            simulado: true,
-            fechaResolucion: new Date().toISOString(),
-            mensaje: `Transacción resuelta a ${nuevoEstado} mediante el Simulador de Pruebas`,
-        };
-
-        const actualizada = await transaccionPagoDao.actualizarEstado(id, nuevoEstado, datosRespuesta, empresaId);
-
-        return {
-            mensaje: `Transacción ${id} actualizada exitosamente a ${nuevoEstado}`,
-            transaccion: actualizada,
-        };
-    }
-
-    /**
-     * Aplica un reembolso a una transacción previamente aprobada.
-     */
-    async reembolsar(id, motivo = 'Reembolso solicitado en mostrador', empresaId = 1) {
-        const transaccion = await transaccionPagoDao.getById(id, empresaId);
-        if (!transaccion) {
-            throw new Error('La transacción no existe.');
-        }
-
-        if (transaccion.ventaId !== null && transaccion.ventaId !== undefined) {
-            throw crearErrorPago(
-                'Las transacciones asociadas a una venta deben reembolsarse mediante la cancelación o devolución de la venta.',
-                409
-            );
-        }
-
-        if (transaccion.estado !== 'APROBADO') {
-            throw new Error(`Solo se pueden reembolsar transacciones en estado APROBADO. Estado actual: ${transaccion.estado}`);
-        }
-
-        const datosRespuesta = {
-            reembolso: true,
-            motivo,
-            fechaReembolso: new Date().toISOString(),
-        };
-
-        const actualizada = await transaccionPagoDao.actualizarEstado(id, 'REEMBOLSADO', datosRespuesta, empresaId);
-
-        // Si la transacción reembolsada fue en efectivo, registrar la salida automática en la caja activa
-        if (transaccion.proveedor === 'EFECTIVO') {
-            try {
-                const aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                    where: {
-                        empresaId,
-                        estado: 'ABIERTA',
-                        deletedAt: null,
-                    },
-                    orderBy: { id: 'desc' },
-                });
-
-                if (aperturaActiva) {
-                    await transaccionPagoDao.prisma.movimientoCaja.create({
-                        data: {
-                            empresaId,
-                            aperturaCajaId: aperturaActiva.id,
-                            empleadoId: aperturaActiva.empleadoId,
-                            tipo: 'SALIDA',
-                            monto: Number(transaccion.monto),
-                            concepto: `Reembolso de Transacción #${transaccion.id}: ${transaccion.concepto}`,
-                            estado: 'VALIDADO',
-                            observaciones: `Salida de efectivo por reembolso en mostrador (Transacción #${transaccion.id}). Motivo: ${motivo}`,
-                        },
-                    });
-                }
-            } catch (movErr) {
-                console.error('No se pudo registrar la salida automática de efectivo por reembolso:', movErr);
-            }
-        }
-
-        return {
-            mensaje: `Transacción ${id} reembolsada exitosamente`,
-            transaccion: actualizada,
-        };
-    }
-
-    /**
-     * Acepta webhooks solo después de validar la firma y consultar el pago por API.
-     */
-    async procesarWebhook(query = {}, body = {}, headers = {}) {
-        const paymentId = String(query['data.id'] ?? body?.data?.id ?? '');
-        if (!paymentId) throw crearErrorPago('La notificación no contiene un ID de pago.', 400);
-        if (!this.mpWebhookSecret) {
-            throw crearErrorPago('Configura MP_WEBHOOK_SECRET antes de recibir notificaciones.', 503);
-        }
-
-        const firmaValida = verificarFirmaMercadoPago({
-            firma: headers['x-signature'],
-            requestId: headers['x-request-id'],
-            paymentId,
-            secreto: this.mpWebhookSecret,
+        const venta = await transaccionPagoDao.prisma.venta.findFirst({
+            where: { id: Number(ventaId), deletedAt: null },
+            select: { id: true, estado: true, motivoCancelacion: true },
         });
-        if (!firmaValida) {
-            throw crearErrorPago('La firma de la notificación de Mercado Pago no es válida.', 401);
+        if (!venta) throw crearErrorPago('La venta no existe.', 404);
+
+        return {
+            venta,
+            pago: {
+                estado: transaccion.estado,
+                monto: Number(transaccion.monto),
+                urlCheckout: transaccion.urlCheckout,
+                venceEn: transaccion.metadatos?.expiresAt ?? null,
+                requiereReembolsoManual: transaccion.metadatos?.requiereReembolsoManual === true,
+            },
+        };
+    }
+
+    async procesarWebhook(query = {}, body = {}, headers = {}) {
+        const paymentId = String(
+            query['data.id'] ?? body?.data?.id ?? query.id ?? body?.id ?? ''
+        );
+        if (!paymentId) {
+            return { recibido: true, procesado: false, motivo: 'Notificación sin paymentId' };
+        }
+
+        if (this.mpWebhookSecret) {
+            const firmaValida = verificarFirmaMercadoPago({
+                firma: headers['x-signature'],
+                requestId: headers['x-request-id'],
+                paymentId,
+                secreto: this.mpWebhookSecret,
+            });
+            if (!firmaValida) {
+                throw crearErrorPago('La firma de la notificación de Mercado Pago no es válida.', 401);
+            }
         }
 
         const paymentData = await this.obtenerPagoMercadoPago(paymentId);

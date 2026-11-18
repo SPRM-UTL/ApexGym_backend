@@ -18,6 +18,16 @@ const INCLUDE_DEFAULT = {
         select: {
             id: true,
             folioVentaId: true,
+            metodoPago: {
+                select: { id: true, nombre: true, codigo: true },
+            },
+        },
+    },
+    devolucion: {
+        select: {
+            metodoPago: {
+                select: { id: true, nombre: true, codigo: true },
+            },
         },
     },
     transaccionPago: {

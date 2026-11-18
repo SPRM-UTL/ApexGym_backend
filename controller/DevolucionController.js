@@ -64,6 +64,8 @@ export class DevolucionController {
                 detalles,
                 montoPrevisualizado,
                 cantidadesDevueltasPrevisualizadas,
+                folioCancelacion,
+                confirmacionTerminal,
             } = req.body ?? {};
             const devolucion = await crearDevolucion({
                 ventaId,
@@ -72,6 +74,8 @@ export class DevolucionController {
                 detallesSolicitados: detalles,
                 montoPrevisualizado,
                 cantidadesDevueltasPrevisualizadas,
+                folioCancelacion,
+                confirmacionTerminal,
             });
 
             return res.status(201).json(new ResponseModel(
@@ -86,14 +90,16 @@ export class DevolucionController {
                 res,
                 error.message || 'No se pudo registrar la devolución',
                 status,
-                error.code
+                error.code,
+                error.data
             );
         }
     };
 
-    respuestaError(res, mensaje, status, code) {
+    respuestaError(res, mensaje, status, code, data = null) {
+        const detalles = { ...(code ? { code } : {}), ...(data ?? {}) };
         return res.status(status).json(new ResponseModel(
-            code ? { code } : null,
+            Object.keys(detalles).length > 0 ? detalles : null,
             1,
             mensaje,
             status

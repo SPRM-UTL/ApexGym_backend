@@ -3,11 +3,14 @@ import { prisma } from './BaseDao.js';
 import { TASA_IVA } from '../utils/constantes.js';
 
 
-function crearError(mensaje, status = 400, code) {
+function crearError(mensaje, status = 400, code, data = null) {
     const error = new Error(mensaje);
     error.status = status;
     if (code) {
         error.code = code;
+    }
+    if (data) {
+        error.data = data;
     }
     return error;
 }
@@ -51,7 +54,19 @@ async function obtenerVentaElegible(tx, idVenta) {
         throw crearError('No se pudo identificar el método de pago original de la venta');
     }
 
-    return { venta, metodoPago };
+    const transaccionPago = await tx.transaccionPago.findFirst({
+        where: { ventaId: idVenta, deletedAt: null },
+        orderBy: { id: 'desc' },
+        select: {
+            id: true,
+            proveedor: true,
+            estado: true,
+            monto: true,
+            montoReembolsado: true,
+        },
+    });
+
+    return { venta, metodoPago, transaccionPago };
 }
 
 async function obtenerEstadoDetallesVenta(tx, idVenta) {
@@ -76,7 +91,14 @@ async function obtenerEstadoDetallesVenta(tx, idVenta) {
     const devolucionesAnteriores = idsDetalle.length === 0
         ? []
         : await tx.devolucionDetalle.findMany({
-            where: { detalleVentaId: { in: idsDetalle } },
+            where: {
+                detalleVentaId: { in: idsDetalle },
+                devolucion: {
+                    is: {
+                        estadoReembolso: { in: ['PENDIENTE_REEMBOLSO', 'COMPLETADA'] },
+                    },
+                },
+            },
             select: {
                 detalleVentaId: true,
                 cantidad: true,
@@ -95,6 +117,228 @@ async function obtenerEstadoDetallesVenta(tx, idVenta) {
     }
 
     return { detallesVenta, cantidadesDevueltas, montoDevueltoAnterior };
+}
+
+function aCentavos(monto) {
+    const valor = Number(monto);
+    if (!Number.isFinite(valor)) {
+        throw crearError('El monto del reembolso no es válido');
+    }
+    return Math.round(valor * 100);
+}
+
+function esMetodoTerminal(metodoPago, transaccionPago) {
+    return metodoPago.codigo === 'TARJETA' || transaccionPago?.proveedor === 'TERMINAL_MANUAL';
+}
+
+async function obtenerMetodoPagoReembolso(tx, metodoPago) {
+    if (metodoPago.codigo !== 'MERCADO_PAGO') {
+        return metodoPago;
+    }
+
+    const metodoEfectivo = await tx.metodoPago.findFirst({
+        where: { codigo: 'EFECTIVO', deletedAt: null },
+        select: { id: true, codigo: true, nombre: true },
+    });
+    if (!metodoEfectivo) {
+        throw crearError('No está configurado el método de pago Efectivo para registrar el reembolso.', 409);
+    }
+    return metodoEfectivo;
+}
+
+export async function validarReembolso(tx, {
+    ventaId,
+    metodoPago,
+    transaccionPago,
+    monto,
+    folioCancelacion,
+    confirmacionTerminal,
+}) {
+    if (!transaccionPago) {
+        throw crearError('La venta no tiene una transacción de pago asociada; no se puede validar el reembolso.', 409);
+    }
+
+    if (transaccionPago.estado !== 'APROBADO') {
+        if (metodoPago.codigo === 'TRANSFERENCIA' && transaccionPago.estado === 'PENDIENTE') {
+            throw crearError('No se puede devolver una transferencia mientras su pago siga pendiente.', 409);
+        }
+        throw crearError(`No se puede reembolsar un pago en estado ${transaccionPago.estado}.`, 409);
+    }
+
+    const total = aCentavos(transaccionPago.monto);
+    const reembolsado = aCentavos(transaccionPago.montoReembolsado ?? 0);
+    const pendientes = await tx.devolucion.aggregate({
+        where: { ventaId, estadoReembolso: 'PENDIENTE_REEMBOLSO' },
+        _sum: { monto: true },
+    });
+    const reservado = aCentavos(pendientes._sum?.monto ?? 0);
+    if (reembolsado + reservado + aCentavos(monto) > total) {
+        throw crearError(
+            'El monto solicitado excede el saldo que queda por reembolsar de la transacción.',
+            409,
+            'MONTO_REEMBOLSO_EXCEDIDO'
+        );
+    }
+
+    if (metodoPago.codigo === 'MERCADO_PAGO') {
+        if (transaccionPago.proveedor !== 'MERCADO_PAGO') {
+            throw crearError('El proveedor del pago no coincide con Mercado Pago.', 409);
+        }
+        return { metodoPagoReembolso: await obtenerMetodoPagoReembolso(tx, metodoPago) };
+    }
+
+    if (esMetodoTerminal(metodoPago, transaccionPago)) {
+        if (transaccionPago.proveedor !== 'TERMINAL_MANUAL') {
+            throw crearError('El proveedor del pago no coincide con la terminal.', 409);
+        }
+        if (confirmacionTerminal !== true) {
+            throw crearError('Confirma que el pago ya fue cancelado en la terminal.', 400);
+        }
+        if (typeof folioCancelacion !== 'string' || !folioCancelacion.trim()) {
+            throw crearError('El folio de cancelación de la terminal es obligatorio.', 400);
+        }
+        if (folioCancelacion.trim().length > 100) {
+            throw crearError('El folio de cancelación no debe exceder 100 caracteres.', 400);
+        }
+        return { metodoPagoReembolso: metodoPago };
+    }
+
+    if (metodoPago.codigo === 'EFECTIVO' && transaccionPago.proveedor !== 'EFECTIVO') {
+        throw crearError('El proveedor del pago no coincide con efectivo.', 409);
+    }
+    if (metodoPago.codigo === 'TRANSFERENCIA') {
+        if (transaccionPago.proveedor !== 'TRANSFERENCIA') {
+            throw crearError('El proveedor del pago no coincide con transferencia.', 409);
+        }
+    } else if (metodoPago.codigo !== 'EFECTIVO') {
+        throw crearError(`El método de pago "${metodoPago.codigo}" no admite devoluciones en este flujo.`, 409);
+    }
+
+    return { metodoPagoReembolso: metodoPago };
+}
+
+async function aplicarStockDevolucion(tx, detalles) {
+    for (const detalle of detalles) {
+        if (!detalle.regresaAStock) continue;
+        if (!Number.isSafeInteger(detalle.productoId) || detalle.productoId <= 0) {
+            throw crearError('La línea marcada para regresar al inventario no tiene un producto válido');
+        }
+
+        const productoActualizado = await tx.producto.updateMany({
+            where: { id: detalle.productoId, deletedAt: null },
+            data: { stockActual: { increment: detalle.cantidad } },
+        });
+        if (productoActualizado.count !== 1) {
+            throw crearError(`No se pudo regresar al inventario el producto ${detalle.productoId}`, 409);
+        }
+    }
+}
+
+export async function completarReembolso(tx, {
+    devolucionId,
+    ventaId,
+    apertura,
+    metodoPago,
+    metodoPagoReembolso = metodoPago,
+    transaccionPago,
+    monto,
+    folioCancelacion,
+    detallesStock = [],
+    cancelacion = null,
+    origenMovimiento = 'DEVOLUCION',
+    conceptoMovimiento = null,
+}) {
+    const devolucionActual = await tx.devolucion.findUnique({
+        where: { id: devolucionId },
+        select: { id: true, estadoReembolso: true },
+    });
+    if (!devolucionActual) {
+        throw crearError('No se encontró el reembolso que se debe completar.', 404);
+    }
+    if (devolucionActual.estadoReembolso === 'COMPLETADA') {
+        return tx.devolucion.findUnique({
+            where: { id: devolucionId },
+            include: { detalles: true, movimientoCaja: true, metodoPago: true },
+        });
+    }
+    if (devolucionActual.estadoReembolso !== 'PENDIENTE_REEMBOLSO') {
+        throw crearError('El reembolso ya no está pendiente.', 409);
+    }
+
+    const pagoActual = await tx.transaccionPago.findFirst({
+        where: { id: transaccionPago.id, deletedAt: null },
+        select: { id: true, monto: true, montoReembolsado: true, estado: true },
+    });
+    if (!pagoActual) {
+        throw crearError('No se encontró la transacción de pago que se debe actualizar.', 404);
+    }
+    const nuevoMontoReembolsado = aCentavos(pagoActual.montoReembolsado ?? 0) + aCentavos(monto);
+    const montoPago = aCentavos(pagoActual.monto);
+    const otrosReembolsosPendientes = await tx.devolucion.aggregate({
+        where: {
+            ventaId,
+            id: { not: devolucionId },
+            estadoReembolso: 'PENDIENTE_REEMBOLSO',
+        },
+        _sum: { monto: true },
+    });
+    const montoReservado = aCentavos(otrosReembolsosPendientes._sum?.monto ?? 0);
+    if (nuevoMontoReembolsado + montoReservado > montoPago) {
+        throw crearError('El reembolso excede el monto total de la transacción.', 409, 'MONTO_REEMBOLSO_EXCEDIDO');
+    }
+    if (pagoActual.estado !== 'APROBADO') {
+        throw crearError(`La transacción cambió a estado ${pagoActual.estado} durante el reembolso.`, 409);
+    }
+
+    await aplicarStockDevolucion(tx, detallesStock);
+    await tx.movimientoCaja.create({
+        data: {
+            empresaId: Number(apertura.empresaId),
+            sucursalId: Number(apertura.sucursalId),
+            aperturaCajaId: Number(apertura.id),
+            empleadoId: Number(apertura.empleadoId),
+            tipo: 'SALIDA',
+            origen: origenMovimiento,
+            monto,
+            concepto: conceptoMovimiento
+                || `Devolución de venta #${ventaId} (${metodoPagoReembolso.nombre || metodoPagoReembolso.codigo})`,
+            estado: 'VALIDADO',
+            afectaEfectivo: metodoPagoReembolso.codigo === 'EFECTIVO',
+            ventaId,
+            transaccionPagoId: transaccionPago.id,
+            devolucionId,
+        },
+    });
+    await tx.transaccionPago.update({
+        where: { id: transaccionPago.id },
+        data: {
+            montoReembolsado: nuevoMontoReembolsado / 100,
+            ...(nuevoMontoReembolsado === montoPago ? { estado: 'REEMBOLSADO' } : {}),
+        },
+    });
+    await tx.devolucion.update({
+        where: { id: devolucionId },
+        data: {
+            metodoPagoId: metodoPagoReembolso.id,
+            estadoReembolso: 'COMPLETADA',
+            folioCancelacion: folioCancelacion?.trim() || null,
+            motivoFallo: null,
+        },
+    });
+    if (cancelacion) {
+        await tx.venta.update({
+            where: { id: ventaId },
+            data: {
+                estado: 'cancelada',
+                motivoCancelacion: cancelacion.motivo,
+            },
+        });
+    }
+
+    return tx.devolucion.findUnique({
+        where: { id: devolucionId },
+        include: { detalles: true, movimientoCaja: true, metodoPago: true },
+    });
 }
 
 function validarCotizacion(calculo, montoPrevisualizado, cantidadesDevueltasPrevisualizadas) {
@@ -219,6 +463,8 @@ export async function crearDevolucion(
         detallesSolicitados,
         montoPrevisualizado,
         cantidadesDevueltasPrevisualizadas,
+        folioCancelacion = null,
+        confirmacionTerminal = false,
     },
     client = prisma
 ) {
@@ -231,7 +477,7 @@ export async function crearDevolucion(
         throw crearError('El motivo es obligatorio y no debe exceder 500 caracteres');
     }
 
-    return client.$transaction(async (tx) => {
+    const preparada = await client.$transaction(async (tx) => {
         const aperturas = await tx.$queryRaw`
             SELECT id, estado, empleado_id AS empleadoId,
                    empresa_id AS empresaId, sucursal_id AS sucursalId
@@ -254,7 +500,51 @@ export async function crearDevolucion(
             throw crearError('La venta no existe', 404);
         }
 
-        const { venta, metodoPago } = await obtenerVentaElegible(tx, idVenta);
+        const { venta, metodoPago, transaccionPago } = await obtenerVentaElegible(tx, idVenta);
+
+        const pendientes = await tx.devolucion.findMany({
+            where: {
+                ventaId: idVenta,
+                aperturaCajaId: idApertura,
+                estadoReembolso: 'PENDIENTE_REEMBOLSO',
+                folioCancelacion: null,
+            },
+            include: {
+                detalles: {
+                    include: {
+                        detalleVenta: {
+                            select: { productoId: true },
+                        },
+                    },
+                },
+            },
+            orderBy: { id: 'desc' },
+        });
+        const detallesSolicitadosOrdenados = [...(detallesSolicitados ?? [])]
+            .map((detalle) => ({
+                detalleVentaId: Number(detalle.detalleVentaId),
+                cantidad: Number(detalle.cantidad),
+                regresaAStock: Boolean(detalle.regresaAStock),
+            }))
+            .sort((a, b) => a.detalleVentaId - b.detalleVentaId);
+        const reembolsoPendiente = pendientes.find((pendiente) => {
+            const detallesPendientes = [...pendiente.detalles]
+                .map((detalle) => ({
+                    detalleVentaId: detalle.detalleVentaId,
+                    cantidad: detalle.cantidad,
+                    regresaAStock: detalle.regresaAStock,
+                }))
+                .sort((a, b) => a.detalleVentaId - b.detalleVentaId);
+            return pendiente.motivo === motivo.trim()
+                && aCentavos(pendiente.monto) === aCentavos(montoPrevisualizado)
+                && JSON.stringify(detallesPendientes) === JSON.stringify(detallesSolicitadosOrdenados);
+        });
+        if (reembolsoPendiente) {
+            const mensaje = metodoPago.codigo === 'MERCADO_PAGO'
+                ? 'Este reembolso quedó pendiente de conciliación con Mercado Pago. Verifica si el cliente ya recibió el dinero antes de entregar efectivo.'
+                : 'Existe un reembolso pendiente para esta venta.';
+            throw crearError(mensaje, 409, 'REEMBOLSO_PENDIENTE_CONCILIACION');
+        }
 
         const calculo = await calcularDevolucion(tx, idVenta, detallesSolicitados, venta.total);
         validarCotizacion(
@@ -269,15 +559,26 @@ export async function crearDevolucion(
                 'DEVOLUCION_NO_PERMITIDA'
             );
         }
+        const validacionPago = await validarReembolso(tx, {
+            ventaId: idVenta,
+            metodoPago,
+            transaccionPago,
+            monto: calculo.montoTotal,
+            folioCancelacion,
+            confirmacionTerminal,
+        });
+        const metodoPagoReembolso = validacionPago.metodoPagoReembolso ?? metodoPago;
 
         const devolucion = await tx.devolucion.create({
             data: {
                 ventaId: idVenta,
                 aperturaCajaId: idApertura,
                 empleadoId: Number(apertura.empleadoId),
-                metodoPagoId: metodoPago.id,
+                metodoPagoId: metodoPagoReembolso.id,
                 monto: calculo.montoTotal,
                 motivo: motivo.trim(),
+                estadoReembolso: 'PENDIENTE_REEMBOLSO',
+                folioCancelacion: folioCancelacion?.trim() || null,
                 detalles: {
                     create: calculo.detalles.map((detalle) => ({
                         detalleVentaId: detalle.detalleVentaId,
@@ -289,85 +590,60 @@ export async function crearDevolucion(
             },
         });
 
-        for (const detalle of calculo.detalles) {
-            if (!detalle.regresaAStock) {
-                continue;
-            }
-            if (!Number.isSafeInteger(detalle.productoId) || detalle.productoId <= 0) {
-                throw crearError('La línea marcada para regresar al inventario no tiene un producto válido');
-            }
+        const detallesStock = calculo.detalles.map((detalle) => ({
+            detalleVentaId: detalle.detalleVentaId,
+            productoId: detalle.productoId,
+            cantidad: detalle.cantidad,
+            regresaAStock: detalle.regresaAStock,
+        }));
+        const contexto = {
+            devolucion,
+            metodoPago,
+            metodoPagoReembolso,
+            transaccionPago,
+            monto: calculo.montoTotal,
+            detallesStock,
+            apertura,
+        };
 
-            const productoActualizado = await tx.producto.updateMany({
-                where: {
-                    id: detalle.productoId,
-                    deletedAt: null,
-                },
-                data: {
-                    stockActual: { increment: detalle.cantidad },
-                },
-            });
-            if (productoActualizado.count !== 1) {
-                throw crearError(`No se pudo regresar al inventario el producto ${detalle.productoId}`, 409);
-            }
-        }
-
-        const esPagoEfectivo = String(metodoPago.codigo ?? '').trim().toUpperCase() === 'EFECTIVO';
-        await tx.movimientoCaja.create({
-            data: {
-                empresaId: Number(apertura.empresaId),
-                sucursalId: Number(apertura.sucursalId),
-                aperturaCajaId: idApertura,
-                empleadoId: Number(apertura.empleadoId),
-                tipo: 'SALIDA',
-                origen: 'DEVOLUCION',
-                monto: calculo.montoTotal,
-                concepto: `Devolución de venta folio ${venta.folioVentaId} (${metodoPago.nombre || metodoPago.codigo})`,
-                estado: 'VALIDADO',
-                afectaEfectivo: esPagoEfectivo,
-                ventaId: idVenta,
-                devolucionId: devolucion.id,
-            },
+        const devolucionRegistrada = await completarReembolso(tx, {
+            devolucionId: devolucion.id,
+            ventaId: idVenta,
+            apertura,
+            metodoPago,
+            metodoPagoReembolso,
+            transaccionPago,
+            monto: calculo.montoTotal,
+            folioCancelacion,
+            detallesStock,
         });
-
-        const devolucionRegistrada = await tx.devolucion.findUnique({
-            where: { id: devolucion.id },
-            include: {
-                detalles: true,
-                movimientoCaja: true,
-                metodoPago: { select: { id: true, nombre: true, codigo: true } },
-            },
-        });
-        const calculosPorDetalle = new Map(
-            calculo.detalles.map((detalle) => [detalle.detalleVentaId, detalle])
-        );
-
         return {
-            ...devolucionRegistrada,
-            detalles: devolucionRegistrada.detalles.map((detalle) => {
-                const desglose = calculosPorDetalle.get(detalle.detalleVentaId);
-                return {
-                    ...detalle,
-                    descripcion: desglose.descripcion,
-                    tipoItem: desglose.tipoItem,
-                    productoId: desglose.productoId,
-                    servicioId: desglose.servicioId,
-                    tipoMembresiaId: desglose.tipoMembresiaId,
-                    precioUnitario: desglose.precioUnitario,
-                    descuentoUnitario: desglose.descuentoUnitario,
-                    precioNetoUnitario: desglose.precioNetoUnitario,
-                    subtotal: desglose.subtotal,
-                    iva: desglose.iva,
-                    ajusteRedondeo: desglose.ajusteRedondeo,
-                };
-            }),
-            desglose: {
-                subtotal: calculo.subtotalTotal,
-                iva: calculo.ivaTotal,
-                ajusteRedondeo: calculo.ajusteRedondeoTotal,
-                montoTotal: calculo.montoTotal,
-            },
+            ...contexto,
+            devolucion: devolucionRegistrada,
+            calculo,
         };
     });
+
+    if (preparada.devolucion.estadoReembolso !== 'COMPLETADA') {
+        throw crearError(
+            'No se pudo completar el reembolso. Verifica el estado antes de intentar de nuevo.',
+            503,
+            'REEMBOLSO_PENDIENTE_CONCILIACION',
+            { devolucionId: preparada.devolucion.id, estadoReembolso: preparada.devolucion.estadoReembolso }
+        );
+    }
+
+    return preparada.calculo
+        ? {
+              ...preparada.devolucion,
+              desglose: {
+                  subtotal: preparada.calculo.subtotalTotal,
+                  iva: preparada.calculo.ivaTotal,
+                  ajusteRedondeo: preparada.calculo.ajusteRedondeoTotal,
+                  montoTotal: preparada.calculo.montoTotal,
+              },
+          }
+        : preparada.devolucion;
 }
 
 export async function calcularDevolucion(tx, ventaId, detallesSolicitados, totalVenta) {

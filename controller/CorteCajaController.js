@@ -136,6 +136,8 @@ export class CorteCajaController extends BaseController {
                         efectivoContado: Number(efectivoContado),
                         totalEntradas,
                         totalSalidas,
+                        totalEntradasEfectivo: totalesEfectivo.totalEntradas,
+                        totalSalidasEfectivo: totalesEfectivo.totalSalidas,
                         totalVentas: resumenVentas.totalVentas,
                         totalVentasEfectivo: resumenVentas.totalVentasEfectivo,
                         totalVentasCanceladas: resumenVentas.totalVentasCanceladas,
@@ -191,9 +193,13 @@ export class CorteCajaController extends BaseController {
             if (!corte) return this.respuestaNoEncontrado(res, 'Corte de caja no encontrado');
 
             let resumenVentas = null;
+            let totalesGenerales = null;
             if (corte.aperturaCajaId) {
                 try {
-                    resumenVentas = await ventaDao.obtenerResumenVentasPorApertura(corte.aperturaCajaId);
+                    [resumenVentas, totalesGenerales] = await Promise.all([
+                        ventaDao.obtenerResumenVentasPorApertura(corte.aperturaCajaId),
+                        obtenerTotalesMovimientos({ aperturaCajaId: corte.aperturaCajaId }),
+                    ]);
                 } catch {
                     resumenVentas = null;
                 }
@@ -201,6 +207,10 @@ export class CorteCajaController extends BaseController {
 
             return this.respuestaExito(res, {
                 ...corte,
+                totalEntradasEfectivo: Number(corte.totalEntradasEfectivo ?? corte.totalVentasEfectivo ?? 0),
+                totalSalidasEfectivo: Number(corte.totalSalidasEfectivo ?? 0),
+                totalEntradasGenerales: totalesGenerales ? totalesGenerales.totalEntradas : Number(corte.totalEntradas ?? 0),
+                totalSalidasGenerales: totalesGenerales ? totalesGenerales.totalSalidas : Number(corte.totalSalidas ?? 0),
                 ventasPorMetodoPago: resumenVentas?.ventasPorMetodoPago ?? [],
                 totalesVentas: resumenVentas ?? null,
             }, 'Corte obtenido exitosamente');

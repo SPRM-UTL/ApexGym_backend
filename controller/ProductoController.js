@@ -218,10 +218,14 @@ export class ProductoController extends BaseController {
                 ));
             }
             const productos = await productoDao.getAll(
-                { disponibleCompra: true },
+                {
+                    disponibleCompra: true,
+                    stockActual: { gt: 0 },
+                    estado: 'ACTIVO',
+                },
                 { id: 'desc' },
                 this.obtenerEmpresaId(req),
-                { sucursalId: req.query.sucursalId ?? null }
+                sucursalId
             );
             return this.respuestaExito(res, productos, "Productos cargados con exito");
         } catch (error) {

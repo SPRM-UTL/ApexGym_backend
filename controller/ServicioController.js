@@ -94,10 +94,13 @@ export class ServicioController extends BaseController {
                 ));
             }
             const servicios = await servicioDao.getAll(
-                { disponibleCompra: true },
+                {
+                    disponibleCompra: true,
+                    estado: 'ACTIVO',
+                },
                 { id: 'desc' },
                 this.obtenerEmpresaId(req),
-                { sucursalId: req.query.sucursalId ?? null }
+                sucursalId
             );
             return this.respuestaExito(res, servicios, "Servicios cargados con exito");
         } catch (error) {

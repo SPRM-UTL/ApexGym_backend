@@ -4,20 +4,55 @@ import currency from "currency.js";
 import crypto from "node:crypto";
 import { ESTADOS_ACTIVOS_CATALOGO, TASA_IVA } from "../utils/constantes.js";
 import { pagoService, PROVEEDOR_POR_CODIGO_METODO } from "../services/PagoService.js";
+import { completarReembolso, validarReembolso } from "./DevolucionDao.js";
 
-const ESTADO_CAJA = { ABIERTA: "ABIERTA", CERRADA: "CERRADA" };
+const ESTADO_CAJA = { ABIERTA: "ABIERTA" };
 const ESTADO_VENTA = { COMPLETADA : "completada" , CANCELADA : "cancelada"}
 const ETIQUETAS_ESTADO_DEVOLUCION = {
     SIN_DEVOLUCION: 'Sin devolución',
     SIN_DEVOLUCIONES: 'Sin devoluciones',
     DEVUELTA_PARCIALMENTE: 'Devuelta parcialmente',
     DEVUELTA_TOTALMENTE: 'Devuelta totalmente',
+    REEMBOLSO_PENDIENTE: 'Reembolso pendiente',
 };
 
 function crearErrorArticuloNoDisponible(mensaje) {
     const error = new Error(mensaje);
     error.status = 400;
     return error;
+}
+
+export function prepararCancelacionConDevoluciones(detallesVenta, devoluciones) {
+    const cantidadesDevueltas = new Map();
+    for (const devolucion of devoluciones) {
+        if (devolucion.estadoReembolso !== 'COMPLETADA') continue;
+        for (const detalle of devolucion.detalles ?? []) {
+            const detalleVentaId = Number(detalle.detalleVentaId);
+            const cantidad = Number(detalle.cantidad);
+            cantidadesDevueltas.set(
+                detalleVentaId,
+                (cantidadesDevueltas.get(detalleVentaId) ?? 0) + cantidad
+            );
+        }
+    }
+
+    const estaTotalmenteDevuelta = detallesVenta.length > 0
+        && detallesVenta.every((detalle) => (
+            (cantidadesDevueltas.get(detalle.id) ?? 0) >= Number(detalle.cantidad)
+        ));
+    const detallesStock = detallesVenta
+        .map((detalle) => ({
+            detalleVentaId: detalle.id,
+            productoId: detalle.productoId,
+            cantidad: Math.max(
+                0,
+                Number(detalle.cantidad) - (cantidadesDevueltas.get(detalle.id) ?? 0)
+            ),
+            regresaAStock: detalle.tipoItem === 'PRODUCTO',
+        }))
+        .filter((detalle) => detalle.regresaAStock && detalle.cantidad > 0);
+
+    return { estaTotalmenteDevuelta, detallesStock };
 }
 
 export class VentaDao extends BaseDao {
@@ -34,60 +69,40 @@ export class VentaDao extends BaseDao {
         );
     }
 
-async getAll() {
-    return this.prisma.venta.findMany({
-        where: { deletedAt: null },
-        omit: {...this.omit, createdAt: false},
-        include: {
-            cliente: {
-                select: {
-                    id: true,
-                    nombre: true,
-                },
-            },
-            empleado: {
-                select: {
-                    id: true,
-                    nombre: true,
-                    apellidoPaterno: true,
-                },
-            },
-            folioVenta : {
-                select : {
-                    id : true
-                }
-            },
-            aperturaCaja: {
-                select: {
-                    id: true,
-                    estado: true,
-                    empleado: {
-                        select: {
-                            id: true,
-                            nombre: true,
-                        },
-                    },
-                    caja: {
-                        select: {
-                            id: true,
-                            nombre: true,
-                        },
-                    },
-                },
-            },
-            metodoPago: {
-                select: {
-                    id: true,
-                    nombre: true,
-                    codigo: true,
-                },
-            },
-        },
-        orderBy: { id: 'desc' },
-    });
+aplicarContextoVenta(where, empresaId, sucursalId) {
+    const contextoApertura = {};
+    if (this.useEmpresa) {
+        contextoApertura.empresaId = this.resolverEmpresaId(empresaId);
+    }
+    if (this.useSucursal) {
+        const sucursalResuelta = this.resolverSucursalId(sucursalId);
+        if (sucursalResuelta !== null) {
+            contextoApertura.sucursalId = sucursalResuelta;
+        }
+    }
+
+    return Object.keys(contextoApertura).length === 0
+        ? where
+        : {
+            ...where,
+            aperturaCaja: { is: contextoApertura },
+        };
 }
 
-async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, fechaHasta, metodoPagoId, estado }) {
+async obtenerVentas({
+    pagina,
+    limite,
+    clienteId,
+    cliente,
+    busqueda,
+    fechaDesde,
+    fechaHasta,
+    metodoPagoId,
+    estado,
+    aperturaCajaId,
+    empresaId,
+    sucursalId,
+}) {
     const condiciones = [
         {
             OR: [
@@ -99,6 +114,7 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
 
     if (clienteId !== undefined) condiciones.push({ clienteId });
     if (metodoPagoId !== undefined) condiciones.push({ metodoPagoId });
+    if (aperturaCajaId !== undefined) condiciones.push({ aperturaCajaId });
     if (cliente) {
         condiciones.push({
             cliente: {
@@ -159,9 +175,18 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
         condiciones.push({ estado: { in: ['cancelada', 'cancelado'] } });
     } else if (estado === 'pendiente_pago') {
         condiciones.push({ estado: 'pendiente_pago' });
+    } else if (estado === 'reembolsado') {
+        condiciones.push({
+            transaccionesPago: {
+                some: {
+                    estado: 'REEMBOLSADO',
+                    deletedAt: null,
+                },
+            },
+        });
     }
 
-    const where = { AND: condiciones };
+    const where = this.aplicarContextoVenta({ AND: condiciones }, empresaId, sucursalId);
     const skip = (pagina - 1) * limite;
     const include = {
         cliente: { select: { id: true, nombre: true, apellidoPaterno: true, apellidoMaterno: true } },
@@ -176,11 +201,31 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
             },
         },
         metodoPago: { select: { id: true, nombre: true, codigo: true } },
-        transaccionesPago: {
-            where: { proveedor: 'MERCADO_PAGO', deletedAt: null },
-            select: { estado: true, urlCheckout: true, metadatos: true },
+        detalleVenta: {
+            select: { id: true, cantidad: true },
+        },
+        devoluciones: {
+            where: {
+                estadoReembolso: { in: ['PENDIENTE_REEMBOLSO', 'COMPLETADA'] },
+            },
+            select: {
+                id: true,
+                estadoReembolso: true,
+                detalles: {
+                    select: { detalleVentaId: true, cantidad: true },
+                },
+            },
             orderBy: { id: 'desc' },
-            take: 1,
+        },
+        transaccionesPago: {
+            where: { deletedAt: null },
+            select: {
+                proveedor: true,
+                estado: true,
+                monto: true,
+                montoReembolsado: true,
+            },
+            orderBy: { id: 'desc' },
         },
     };
 
@@ -260,6 +305,7 @@ async getById(id, clientOrEmpresaId = 1) {
                     folioVoucher: true,
                     referenciaExterna: true,
                     monto: true,
+                    montoReembolsado: true,
                     metadatos: true,
                 },
             },
@@ -270,6 +316,7 @@ async getById(id, clientOrEmpresaId = 1) {
                     createdAt: true,
                     monto: true,
                     motivo: true,
+                    estadoReembolso: true,
                     empleado: {
                         select: {
                             id: true,
@@ -290,6 +337,15 @@ async getById(id, clientOrEmpresaId = 1) {
             detalleVenta: {
                 include: {
                     devoluciones: {
+                        where: {
+                            devolucion: {
+                                is: {
+                                    estadoReembolso: {
+                                        in: ['PENDIENTE_REEMBOLSO', 'COMPLETADA'],
+                                    },
+                                },
+                            },
+                        },
                         select: {
                             cantidad: true,
                         },
@@ -350,7 +406,13 @@ async getById(id, clientOrEmpresaId = 1) {
                 detalle.descripcion,
         };
     });
-    const totalDevuelto = venta.devoluciones.reduce(
+    const devolucionesCompletadas = venta.devoluciones.filter(
+        (devolucion) => devolucion.estadoReembolso === 'COMPLETADA'
+    );
+    const devolucionesPendientes = venta.devoluciones.filter(
+        (devolucion) => devolucion.estadoReembolso === 'PENDIENTE_REEMBOLSO'
+    );
+    const totalDevuelto = devolucionesCompletadas.reduce(
         (total, devolucion) => total.add(Number(devolucion.monto)),
         currency(0)
     );
@@ -363,8 +425,10 @@ async getById(id, clientOrEmpresaId = 1) {
         0
     );
     const puedeRegistrarDevolucion = ventaCompletada && cantidadDisponible > 0;
-    const estadoDevolucion = cantidadDevuelta === 0
-        ? 'SIN_DEVOLUCIONES'
+    const estadoDevolucion = devolucionesPendientes.length > 0
+        ? 'REEMBOLSO_PENDIENTE'
+        : cantidadDevuelta === 0
+            ? 'SIN_DEVOLUCIONES'
         : cantidadVendida > 0 && cantidadDevuelta >= cantidadVendida
             ? 'DEVUELTA_TOTALMENTE'
             : 'DEVUELTA_PARCIALMENTE';
@@ -387,6 +451,11 @@ async getById(id, clientOrEmpresaId = 1) {
         puedeRegistrarDevolucion,
         resumenDevoluciones: {
             cantidadDevoluciones: venta.devoluciones.length,
+            cantidadDevolucionesCompletadas: devolucionesCompletadas.length,
+            cantidadDevolucionesPendientes: devolucionesPendientes.length,
+            cantidadDevolucionesFallidas: venta.devoluciones.filter(
+                (devolucion) => devolucion.estadoReembolso === 'FALLIDA'
+            ).length,
             cantidadVendida,
             cantidadDevuelta,
             cantidadDisponible,
@@ -636,7 +705,7 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
         const rechazado = ['rejected', 'cancelled'].includes(estadoMP);
 
         if (estadoVenta === 'completada' || estadoVenta === 'completado') {
-            if (aprobado && transaccion.estado !== 'APROBADO') {
+            if (aprobado && !['APROBADO', 'REEMBOLSADO'].includes(transaccion.estado)) {
                 await tx.transaccionPago.update({
                     where: { id: transaccion.id },
                     data: {
@@ -649,7 +718,7 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
         }
 
         if (estadoVenta !== 'pendiente_pago') {
-            if (aprobado) {
+            if (aprobado && transaccion.estado !== 'REEMBOLSADO') {
                 await tx.transaccionPago.update({
                     where: { id: transaccion.id },
                     data: {
@@ -662,8 +731,9 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
                         datosRespuesta: JSON.stringify(resumenMP),
                     },
                 });
+                return { procesado: false, estado: 'APROBADO_HUERFANO' };
             }
-            return { procesado: false, estado: aprobado ? 'APROBADO_HUERFANO' : transaccion.estado };
+            return { procesado: false, estado: transaccion.estado };
         }
 
         if (venceEn <= new Date()) {
@@ -718,6 +788,7 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
                     monto: Number(transaccion.monto),
                     concepto: `Cobro Mercado Pago de venta #${venta.id}`,
                     proveedor: 'MERCADO_PAGO',
+                    estado: 'VALIDADO',
                 });
             }
             return { procesado: true, estado: 'APROBADO' };
@@ -830,6 +901,60 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
         totalVentasCanceladas: totalVentasCanceladas.value,
         cantidadVentasCanceladas,
         totalVentasEfectivoCanceladas: totalVentasEfectivoCanceladas.value,
+    };
+}
+
+async obtenerResumenHistorial({ aperturaCajaId, empresaId, sucursalId } = {}) {
+    const idApertura = aperturaCajaId === undefined || aperturaCajaId === null
+        ? undefined
+        : Number(aperturaCajaId);
+    if (
+        idApertura !== undefined
+        && (!Number.isSafeInteger(idApertura) || idApertura <= 0)
+    ) {
+        throw Object.assign(new Error('ID de apertura de caja no válido'), { status: 400 });
+    }
+
+    const filtroApertura = idApertura === undefined ? {} : { aperturaCajaId: idApertura };
+    const whereVentas = this.aplicarContextoVenta({
+        deletedAt: null,
+        ...filtroApertura,
+        estado: { in: ['completada', 'completado', 'completa'] },
+    }, empresaId, sucursalId);
+    const whereVentasCanceladas = this.aplicarContextoVenta({
+        ...filtroApertura,
+        estado: { in: ['cancelada', 'cancelado'] },
+    }, empresaId, sucursalId);
+    const whereMovimientos = this.aplicarFiltrosContexto({
+        deletedAt: null,
+        ...filtroApertura,
+    }, empresaId, sucursalId);
+
+    const [ventas, ventasCanceladas, reembolsos] = await Promise.all([
+        this.prisma.venta.aggregate({
+            where: whereVentas,
+            _sum: { total: true },
+        }),
+        this.prisma.venta.aggregate({
+            where: whereVentasCanceladas,
+            _sum: { total: true },
+        }),
+        this.prisma.movimientoCaja.aggregate({
+            where: {
+                ...whereMovimientos,
+                tipo: 'SALIDA',
+                origen: { in: ['DEVOLUCION', 'CANCELACION'] },
+                estado: 'VALIDADO',
+            },
+            _sum: { monto: true },
+        }),
+    ]);
+
+    return {
+        aperturaCajaId: idApertura ?? null,
+        totalCobrado: Number(ventas._sum?.total ?? 0),
+        totalCancelado: Number(ventasCanceladas._sum?.total ?? 0),
+        totalReembolsado: Number(reembolsos._sum?.monto ?? 0),
     };
 }
 
@@ -1081,10 +1206,17 @@ async create(data) {
     return this.getById(resultado.ventaId);
 }
 
-async cancel(id, motivoCancelacion) {
+async cancel(id, motivoCancelacion, {
+    folioCancelacion = null,
+    confirmacionTerminal = false,
+} = {}) {
     const ventaId = this.validarId(id, 'la venta');
+    const motivo = typeof motivoCancelacion === 'string' ? motivoCancelacion.trim() : '';
+    if (!motivo || motivo.length > 500) {
+        throw Object.assign(new Error('El motivo de cancelación es obligatorio y no debe exceder 500 caracteres.'), { status: 400 });
+    }
 
-    return this.prisma.$transaction(async (tx) => {
+    const preparada = await this.prisma.$transaction(async (tx) => {
         const referenciaVenta = await tx.venta.findFirst({
             where: {
                 id: ventaId,
@@ -1101,7 +1233,8 @@ async cancel(id, motivoCancelacion) {
         }
 
         const cajasCancelBloqueadas = await tx.$queryRaw`
-            SELECT id, estado, empresa_id AS empresaId, sucursal_id AS sucursalId
+            SELECT id, estado, empresa_id AS empresaId,
+                   sucursal_id AS sucursalId, empleado_id AS empleadoId
             FROM aperturas_caja
             WHERE id = ${referenciaVenta.aperturaCajaId} AND deleted_at IS NULL
             FOR UPDATE
@@ -1127,13 +1260,21 @@ async cancel(id, motivoCancelacion) {
             include: {
                 detalleVenta: true,
                 metodoPago: {
-                    select: { codigo: true },
+                    select: { id: true, codigo: true, nombre: true },
                 },
                 transaccionesPago: {
                     where: {
                         deletedAt: null,
                     },
-                    select: { id: true, proveedor: true, estado: true, metadatos: true },
+                    orderBy: { id: 'desc' },
+                    select: {
+                        id: true,
+                        proveedor: true,
+                        estado: true,
+                        monto: true,
+                        montoReembolsado: true,
+                        metadatos: true,
+                    },
                 },
                 folioVenta: {
                     select: { id: true },
@@ -1144,59 +1285,13 @@ async cancel(id, motivoCancelacion) {
         if (venta.estado === ESTADO_VENTA.CANCELADA) {
             throw new Error('La venta ya está cancelada');
         }
-        if (
-            venta.metodoPago?.codigo === 'MERCADO_PAGO'
-            && ['completada', 'completado'].includes(String(venta.estado ?? '').toLowerCase())
-        ) {
-            const error = new Error('El cobro de Mercado Pago debe reembolsarse en el proveedor antes de cancelar esta venta.');
-            error.status = 409;
-            throw error;
-        }
 
-        const devolucionesExistentes = await tx.devolucion.count({
-            where: { ventaId },
-        });
-        if (devolucionesExistentes > 0) {
-            throw new Error('No se puede cancelar una venta que ya tiene devoluciones');
-        }
-
-        await this.ajustarStock(tx, venta.detalleVenta, []);
-
-        const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
-        const ventaFueCompletada = ['completada', 'completado'].includes(String(venta.estado ?? '').toLowerCase());
-
-        if (ventaFueCompletada) {
-            const transaccionAprobada = venta.transaccionesPago.find(
-                (transaccion) => transaccion.estado === 'APROBADO' || transaccion.deletedAt === null
-            );
-            if (transaccionAprobada && transaccionAprobada.estado !== 'REEMBOLSADO') {
-                await tx.transaccionPago.update({
-                    where: { id: transaccionAprobada.id },
-                    data: { estado: 'REEMBOLSADO' },
-                });
-            }
-
-            await tx.movimientoCaja.create({
-                data: {
-                    empresaId: Number(caja.empresaId),
-                    sucursalId: Number(caja.sucursalId),
-                    aperturaCajaId: caja.id,
-                    empleadoId: venta.empleadoId,
-                    tipo: 'SALIDA',
-                    origen: 'CANCELACION',
-                    monto: venta.total,
-                    concepto: `Cancelación de venta folio ${venta.folioVenta?.id ?? venta.id} (${venta.metodoPago?.nombre || (esPagoEfectivo ? 'Efectivo' : 'Tarjeta')})`,
-                    estado: 'VALIDADO',
-                    afectaEfectivo: esPagoEfectivo,
-                    ventaId: venta.id,
-                    transaccionPagoId: transaccionAprobada?.id ?? null,
-                },
-            });
-        }
         const pagoMercadoPago = venta.transaccionesPago.find(
             (transaccion) => transaccion.proveedor === 'MERCADO_PAGO'
         );
-        if (pagoMercadoPago && venta.estado === 'pendiente_pago') {
+        if (venta.estado === 'pendiente_pago') {
+            await this.ajustarStock(tx, venta.detalleVenta, []);
+            if (pagoMercadoPago) {
             const metadatos = pagoMercadoPago.metadatos && typeof pagoMercadoPago.metadatos === 'object'
                 ? pagoMercadoPago.metadatos
                 : {};
@@ -1208,17 +1303,135 @@ async cancel(id, motivoCancelacion) {
                     datosRespuesta: JSON.stringify({ motivoCancelacion }),
                 },
             });
+            }
+
+            return {
+                respuesta: await tx.venta.update({
+                    where: { id: ventaId },
+                    data: {
+                        estado: ESTADO_VENTA.CANCELADA,
+                        motivoCancelacion: motivo,
+                    },
+                    omit: this.omit,
+                }),
+            };
         }
 
-        return tx.venta.update({
-            where: { id: ventaId },
-            data: {
-                estado: ESTADO_VENTA.CANCELADA,
-                motivoCancelacion,
+        const ventaCompletada = ['completada', 'completado']
+            .includes(String(venta.estado ?? '').toLowerCase());
+        if (!ventaCompletada) {
+            throw Object.assign(new Error('Solo se pueden cancelar ventas completadas o pagos pendientes.'), { status: 409 });
+        }
+
+        const devolucionesActivas = await tx.devolucion.findMany({
+            where: {
+                ventaId,
+                estadoReembolso: { in: ['PENDIENTE_REEMBOLSO', 'COMPLETADA'] },
             },
+            select: {
+                estadoReembolso: true,
+                detalles: {
+                    select: {
+                        detalleVentaId: true,
+                        cantidad: true,
+                    },
+                },
+            },
+        });
+        if (devolucionesActivas.some((devolucion) => (
+            devolucion.estadoReembolso === 'PENDIENTE_REEMBOLSO'
+            && devolucion.detalles.length > 0
+        ))) {
+            throw Object.assign(
+                new Error('Hay una devolución pendiente de confirmación para esta venta.'),
+                { status: 409 }
+            );
+        }
+
+        const { estaTotalmenteDevuelta, detallesStock } = prepararCancelacionConDevoluciones(
+            venta.detalleVenta,
+            devolucionesActivas
+        );
+        if (estaTotalmenteDevuelta) {
+            throw Object.assign(
+                new Error('No se puede cancelar una venta que ya fue devuelta completamente.'),
+                { status: 409, code: 'VENTA_TOTALMENTE_DEVUELTA' }
+            );
+        }
+
+        const devolucionPendiente = await tx.devolucion.findFirst({
+            where: {
+                ventaId,
+                estadoReembolso: 'PENDIENTE_REEMBOLSO',
+                detalles: { none: {} },
+            },
+        });
+        if (devolucionPendiente) {
+            throw Object.assign(
+                new Error('Esta cancelación quedó pendiente de conciliación. Verifica si el cliente ya recibió el dinero antes de entregar efectivo.'),
+                { status: 409, code: 'REEMBOLSO_PENDIENTE_CONCILIACION' }
+            );
+        }
+        const transaccionPago = venta.transaccionesPago.find(
+            (transaccion) => transaccion.estado === 'APROBADO'
+        );
+        if (!transaccionPago) {
+            throw Object.assign(new Error('No se encontró un pago aprobado asociado a la venta.'), { status: 409 });
+        }
+
+        const montoReembolsado = Math.round(Number(transaccionPago.montoReembolsado ?? 0) * 100);
+        const montoTransaccion = Math.round(Number(transaccionPago.monto) * 100);
+        const monto = (montoTransaccion - montoReembolsado) / 100;
+        if (monto <= 0) {
+            throw Object.assign(new Error('La transacción ya está reembolsada por completo.'), { status: 409 });
+        }
+        if (Math.round(monto * 100) > montoTransaccion - montoReembolsado) {
+            throw Object.assign(new Error('El reembolso excede el monto total de la transacción.'), { status: 409 });
+        }
+
+        const validacionPago = await validarReembolso(tx, {
+            ventaId,
+            metodoPago: venta.metodoPago,
+            transaccionPago,
+            monto,
+            folioCancelacion,
+            confirmacionTerminal,
+        });
+        const metodoPagoReembolso = validacionPago.metodoPagoReembolso ?? venta.metodoPago;
+
+        const reembolso = await tx.devolucion.create({
+            data: {
+                ventaId,
+                aperturaCajaId: Number(caja.id),
+                empleadoId: Number(venta.empleadoId),
+                metodoPagoId: Number(metodoPagoReembolso.id),
+                monto,
+                motivo,
+                estadoReembolso: 'PENDIENTE_REEMBOLSO',
+                folioCancelacion: folioCancelacion?.trim() || null,
+            },
+        });
+
+        await completarReembolso(tx, {
+            devolucionId: reembolso.id,
+            ventaId,
+            apertura: caja,
+            metodoPago: venta.metodoPago,
+            metodoPagoReembolso,
+            transaccionPago,
+            monto,
+            folioCancelacion,
+            detallesStock,
+            cancelacion: { motivo },
+            origenMovimiento: 'CANCELACION',
+            conceptoMovimiento: `Cancelación de venta folio ${venta.folioVenta?.id ?? venta.id} (reembolso en ${metodoPagoReembolso.nombre || metodoPagoReembolso.codigo})`,
+        });
+        return tx.venta.findUnique({
+            where: { id: ventaId },
             omit: this.omit,
         });
     }, { isolationLevel: 'ReadCommitted' });
+    return preparada;
 }
     validarId(id, modulo = "indefinido") {
     const n = Number(id);

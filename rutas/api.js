@@ -897,6 +897,13 @@ ventaRoutes.get(
 )
 
 ventaRoutes.get(
+    '/resumen',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.obtenerResumen.bind(ventaController)
+)
+
+ventaRoutes.get(
     '/:id/pago',
     autenticarUsuario,
     verificarPermiso('Ventas', 'Listar'),
@@ -1201,14 +1208,8 @@ router.use('/ventas', ventaRoutes)
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
 
-// ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
+// ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
-pagoRoutes.post('/crear-cobro', autenticarUsuario, verificarEmpleado, pagoController.crearCobro.bind(pagoController));
-pagoRoutes.post('/simular-resolucion/:id', autenticarUsuario, verificarEmpleado, pagoController.simularResolucion.bind(pagoController));
-pagoRoutes.post('/reembolsar/:id', autenticarUsuario, verificarEmpleado, pagoController.reembolsar.bind(pagoController));
-pagoRoutes.get('/resumen', autenticarUsuario, verificarEmpleado, pagoController.obtenerResumen.bind(pagoController));
-pagoRoutes.get('/transacciones', autenticarUsuario, verificarEmpleado, pagoController.obtenerTodos.bind(pagoController));
-pagoRoutes.get('/transacciones/:id', autenticarUsuario, verificarEmpleado, pagoController.obtenerPorId.bind(pagoController));
 router.use('/pagos', pagoRoutes);
 
 export { router as api };

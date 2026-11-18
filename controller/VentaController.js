@@ -26,15 +26,21 @@ export class VentaController extends BaseController {
                 : this.leerId(req.query.metodoPagoId, 'método de pago');
             const fechaDesde = this.leerFecha(req.query.fechaDesde, 'fecha desde');
             const fechaHasta = this.leerFecha(req.query.fechaHasta, 'fecha hasta');
+            const aperturaCajaId = req.query.aperturaCajaId === undefined
+                ? undefined
+                : Number(req.query.aperturaCajaId);
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursalId = this.obtenerSucursalId(req);
 
             if (
                 !Number.isSafeInteger(pagina) || pagina < 1
                 || !Number.isSafeInteger(limiteSolicitado) || limiteSolicitado < 1
+                || (aperturaCajaId !== undefined && (!Number.isSafeInteger(aperturaCajaId) || aperturaCajaId < 1))
                 || (req.query.cliente !== undefined && typeof req.query.cliente !== 'string')
                 || cliente.length > 100
                 || (req.query.q !== undefined && typeof req.query.q !== 'string')
                 || busqueda.length > 100
-                || (estado !== undefined && !['completada', 'cancelada', 'pendiente_pago'].includes(estado))
+                || (estado !== undefined && !['completada', 'cancelada', 'pendiente_pago', 'reembolsado'].includes(estado))
                 || (fechaDesde && fechaHasta && fechaDesde > fechaHasta)
             ) {
                 return res.status(400).json(new ResponseModel(
@@ -55,8 +61,67 @@ export class VentaController extends BaseController {
                 fechaHasta,
                 metodoPagoId,
                 estado,
+                aperturaCajaId,
+                empresaId,
+                sucursalId,
             });
+
+            const ventasPendientes = (resultado.registros ?? []).filter(
+                (v) => String(v.estado ?? '').toLowerCase() === 'pendiente_pago'
+            );
+            if (ventasPendientes.length > 0) {
+                await Promise.allSettled(
+                    ventasPendientes.map((v) => pagoService.consultarEstadoVenta(v.id, empresaId).catch(() => null))
+                );
+                const recargados = await this.dao.obtenerVentas({
+                    pagina,
+                    limite: Math.min(limiteSolicitado, 100),
+                    clienteId,
+                    cliente,
+                    busqueda,
+                    fechaDesde,
+                    fechaHasta,
+                    metodoPagoId,
+                    estado,
+                    aperturaCajaId,
+                    empresaId,
+                    sucursalId,
+                });
+                return this.respuestaExito(res, recargados, 'Ventas obtenidas correctamente');
+            }
+
             return this.respuestaExito(res, resultado, 'Ventas obtenidas correctamente');
+        } catch (error) {
+            if (error.status === 400) {
+                return res.status(400).json(new ResponseModel(null, 1, error.message, 400));
+            }
+            return this.respuestaError(res, error);
+        }
+    };
+
+    obtenerResumen = async (req, res) => {
+        try {
+            const aperturaCajaId = req.query.aperturaCajaId === undefined
+                ? undefined
+                : Number(req.query.aperturaCajaId);
+            if (
+                aperturaCajaId !== undefined
+                && (!Number.isSafeInteger(aperturaCajaId) || aperturaCajaId < 1)
+            ) {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'El ID de apertura de caja no es válido',
+                    400
+                ));
+            }
+
+            const resumen = await this.dao.obtenerResumenHistorial({
+                aperturaCajaId,
+                empresaId: this.obtenerEmpresaId(req),
+                sucursalId: this.obtenerSucursalId(req),
+            });
+            return this.respuestaExito(res, resumen, 'Resumen de ventas obtenido correctamente');
         } catch (error) {
             if (error.status === 400) {
                 return res.status(400).json(new ResponseModel(null, 1, error.message, 400));
@@ -174,6 +239,8 @@ export class VentaController extends BaseController {
         try {
             const id = this.leerId(req.params.id);
             const motivoCancelacion = req.body?.motivoCancelacion;
+            const folioCancelacion = req.body?.folioCancelacion;
+            const confirmacionTerminal = req.body?.confirmacionTerminal;
             if (
                 typeof motivoCancelacion !== 'string'
                 || !motivoCancelacion.trim()
@@ -187,7 +254,10 @@ export class VentaController extends BaseController {
                 ));
             }
 
-            const respuesta = await this.dao.cancel(id, motivoCancelacion.trim());
+            const respuesta = await this.dao.cancel(id, motivoCancelacion.trim(), {
+                folioCancelacion,
+                confirmacionTerminal,
+            });
 
             return this.respuestaExito(
                 res,
@@ -195,8 +265,14 @@ export class VentaController extends BaseController {
                 'Se canceló la venta con éxito'
             );
         } catch (error) {
-            if ([400, 409].includes(error.status)) {
-                return res.status(error.status).json(new ResponseModel(null, 1, error.message, error.status));
+            if ([400, 409, 422, 502, 503].includes(error.status)) {
+                const detalles = { ...(error.code ? { code: error.code } : {}), ...(error.data ?? {}) };
+                return res.status(error.status).json(new ResponseModel(
+                    Object.keys(detalles).length > 0 ? detalles : null,
+                    1,
+                    error.message,
+                    error.status
+                ));
             }
             return this.respuestaError(res, error);
         }

@@ -48,30 +48,25 @@ export class UsuarioController extends BaseController {
     }
 
     verificarCredenciales = async (req, res) => {
-        const { email, contrasenia, checkbox } = req.body;
-
         try {
-            const usuario = await usuarioDao.getByCredenciales(email, contrasenia);
+            const { usuario, token, checkbox } = await usuarioService.verificarCredenciales(req.body);
             if (!usuario) {
                 throw new Error("Credenciales inválidas");
             }
-            
-
-            const token = await tokenDao.crearTokenSesion(usuario.id);
 
             //librerias instaladas cookie-parser y helmet
             //usamos las cookies httpOnly esto hace que no sea accesible desde ningun codigo de cliente evitando que el frontend vea el token
             //de esta manera evitamos que nuestro tokeen codificado con Base64 lo pueda ver cualquier persona a pesar de estar codificado
             const opcionesCookies = {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                    
-                    /**Perdon ya vi por que se quitaba tan repido la session es por que aqui cuenta por milisegundos ya lo cambie Perdon   😅*/
-                }
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
 
-            if(checkbox == true){
-                    opcionesCookies.maxAge = token.registro.tiempoVida * 1000;
+                /**Perdon ya vi por que se quitaba tan repido la session es por que aqui cuenta por milisegundos ya lo cambie Perdon   😅*/
+            }
+
+            if (checkbox == true) {
+                opcionesCookies.maxAge = token.registro.tiempoVida * 1000;
             }
             res.cookie('token', token.token, opcionesCookies)
             return this.respuestaExito(
@@ -131,7 +126,7 @@ export class UsuarioController extends BaseController {
             return this.respuestaError(res, error);
         }
     }
-    
+
     actualizarUsuario = async (req, res) => {
         try {
             const nuevaImagen = obtenerImagen('usuarios', req.file);
@@ -152,7 +147,7 @@ export class UsuarioController extends BaseController {
             return this.respuestaError(res, error);
         }
     }
-    
+
     eliminarUsuario = async (req, res) => {
         const { id } = req.body;
         try {
