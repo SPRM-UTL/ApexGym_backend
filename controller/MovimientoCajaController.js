@@ -142,6 +142,13 @@ export class MovimientoCajaController extends BaseController {
                 });
             }
 
+            if (movimientoExistente.ventaId) {
+                await prisma.venta.updateMany({
+                    where: { id: movimientoExistente.ventaId, estado: 'pendiente_pago' },
+                    data: { estado: 'completada' },
+                });
+            }
+
             return this.respuestaExito(res, registro, 'Movimiento de caja validado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);

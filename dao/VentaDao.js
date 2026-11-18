@@ -1057,6 +1057,8 @@ async create(data) {
             await pagoService.registrarCobroDigitalVenta(tx, {
                 empresaId: Number(cajaAbierta.empresaId),
                 sucursalId: Number(cajaAbierta.sucursalId),
+                aperturaCajaId: Number(cajaAbierta.id),
+                empleadoId: Number(cajaAbierta.empleadoId),
                 ventaId: nuevaVenta.id,
                 folioVenta: nuevaVenta.folioVenta.id,
                 monto: total,

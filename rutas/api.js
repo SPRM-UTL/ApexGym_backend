@@ -906,7 +906,7 @@ ventaRoutes.get(
 ventaRoutes.post(
     '/:id/pago/checkout',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    verificarPermiso('Ventas', 'Crear'),
     ventaController.crearCheckoutPago.bind(ventaController)
 )
 
