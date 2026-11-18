@@ -830,6 +830,7 @@ enum ProveedorPago {
   STRIPE
   TERMINAL_MANUAL
   EFECTIVO
+  TRANSFERENCIA
 }
 
 enum OrigenMovimiento {

@@ -1129,7 +1129,6 @@ async cancel(id, motivoCancelacion) {
                 },
                 transaccionesPago: {
                     where: {
-                        proveedor: { in: ['MERCADO_PAGO', 'EFECTIVO'] },
                         deletedAt: null,
                     },
                     select: { id: true, proveedor: true, estado: true, metadatos: true },

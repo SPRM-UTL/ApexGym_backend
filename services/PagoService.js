@@ -7,6 +7,7 @@ const MARCAS_TARJETA_VALIDAS = new Set(['VISA', 'MASTERCARD', 'AMEX', 'CARNET', 
 export const PROVEEDOR_POR_CODIGO_METODO = Object.freeze({
     EFECTIVO: 'EFECTIVO',
     TARJETA: 'TERMINAL_MANUAL',
+    TRANSFERENCIA: 'TRANSFERENCIA',
 });
 
 function crearErrorPago(mensaje, status = 400) {
@@ -95,6 +96,13 @@ export function resolverCobroPresencial({
         return {
             estado: 'APROBADO',
             referenciaExterna: `TERM_MANUAL_${folioVoucher.trim()}`,
+        };
+    }
+
+    if (proveedor === 'TRANSFERENCIA') {
+        return {
+            estado: 'APROBADO',
+            referenciaExterna: `TRANSFERENCIA_${Date.now()}`,
         };
     }
 
@@ -548,15 +556,20 @@ export class PagoService {
                               efectivoRecibido: Number(efectivoRecibido),
                               cambio: Number(cambio),
                           }
-                        : {
-                              tipoTarjeta: normalizarValorTarjeta(tipoTarjeta),
-                              marcaTarjeta: normalizarValorTarjeta(marcaTarjeta),
-                              ultimosDigitos: String(ultimosDigitos),
-                          },
+                        : (proveedor === 'TERMINAL_MANUAL'
+                            ? {
+                                  tipoTarjeta: normalizarValorTarjeta(tipoTarjeta),
+                                  marcaTarjeta: normalizarValorTarjeta(marcaTarjeta),
+                                  ultimosDigitos: String(ultimosDigitos),
+                              }
+                            : { metodo: 'TRANSFERENCIA' }),
                 },
             });
 
             if (montoNumerico > 0 && cobro.estado === 'APROBADO') {
+                const nombreMetodo = proveedor === 'EFECTIVO'
+                    ? 'en efectivo'
+                    : (proveedor === 'TRANSFERENCIA' ? 'por transferencia' : 'con tarjeta');
                 await this.registrarMovimientoCobro(tx, {
                     empresaId: Number(empresaId),
                     sucursalId: Number(sucursalId),
@@ -565,7 +578,7 @@ export class PagoService {
                     ventaId: Number(ventaId),
                     transaccionPagoId: transaccion.id,
                     monto: montoNumerico,
-                    concepto: `Cobro ${proveedor === 'EFECTIVO' ? 'en efectivo' : 'con tarjeta'} de venta folio ${folioVenta}`,
+                    concepto: `Cobro ${nombreMetodo} de venta folio ${folioVenta}`,
                     proveedor,
                 });
             }
