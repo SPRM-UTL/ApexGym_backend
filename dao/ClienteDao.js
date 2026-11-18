@@ -45,12 +45,22 @@ export class ClienteDao extends BaseDao {
     async buscarPorNombreOId(termino, { pagina = 1, limite = 20 } = {}) {
         const consulta = String(termino ?? '').trim();
         const idNumerico = /^\d+$/.test(consulta) ? Number(consulta) : null;
+        const palabras = consulta.split(/\s+/).filter(Boolean);
         const where = {
             deletedAt: null,
             OR: [
                 { nombre: { contains: consulta } },
                 { apellidoPaterno: { contains: consulta } },
                 { apellidoMaterno: { contains: consulta } },
+                ...(palabras.length > 1 ? [{
+                    AND: palabras.map((p) => ({
+                        OR: [
+                            { nombre: { contains: p } },
+                            { apellidoPaterno: { contains: p } },
+                            { apellidoMaterno: { contains: p } },
+                        ],
+                    })),
+                }] : []),
                 ...(Number.isSafeInteger(idNumerico) && idNumerico > 0 ? [{ id: idNumerico }] : []),
             ],
         };

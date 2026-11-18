@@ -53,6 +53,7 @@ export function resolverCobroPresencial({
     tipoTarjeta = null,
     marcaTarjeta = null,
     ultimosDigitos = null,
+    referenciaTransferencia = null,
     exigirDatosCompletos = false,
 }) {
     if (proveedor === 'EFECTIVO') {
@@ -82,13 +83,13 @@ export function resolverCobroPresencial({
             if (folioVoucher.trim().length > 100) {
                 throw crearErrorPago('El folio del voucher no puede exceder 100 caracteres.');
             }
-            if (!TIPOS_TARJETA_VALIDOS.has(normalizarValorTarjeta(tipoTarjeta))) {
+            if (tipoTarjeta && !TIPOS_TARJETA_VALIDOS.has(normalizarValorTarjeta(tipoTarjeta))) {
                 throw crearErrorPago('El tipo de tarjeta debe ser CREDITO o DEBITO.');
             }
-            if (!MARCAS_TARJETA_VALIDAS.has(normalizarValorTarjeta(marcaTarjeta))) {
+            if (marcaTarjeta && !MARCAS_TARJETA_VALIDAS.has(normalizarValorTarjeta(marcaTarjeta))) {
                 throw crearErrorPago('La marca de tarjeta no es válida.');
             }
-            if (!/^\d{4}$/.test(String(ultimosDigitos ?? ''))) {
+            if (ultimosDigitos && !/^\d{4}$/.test(String(ultimosDigitos ?? ''))) {
                 throw crearErrorPago('Los últimos dígitos de la tarjeta deben ser exactamente cuatro números.');
             }
         }
@@ -100,9 +101,10 @@ export function resolverCobroPresencial({
     }
 
     if (proveedor === 'TRANSFERENCIA') {
+        const ref = referenciaTransferencia?.trim();
         return {
             estado: 'APROBADO',
-            referenciaExterna: `TRANSFERENCIA_${Date.now()}`,
+            referenciaExterna: ref ? `TRANSFERENCIA_${ref}` : `TRANSFERENCIA_${Date.now()}`,
         };
     }
 
@@ -496,6 +498,7 @@ export class PagoService {
         tipoTarjeta = null,
         marcaTarjeta = null,
         ultimosDigitos = null,
+        referenciaTransferencia = null,
     }) {
         if (!tx?.transaccionPago) {
             throw crearErrorPago('Se requiere la transacción de base de datos de la venta.');
@@ -519,6 +522,7 @@ export class PagoService {
             tipoTarjeta,
             marcaTarjeta,
             ultimosDigitos,
+            referenciaTransferencia,
             exigirDatosCompletos: true,
         });
 
@@ -558,11 +562,15 @@ export class PagoService {
                           }
                         : (proveedor === 'TERMINAL_MANUAL'
                             ? {
-                                  tipoTarjeta: normalizarValorTarjeta(tipoTarjeta),
-                                  marcaTarjeta: normalizarValorTarjeta(marcaTarjeta),
-                                  ultimosDigitos: String(ultimosDigitos),
+                                  tipoTarjeta: normalizarValorTarjeta(tipoTarjeta) || 'DEBITO',
+                                  marcaTarjeta: normalizarValorTarjeta(marcaTarjeta) || 'VISA',
+                                  ultimosDigitos: String(ultimosDigitos || ''),
                               }
-                            : { metodo: 'TRANSFERENCIA' }),
+                            : {
+                                  metodo: 'TRANSFERENCIA',
+                                  ...(referenciaTransferencia?.trim() ? { referencia: referenciaTransferencia.trim() } : {}),
+                                  confirmada: true,
+                              }),
                 },
             });
 
