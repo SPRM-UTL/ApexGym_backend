@@ -75,14 +75,12 @@ export function resolverCobroPresencial({
     }
 
     if (proveedor === 'TERMINAL_MANUAL') {
-        if (typeof folioVoucher !== 'string' || !folioVoucher.trim()) {
-            throw crearErrorPago('Para cobros en terminal física manual se requiere el folio/autorización del voucher.');
+        const voucher = typeof folioVoucher === 'string' && folioVoucher.trim() ? folioVoucher.trim() : null;
+        if (voucher && voucher.length > 100) {
+            throw crearErrorPago('El folio del voucher no puede exceder 100 caracteres.');
         }
 
         if (exigirDatosCompletos) {
-            if (folioVoucher.trim().length > 100) {
-                throw crearErrorPago('El folio del voucher no puede exceder 100 caracteres.');
-            }
             if (tipoTarjeta && !TIPOS_TARJETA_VALIDOS.has(normalizarValorTarjeta(tipoTarjeta))) {
                 throw crearErrorPago('El tipo de tarjeta debe ser CREDITO o DEBITO.');
             }
@@ -96,14 +94,14 @@ export function resolverCobroPresencial({
 
         return {
             estado: 'APROBADO',
-            referenciaExterna: `TERM_MANUAL_${folioVoucher.trim()}`,
+            referenciaExterna: voucher ? `TERM_MANUAL_${voucher}` : `TARJETA_${Date.now()}`,
         };
     }
 
     if (proveedor === 'TRANSFERENCIA') {
         const ref = referenciaTransferencia?.trim();
         return {
-            estado: 'APROBADO',
+            estado: 'PENDIENTE',
             referenciaExterna: ref ? `TRANSFERENCIA_${ref}` : `TRANSFERENCIA_${Date.now()}`,
         };
     }
@@ -433,6 +431,7 @@ export class PagoService {
         monto,
         concepto = null,
         proveedor = 'EFECTIVO',
+        estado = null,
     }) {
         if (!tx?.movimientoCaja) {
             throw crearErrorPago('Se requiere la transacción de base de datos para registrar el movimiento de caja.');
@@ -464,6 +463,7 @@ export class PagoService {
         }
 
         const esEfectivo = proveedor === 'EFECTIVO';
+        const estadoMovimiento = estado ?? (proveedor === 'TRANSFERENCIA' ? 'PENDIENTE' : 'VALIDADO');
 
         return tx.movimientoCaja.create({
             data: {
@@ -475,7 +475,7 @@ export class PagoService {
                 origen: 'COBRO_VENTA',
                 monto: montoNumerico,
                 concepto: concepto || `Cobro de venta (${proveedor})`,
-                estado: 'VALIDADO',
+                estado: estadoMovimiento,
                 afectaEfectivo: esEfectivo,
                 ventaId: ventaId ? Number(ventaId) : null,
                 transaccionPagoId: transaccionPagoId ? Number(transaccionPagoId) : null,
@@ -526,7 +526,9 @@ export class PagoService {
             exigirDatosCompletos: true,
         });
 
-        const voucher = proveedor === 'TERMINAL_MANUAL' ? folioVoucher.trim() : null;
+        const voucher = proveedor === 'TERMINAL_MANUAL' && typeof folioVoucher === 'string' && folioVoucher.trim()
+            ? folioVoucher.trim()
+            : null;
         if (voucher) {
             const existente = await tx.transaccionPago.findFirst({
                 where: {
@@ -569,12 +571,12 @@ export class PagoService {
                             : {
                                   metodo: 'TRANSFERENCIA',
                                   ...(referenciaTransferencia?.trim() ? { referencia: referenciaTransferencia.trim() } : {}),
-                                  confirmada: true,
+                                  confirmada: false,
                               }),
                 },
             });
 
-            if (montoNumerico > 0 && cobro.estado === 'APROBADO') {
+            if (montoNumerico > 0 && (cobro.estado === 'APROBADO' || cobro.estado === 'PENDIENTE')) {
                 const nombreMetodo = proveedor === 'EFECTIVO'
                     ? 'en efectivo'
                     : (proveedor === 'TRANSFERENCIA' ? 'por transferencia' : 'con tarjeta');
