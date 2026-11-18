@@ -38,6 +38,11 @@ imagenes/
 usuarios/
 /usuarios/
 tests/
+test/
+scripts/
+/tests/
+/test/
+/scripts/
 
 prisma/migrations/
 prisma/migrations/**
