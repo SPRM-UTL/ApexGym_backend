@@ -703,7 +703,9 @@ async function sembrarEjemplos(ejemplos) {
         };
         apertura = apertura
             ? await prisma.aperturaCaja.update({ where: { id: apertura.id }, data: { ...dataApertura, deletedAt: null } })
-            : await prisma.aperturaCaja.create({ data: dataApertura });
+            : await prisma.aperturaCaja.create({
+                  data: { ...dataApertura, usaMovimientosCobro: true },
+              });
 
         for (const movimiento of item.movimientos ?? []) {
             const notaMovimiento = marcaEjemplo(movimiento.clave);

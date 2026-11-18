@@ -914,6 +914,20 @@ ventaRoutes.get(
 )
 
 ventaRoutes.get(
+    '/:id/pago',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.consultarEstadoPago.bind(ventaController)
+)
+
+ventaRoutes.post(
+    '/:id/pago/checkout',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.crearCheckoutPago.bind(ventaController)
+)
+
+ventaRoutes.get(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Ventas', 'Listar'),
@@ -953,13 +967,6 @@ ventaRoutes.post(
     autenticarUsuario,
     verificarPermiso('Ventas', 'Eliminar'),
     ventaController.cancel.bind(ventaController)
-)
-
-ventaRoutes.put(
-    '/:id',
-    autenticarUsuario,
-    verificarPermiso('Ventas', 'Editar'),
-    ventaController.update.bind(ventaController)
 )
 
 //---Rutas Servicios-------------------------

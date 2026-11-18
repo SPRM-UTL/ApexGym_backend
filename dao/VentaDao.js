@@ -1,6 +1,7 @@
 import { BaseDao } from "./BaseDao.js";
 //dependecia que nos permite hacer movimientos y redondeo de dinero
 import currency from "currency.js";
+import crypto from "node:crypto";
 import { ESTADOS_ACTIVOS_CATALOGO, TASA_IVA } from "../utils/constantes.js";
 import { pagoService, PROVEEDOR_POR_CODIGO_METODO } from "../services/PagoService.js";
 
@@ -156,6 +157,8 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
         condiciones.push({ estado: { in: ['completada', 'completado', 'completa'] } });
     } else if (estado === 'cancelada') {
         condiciones.push({ estado: { in: ['cancelada', 'cancelado'] } });
+    } else if (estado === 'pendiente_pago') {
+        condiciones.push({ estado: 'pendiente_pago' });
     }
 
     const where = { AND: condiciones };
@@ -173,6 +176,12 @@ async obtenerVentas({ pagina, limite, clienteId, cliente, busqueda, fechaDesde, 
             },
         },
         metodoPago: { select: { id: true, nombre: true, codigo: true } },
+        transaccionesPago: {
+            where: { proveedor: 'MERCADO_PAGO', deletedAt: null },
+            select: { estado: true, urlCheckout: true, metadatos: true },
+            orderBy: { id: 'desc' },
+            take: 1,
+        },
     };
 
     const [registros, total] = await Promise.all([
@@ -390,6 +399,329 @@ async getById(id, clientOrEmpresaId = 1) {
     };
 }
 
+async expirarVentaPendientePago(ventaId, fechaActual = new Date()) {
+    return this.prisma.$transaction((tx) =>
+        this.expirarVentaPendientePagoEnTx(tx, ventaId, fechaActual)
+    );
+}
+
+async expirarVentasDigitalesPendientes(ventaId = null) {
+    const candidatas = await this.prisma.transaccionPago.findMany({
+        where: {
+            proveedor: 'MERCADO_PAGO',
+            estado: { in: ['PENDIENTE', 'RECHAZADO'] },
+            deletedAt: null,
+            venta: {
+                is: {
+                    ...(ventaId == null ? {} : { id: Number(ventaId) }),
+                    estado: 'pendiente_pago',
+                    deletedAt: null,
+                },
+            },
+        },
+        select: {
+            ventaId: true,
+            createdAt: true,
+            metadatos: true,
+        },
+        orderBy: { id: 'asc' },
+        take: 500,
+    });
+    const ahora = new Date();
+    let expiradas = 0;
+
+    for (const transaccion of candidatas) {
+        const venceEn = new Date(
+            transaccion.metadatos?.expiresAt
+                ?? pagoService.obtenerExpiracionPagoDigital(transaccion.createdAt)
+        );
+        if (venceEn > ahora) continue;
+        if (await this.expirarVentaPendientePago(transaccion.ventaId, ahora)) expiradas += 1;
+    }
+
+    return expiradas;
+}
+
+async expirarPagosPendientesEnApertura(tx, aperturaCajaId, fechaActual = new Date()) {
+    const candidatas = await tx.transaccionPago.findMany({
+        where: {
+            proveedor: 'MERCADO_PAGO',
+            estado: { in: ['PENDIENTE', 'RECHAZADO'] },
+            deletedAt: null,
+            venta: {
+                is: {
+                    aperturaCajaId: Number(aperturaCajaId),
+                    estado: 'pendiente_pago',
+                    deletedAt: null,
+                },
+            },
+        },
+        select: {
+            ventaId: true,
+            createdAt: true,
+            metadatos: true,
+        },
+    });
+    let expiradas = 0;
+    for (const transaccion of candidatas) {
+        const venceEn = new Date(
+            transaccion.metadatos?.expiresAt
+                ?? pagoService.obtenerExpiracionPagoDigital(transaccion.createdAt)
+        );
+        if (venceEn <= fechaActual
+            && await this.expirarVentaPendientePagoEnTx(tx, transaccion.ventaId, fechaActual)) {
+            expiradas += 1;
+        }
+    }
+    return expiradas;
+}
+
+async expirarVentaPendientePagoEnTx(tx, ventaId, fechaActual = new Date()) {
+    const referencia = await tx.venta.findFirst({
+        where: { id: Number(ventaId), deletedAt: null },
+        select: { id: true, aperturaCajaId: true },
+    });
+    if (!referencia || !referencia.aperturaCajaId) return false;
+
+    await tx.$queryRaw`
+        SELECT id
+        FROM aperturas_caja
+        WHERE id = ${referencia.aperturaCajaId}
+        FOR UPDATE
+    `;
+    const ventasBloqueadas = await tx.$queryRaw`
+        SELECT id
+        FROM venta
+        WHERE id = ${Number(ventaId)} AND deleted_at IS NULL
+        FOR UPDATE
+    `;
+    if (ventasBloqueadas.length === 0) return false;
+
+    const venta = await tx.venta.findFirst({
+        where: { id: Number(ventaId), deletedAt: null },
+        include: {
+            detalleVenta: true,
+            transaccionesPago: {
+                where: { proveedor: 'MERCADO_PAGO', deletedAt: null },
+                orderBy: { id: 'desc' },
+                take: 1,
+            },
+        },
+    });
+    const transaccion = venta?.transaccionesPago[0];
+    if (
+        venta?.estado !== 'pendiente_pago'
+        || !transaccion
+        || transaccion.estado === 'APROBADO'
+    ) return false;
+
+    const venceEn = new Date(
+        transaccion.metadatos?.expiresAt
+            ?? pagoService.obtenerExpiracionPagoDigital(transaccion.createdAt)
+    );
+    if (venceEn > fechaActual) return false;
+
+    await this.ajustarStock(tx, venta.detalleVenta, []);
+    await tx.venta.update({
+        where: { id: venta.id },
+        data: {
+            estado: 'cancelada',
+            motivoCancelacion: 'Pago no completado: venció el enlace de Mercado Pago',
+        },
+    });
+    await tx.transaccionPago.update({
+        where: { id: transaccion.id },
+        data: {
+            estado: 'EXPIRADO',
+            datosRespuesta: JSON.stringify({
+                motivo: 'La venta venció sin confirmación de pago.',
+                expiradoEn: fechaActual.toISOString(),
+            }),
+        },
+    });
+    return true;
+}
+
+async resolverPagoMercadoPago(paymentData, empresaId = null) {
+    const externalReference = paymentData?.external_reference;
+    if (typeof externalReference !== 'string' || !externalReference) {
+        throw Object.assign(new Error('El pago no tiene referencia externa de venta.'), { status: 400 });
+    }
+
+    const transaccionInicial = await this.prisma.transaccionPago.findFirst({
+        where: {
+            uuidIdempotencia: externalReference,
+            proveedor: 'MERCADO_PAGO',
+            deletedAt: null,
+            ...(empresaId == null ? {} : { empresaId: Number(empresaId) }),
+        },
+        select: {
+            id: true,
+            ventaId: true,
+            empresaId: true,
+            monto: true,
+        },
+    });
+    if (!transaccionInicial || transaccionInicial.ventaId == null) {
+        throw Object.assign(new Error('No existe una venta asociada a este pago de Mercado Pago.'), { status: 404 });
+    }
+    if (
+        !Number.isFinite(Number(paymentData.transaction_amount))
+        || currency(Number(paymentData.transaction_amount)).intValue
+            !== currency(Number(transaccionInicial.monto)).intValue
+        || paymentData.currency_id !== 'MXN'
+    ) {
+        throw Object.assign(new Error('El monto o la moneda del pago no coincide con la venta.'), { status: 409 });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+        const referenciaVenta = await tx.venta.findFirst({
+            where: { id: transaccionInicial.ventaId, deletedAt: null },
+            select: { id: true, aperturaCajaId: true },
+        });
+        if (!referenciaVenta) {
+            throw Object.assign(new Error('La venta asociada al pago ya no existe.'), { status: 404 });
+        }
+        if (referenciaVenta.aperturaCajaId) {
+            await tx.$queryRaw`
+                SELECT id
+                FROM aperturas_caja
+                WHERE id = ${referenciaVenta.aperturaCajaId}
+                FOR UPDATE
+            `;
+        }
+        const ventaBloqueada = await tx.$queryRaw`
+            SELECT id
+            FROM venta
+            WHERE id = ${transaccionInicial.ventaId} AND deleted_at IS NULL
+            FOR UPDATE
+        `;
+        await tx.$queryRaw`
+            SELECT id
+            FROM transacciones_pagos
+            WHERE id = ${transaccionInicial.id}
+            FOR UPDATE
+        `;
+
+        const [venta, transaccion] = await Promise.all([
+            tx.venta.findUnique({
+                where: { id: transaccionInicial.ventaId },
+                include: { detalleVenta: true },
+            }),
+            tx.transaccionPago.findUnique({ where: { id: transaccionInicial.id } }),
+        ]);
+        if (ventaBloqueada.length === 0 || !venta || !transaccion) {
+            throw Object.assign(new Error('La venta o transacción de pago ya no existe.'), { status: 404 });
+        }
+
+        const estadoMP = paymentData.status;
+        const resumenMP = {
+            paymentId: String(paymentData.id),
+            status: estadoMP,
+            statusDetail: paymentData.status_detail ?? null,
+            amount: Number(paymentData.transaction_amount),
+            currency: paymentData.currency_id,
+            paymentMethod: paymentData.payment_method_id ?? null,
+            dateApproved: paymentData.date_approved ?? null,
+        };
+        const metadataActual = transaccion.metadatos && typeof transaccion.metadatos === 'object'
+            ? transaccion.metadatos
+            : {};
+        const estadoVenta = String(venta.estado ?? '').toLowerCase();
+        const venceEn = new Date(
+            metadataActual.expiresAt
+                ?? pagoService.obtenerExpiracionPagoDigital(transaccion.createdAt)
+        );
+        const aprobado = estadoMP === 'approved';
+        const rechazado = ['rejected', 'cancelled'].includes(estadoMP);
+
+        if (estadoVenta === 'completada' || estadoVenta === 'completado') {
+            if (aprobado && transaccion.estado !== 'APROBADO') {
+                await tx.transaccionPago.update({
+                    where: { id: transaccion.id },
+                    data: {
+                        estado: 'APROBADO',
+                        datosRespuesta: JSON.stringify(resumenMP),
+                    },
+                });
+            }
+            return { procesado: false, estado: transaccion.estado };
+        }
+
+        if (estadoVenta !== 'pendiente_pago') {
+            if (aprobado) {
+                await tx.transaccionPago.update({
+                    where: { id: transaccion.id },
+                    data: {
+                        estado: 'APROBADO',
+                        metadatos: {
+                            ...metadataActual,
+                            requiereReembolsoManual: true,
+                            pagoHuerfano: true,
+                        },
+                        datosRespuesta: JSON.stringify(resumenMP),
+                    },
+                });
+            }
+            return { procesado: false, estado: aprobado ? 'APROBADO_HUERFANO' : transaccion.estado };
+        }
+
+        if (venceEn <= new Date()) {
+            await this.ajustarStock(tx, venta.detalleVenta, []);
+            await tx.venta.update({
+                where: { id: venta.id },
+                data: {
+                    estado: 'cancelada',
+                    motivoCancelacion: 'Pago no completado: venció el enlace de Mercado Pago',
+                },
+            });
+            await tx.transaccionPago.update({
+                where: { id: transaccion.id },
+                data: {
+                    estado: aprobado ? 'APROBADO' : 'EXPIRADO',
+                    metadatos: {
+                        ...metadataActual,
+                        ...(aprobado ? {
+                            requiereReembolsoManual: true,
+                            pagoHuerfano: true,
+                        } : {}),
+                    },
+                    datosRespuesta: JSON.stringify({
+                        ...resumenMP,
+                        ...(aprobado ? { requiereReembolsoManual: true } : {}),
+                    }),
+                },
+            });
+            return { procesado: true, estado: aprobado ? 'APROBADO_HUERFANO' : 'EXPIRADO' };
+        }
+
+        if (aprobado) {
+            await tx.transaccionPago.update({
+                where: { id: transaccion.id },
+                data: {
+                    estado: 'APROBADO',
+                    datosRespuesta: JSON.stringify(resumenMP),
+                },
+            });
+            await tx.venta.update({
+                where: { id: venta.id },
+                data: { estado: ESTADO_VENTA.COMPLETADA },
+            });
+            return { procesado: true, estado: 'APROBADO' };
+        }
+
+        const nuevoEstado = rechazado ? 'RECHAZADO' : 'PENDIENTE';
+        await tx.transaccionPago.update({
+            where: { id: transaccion.id },
+            data: {
+                estado: nuevoEstado,
+                datosRespuesta: JSON.stringify(resumenMP),
+            },
+        });
+        return { procesado: true, estado: nuevoEstado };
+    }, { isolationLevel: 'ReadCommitted' });
+}
+
 async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
     const idApertura = Number(aperturaCajaId);
     if (!Number.isSafeInteger(idApertura) || idApertura <= 0) {
@@ -425,6 +757,7 @@ async obtenerResumenVentasPorApertura(aperturaCajaId, client = this.prisma) {
     const metodosMap = new Map();
 
     for (const venta of ventas) {
+        if (String(venta.estado ?? '').trim().toLowerCase() === 'pendiente_pago') continue;
         const totalItem = currency(venta.total);
         const esCancelada = ['cancelada', 'cancelado'].includes(String(venta.estado ?? '').trim().toLowerCase());
         const esEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
@@ -495,6 +828,8 @@ async create(data) {
         empleadoId,
         clienteId,
         usuarioId,
+        empresaId,
+        uuidIdempotencia,
         subtotal: subtotalEnviado,
         total: totalEnviado,
         montoRecibido: montoRecibidoEnviado,
@@ -518,7 +853,62 @@ async create(data) {
         throw error;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const metodoPagoSolicitado = await this.prisma.metodoPago.findFirst({
+        where: {
+            id: Number(restoDatos.metodoPagoId),
+            estado: 'activo',
+            deletedAt: null,
+        },
+        select: { codigo: true },
+    });
+    const esPagoMercadoPago = metodoPagoSolicitado?.codigo === 'MERCADO_PAGO';
+    const hashSolicitud = esPagoMercadoPago
+        ? crypto.createHash('sha256').update(JSON.stringify({
+              aperturaCajaId,
+              empleadoId: idEmpleado,
+              clienteId: idCliente,
+              metodoPagoId: Number(restoDatos.metodoPagoId),
+              subtotal: Number(subtotalEnviado),
+              total: Number(totalEnviado),
+              detalleVenta,
+          })).digest('hex')
+        : null;
+
+    if (esPagoMercadoPago && !uuidIdempotencia) {
+        const error = new Error('Se requiere una llave de idempotencia para crear un checkout digital.');
+        error.status = 400;
+        throw error;
+    }
+
+    const recuperarVentaDigital = async (transaccion) => {
+        if (
+            !esPagoMercadoPago
+            || transaccion.proveedor !== 'MERCADO_PAGO'
+            || Number(transaccion.empresaId) !== Number(empresaId)
+            || transaccion.metadatos?.requestHash !== hashSolicitud
+        ) {
+            const error = new Error('La llave de idempotencia ya se utilizó con otra solicitud.');
+            error.status = 409;
+            throw error;
+        }
+        const ventaExistente = await this.getById(transaccion.ventaId);
+        if (!ventaExistente) {
+            const error = new Error('No se encontró la venta asociada a la llave de idempotencia.');
+            error.status = 409;
+            throw error;
+        }
+        const pagoDigital = await pagoService.prepararCheckoutVenta(transaccion.ventaId, empresaId);
+        return { ...ventaExistente, pagoDigital };
+    };
+
+    if (uuidIdempotencia) {
+        const transaccionExistente = await this.prisma.transaccionPago.findUnique({
+            where: { uuidIdempotencia },
+        });
+        if (transaccionExistente) return recuperarVentaDigital(transaccionExistente);
+    }
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
         const empleado = await tx.empleado.findFirst({
             where: {
                 id: idEmpleado,
@@ -551,7 +941,8 @@ async create(data) {
         // Bloquear la fila de apertura para serializar con corte de caja
         const aperturasBloqueadas = await tx.$queryRaw`
             SELECT id, estado, empleado_id AS empleadoId,
-                   empresa_id AS empresaId, sucursal_id AS sucursalId
+                   empresa_id AS empresaId, sucursal_id AS sucursalId,
+                   usa_movimientos_cobro AS usaMovimientosCobro
             FROM aperturas_caja
             WHERE id = ${aperturaCajaId} AND deleted_at IS NULL
             FOR UPDATE
@@ -563,6 +954,26 @@ async create(data) {
             error.code = 'APERTURA_CAJA_CERRADA';
             error.status = 409;
             throw error;
+        }
+        if (!(cajaAbierta.usaMovimientosCobro === true || Number(cajaAbierta.usaMovimientosCobro) === 1)) {
+            const error = new Error('La apertura debe migrarse al registro de movimientos antes de registrar ventas.');
+            error.code = 'APERTURA_REQUIERE_MOVIMIENTOS';
+            error.status = 409;
+            throw error;
+        }
+        if (empresaId != null && Number(empresaId) !== Number(cajaAbierta.empresaId)) {
+            const error = new Error('La apertura de caja no pertenece a la empresa del usuario.');
+            error.status = 403;
+            throw error;
+        }
+
+        if (uuidIdempotencia) {
+            const transaccionConcurrente = await tx.transaccionPago.findUnique({
+                where: { uuidIdempotencia },
+            });
+            if (transaccionConcurrente) {
+                return { ventaId: transaccionConcurrente.ventaId, esPagoMercadoPago: true };
+            }
         }
 
         const detalles = await this.prepararDetalles(
@@ -581,12 +992,20 @@ async create(data) {
             { subtotal: subtotalEnviado, total: totalEnviado }
         );
         const esPagoEfectivo = metodoPago.codigo === 'EFECTIVO';
-        const montoRecibido = esPagoEfectivo
-            ? this.validarMontoRecibido(montoRecibidoEnviado, total)
-            : total;
+        const esDigital = metodoPago.codigo === 'MERCADO_PAGO';
+        const montoRecibido = esDigital
+            ? null
+            : esPagoEfectivo
+                ? this.validarMontoRecibido(montoRecibidoEnviado, total)
+                : total;
         const cambio = esPagoEfectivo
             ? currency(montoRecibido).subtract(total).value
             : 0;
+        if (esDigital && total <= 0) {
+            const error = new Error('El total debe ser mayor a cero para cobrar con Mercado Pago.');
+            error.status = 400;
+            throw error;
+        }
 
         const nuevaVenta = await tx.venta.create({
             data: {
@@ -599,6 +1018,7 @@ async create(data) {
                 total,
                 montoRecibido,
                 cambio,
+                estado: esDigital ? 'pendiente_pago' : ESTADO_VENTA.COMPLETADA,
                 detalleVenta: {
                     create: detalles,
                 },
@@ -618,6 +1038,8 @@ async create(data) {
                 ...pago,
                 empresaId: Number(cajaAbierta.empresaId),
                 sucursalId: Number(cajaAbierta.sucursalId),
+                aperturaCajaId: Number(cajaAbierta.id),
+                empleadoId: Number(cajaAbierta.empleadoId),
                 ventaId: nuevaVenta.id,
                 folioVenta: nuevaVenta.folioVenta.id,
                 proveedor,
@@ -627,159 +1049,32 @@ async create(data) {
             });
         }
 
+        if (esDigital) {
+            await pagoService.registrarCobroDigitalVenta(tx, {
+                empresaId: Number(cajaAbierta.empresaId),
+                sucursalId: Number(cajaAbierta.sucursalId),
+                ventaId: nuevaVenta.id,
+                folioVenta: nuevaVenta.folioVenta.id,
+                monto: total,
+                correoCliente: pago?.correoCliente ?? null,
+                uuidIdempotencia,
+                requestHash: hashSolicitud,
+            });
+        }
+
         await this.ajustarStock(tx, [], detalles);
 
-        return this.getById(nuevaVenta.id, tx);
+        return { ventaId: nuevaVenta.id, esPagoMercadoPago: esDigital };
     });
+
+    if (resultado.esPagoMercadoPago) {
+        const venta = await this.getById(resultado.ventaId);
+        const pagoDigital = await pagoService.prepararCheckoutVenta(resultado.ventaId, empresaId);
+        return { ...venta, pagoDigital };
+    }
+    return this.getById(resultado.ventaId);
 }
 
-async update(id, data) {
-    const ventaId = this.validarId(id, 'la venta');
-
-    if (
-        data.metodoPagoId === undefined &&
-        data.detalleVenta === undefined
-    ) {
-        throw new Error('No hay campos para actualizar');
-    }
-
-    if (data.detalleVenta !== undefined) {
-        if (data.subtotal === undefined || data.total === undefined) {
-            throw new Error('El subtotal y el total son requeridos al actualizar el detalle de una venta');
-        }
-        this.validarDetalles(data.detalleVenta);
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-        const referenciaVenta = await tx.venta.findFirst({
-            where: {
-                id: ventaId,
-                deletedAt: null,
-            },
-            select: {
-                aperturaCajaId: true,
-                aperturaCaja: {
-                    select: { empresaId: true, sucursalId: true },
-                },
-            },
-        });
-
-        if (!referenciaVenta) {
-            throw new Error('La venta no existe');
-        }
-        if (!referenciaVenta.aperturaCajaId) {
-            throw new Error('La venta no tiene una apertura de caja asociada');
-        }
-
-        // Bloquear la fila de apertura para serializar con corte de caja
-        const cajasUpdateBloqueadas = await tx.$queryRaw`
-            SELECT id, estado
-            FROM aperturas_caja
-            WHERE id = ${referenciaVenta.aperturaCajaId} AND deleted_at IS NULL
-            FOR UPDATE
-        `;
-        const caja = cajasUpdateBloqueadas[0];
-
-        if (!caja || caja.estado !== ESTADO_CAJA.ABIERTA) {
-            throw new Error('La caja de esta venta está cerrada');
-        }
-
-        const ventasUpdateBloqueadas = await tx.$queryRaw`
-            SELECT id
-            FROM venta
-            WHERE id = ${ventaId} AND deleted_at IS NULL
-            FOR UPDATE
-        `;
-        if (ventasUpdateBloqueadas.length === 0) {
-            throw new Error('La venta no existe');
-        }
-
-        const venta = await tx.venta.findFirst({
-            where: {
-                id: ventaId,
-                deletedAt: null,
-            },
-            include: {
-                detalleVenta: true,
-            },
-        });
-        if (!venta) {
-            throw new Error('La venta no existe');
-        }
-        if (venta.estado === ESTADO_VENTA.CANCELADA) {
-            throw new Error('No se puede modificar una venta cancelada');
-        }
-
-        const metodoPago = data.metodoPagoId === undefined
-            ? undefined
-            : await this.validarMetodoPago(tx, data.metodoPagoId);
-
-        if (data.detalleVenta === undefined) {
-            await tx.venta.update({
-                where: { id: ventaId },
-                data: metodoPago
-                    ? { metodoPago: { connect: { id: metodoPago.id } } }
-                    : {},
-            });
-
-            return this.getById(ventaId, tx);
-        }
-
-        const items = data.detalleVenta ??
-            venta.detalleVenta.map((d) => ({
-                tipoItem: d.tipoItem,
-                productoId: d.productoId,
-                servicioId: d.servicioId,
-                tipoMembresiaId: d.tipoMembresiaId,
-                cantidad: d.cantidad,
-                descripcion: d.descripcion,
-            }));
-
-        const detalles = await this.prepararDetalles(
-            tx,
-            items,
-            venta.detalleVenta,
-            {
-                empresaId: referenciaVenta.aperturaCaja.empresaId,
-                sucursalId: referenciaVenta.aperturaCaja.sucursalId,
-            }
-        );
-
-        const { subtotal, total } = this.calcularTotal(
-            detalles,
-        );
-        this.validarMontos(
-            { subtotal, total },
-            { subtotal: data.subtotal, total: data.total }
-        );
-
-        await tx.detalleVenta.deleteMany({
-            where: { ventaId },
-        });
-
-        await tx.venta.update({
-            where: { id: ventaId },
-            data: {
-                subtotal,
-                total,
-                ...(metodoPago
-                    ? { metodoPago: { connect: { id: metodoPago.id } } }
-                    : {}),
-                detalleVenta: {
-                    create: detalles,
-                },
-            },
-        });
-
-        await this.ajustarStock(
-            tx,
-            venta.detalleVenta,
-            detalles
-        );
-
-        return this.getById(ventaId, tx);
-    }, { isolationLevel: 'ReadCommitted' });
-}
 async cancel(id, motivoCancelacion) {
     const ventaId = this.validarId(id, 'la venta');
 
@@ -800,7 +1095,7 @@ async cancel(id, motivoCancelacion) {
         }
 
         const cajasCancelBloqueadas = await tx.$queryRaw`
-            SELECT id, estado
+            SELECT id, estado, empresa_id AS empresaId, sucursal_id AS sucursalId
             FROM aperturas_caja
             WHERE id = ${referenciaVenta.aperturaCajaId} AND deleted_at IS NULL
             FOR UPDATE
@@ -828,6 +1123,13 @@ async cancel(id, motivoCancelacion) {
                 metodoPago: {
                     select: { codigo: true },
                 },
+                transaccionesPago: {
+                    where: {
+                        proveedor: { in: ['MERCADO_PAGO', 'EFECTIVO'] },
+                        deletedAt: null,
+                    },
+                    select: { id: true, proveedor: true, estado: true, metadatos: true },
+                },
                 folioVenta: {
                     select: { id: true },
                 },
@@ -836,6 +1138,14 @@ async cancel(id, motivoCancelacion) {
 
         if (venta.estado === ESTADO_VENTA.CANCELADA) {
             throw new Error('La venta ya está cancelada');
+        }
+        if (
+            venta.metodoPago?.codigo === 'MERCADO_PAGO'
+            && ['completada', 'completado'].includes(String(venta.estado ?? '').toLowerCase())
+        ) {
+            const error = new Error('El cobro de Mercado Pago debe reembolsarse en el proveedor antes de cancelar esta venta.');
+            error.status = 409;
+            throw error;
         }
 
         const devolucionesExistentes = await tx.devolucion.count({
@@ -850,14 +1160,38 @@ async cancel(id, motivoCancelacion) {
         const esPagoEfectivo = venta.metodoPago?.codigo === 'EFECTIVO';
 
         if (esPagoEfectivo) {
+            const transaccionEfectivo = venta.transaccionesPago.find(
+                (transaccion) => transaccion.proveedor === 'EFECTIVO'
+            );
             await tx.movimientoCaja.create({
                 data: {
+                    empresaId: Number(caja.empresaId),
+                    sucursalId: Number(caja.sucursalId),
                     aperturaCajaId: caja.id,
                     empleadoId: venta.empleadoId,
                     tipo: 'SALIDA',
+                    origen: 'CANCELACION',
                     monto: venta.total,
                     concepto: `Cancelación de venta folio ${venta.folioVenta.id}`,
                     estado: 'PENDIENTE',
+                    ventaId: venta.id,
+                    transaccionPagoId: transaccionEfectivo?.id,
+                },
+            });
+        }
+        const pagoMercadoPago = venta.transaccionesPago.find(
+            (transaccion) => transaccion.proveedor === 'MERCADO_PAGO'
+        );
+        if (pagoMercadoPago && venta.estado === 'pendiente_pago') {
+            const metadatos = pagoMercadoPago.metadatos && typeof pagoMercadoPago.metadatos === 'object'
+                ? pagoMercadoPago.metadatos
+                : {};
+            await tx.transaccionPago.update({
+                where: { id: pagoMercadoPago.id },
+                data: {
+                    estado: 'EXPIRADO',
+                    metadatos: { ...metadatos, canceladoManualmente: true },
+                    datosRespuesta: JSON.stringify({ motivoCancelacion }),
                 },
             });
         }

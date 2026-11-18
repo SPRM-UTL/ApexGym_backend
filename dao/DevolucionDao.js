@@ -233,7 +233,8 @@ export async function crearDevolucion(
 
     return client.$transaction(async (tx) => {
         const aperturas = await tx.$queryRaw`
-            SELECT id, estado, empleado_id AS empleadoId
+            SELECT id, estado, empleado_id AS empleadoId,
+                   empresa_id AS empresaId, sucursal_id AS sucursalId
             FROM aperturas_caja
             WHERE id = ${idApertura} AND deleted_at IS NULL
             FOR UPDATE
@@ -314,15 +315,19 @@ export async function crearDevolucion(
         if (esPagoEfectivo) {
             await tx.movimientoCaja.create({
                 data: {
+                    empresaId: Number(apertura.empresaId),
+                    sucursalId: Number(apertura.sucursalId),
                     aperturaCajaId: idApertura,
                     empleadoId: Number(apertura.empleadoId),
                     tipo: 'SALIDA',
+                    origen: 'DEVOLUCION',
                     monto: calculo.montoTotal,
                     concepto: `Devolución de venta folio ${venta.folioVentaId}`,
                     estado: 'PENDIENTE',
+                    ventaId: idVenta,
                     devolucionId: devolucion.id,
                 },
-            }, { isolationLevel: 'ReadCommitted' });
+            });
         }
 
         const devolucionRegistrada = await tx.devolucion.findUnique({

@@ -2,6 +2,7 @@
 import { ventaDao } from '../dao/VentaDao.js';
 import { BaseController } from './BaseController.js';
 import { ResponseModel } from '../modelos/ResponseModel.js';
+import { pagoService } from '../services/PagoService.js';
 
 export class VentaController extends BaseController {
     constructor() {
@@ -33,7 +34,7 @@ export class VentaController extends BaseController {
                 || cliente.length > 100
                 || (req.query.q !== undefined && typeof req.query.q !== 'string')
                 || busqueda.length > 100
-                || (estado !== undefined && !['completada', 'cancelada'].includes(estado))
+                || (estado !== undefined && !['completada', 'cancelada', 'pendiente_pago'].includes(estado))
                 || (fechaDesde && fechaHasta && fechaDesde > fechaHasta)
             ) {
                 return res.status(400).json(new ResponseModel(
@@ -85,6 +86,8 @@ export class VentaController extends BaseController {
                 aperturaCajaId: Number(aperturaCajaId),
                 clienteId: Number(clienteId),
                 usuarioId: this.leerId(req.usuario?.id, 'usuario autenticado'),
+                empresaId: this.obtenerEmpresaId(req),
+                uuidIdempotencia: req.get('x-idempotency-key') ?? req.body.uuidIdempotencia,
                 metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),
                 subtotal: this.leerMonto(subtotal, 'subtotal'),
                 total: this.leerMonto(total, 'total'),
@@ -107,7 +110,7 @@ export class VentaController extends BaseController {
                     error.status
                 ));
             }
-            if ([400, 409].includes(error.status)) {
+            if ([400, 403, 409, 502, 503].includes(error.status)) {
                 return res.status(error.status).json(new ResponseModel(
                     null,
                     1,
@@ -119,48 +122,43 @@ export class VentaController extends BaseController {
         }
     };
 
-    update = async (req, res) => {
+    consultarEstadoPago = async (req, res) => {
         try {
-            const id = this.leerId(req.params.id);
-            const { metodoPagoId, detalleVenta, subtotal, total } = req.body;
-
-            if (
-                detalleVenta === undefined
-                && (subtotal !== undefined || total !== undefined)
-            ) {
-                throw new Error(
-                    'El subtotal y el total solo se pueden validar junto con el detalle de la venta'
-                );
-            }
-
-            const datos = {};
-
-            if (metodoPagoId !== undefined) {
-                datos.metodoPagoId = this.leerId(
-                    metodoPagoId,
-                    'método de pago'
-                );
-            }
-
-            if (detalleVenta !== undefined) {
-                datos.detalleVenta = this.normalizarDetalles(detalleVenta);
-                datos.subtotal = this.leerMonto(subtotal, 'subtotal');
-                datos.total = this.leerMonto(total, 'total');
-            }
-
-            if (Object.keys(datos).length === 0) {
-                throw new Error('No hay campos para actualizar');
-            }
-
-            const registro = await this.dao.update(id, datos);
-
-            return this.respuestaExito(
-                res,
-                registro,
-                'Venta actualizada correctamente'
+            const ventaId = this.leerId(req.params.id, 'venta');
+            const paymentId = typeof req.query.payment_id === 'string'
+                ? req.query.payment_id
+                : typeof req.query.collection_id === 'string'
+                    ? req.query.collection_id
+                    : null;
+            const resultado = await pagoService.consultarEstadoVenta(
+                ventaId,
+                this.obtenerEmpresaId(req),
+                paymentId
             );
+            return this.respuestaExito(res, resultado, 'Estado del pago consultado correctamente');
         } catch (error) {
-            if ([400, 409].includes(error.status)) {
+            if ([400, 401, 403, 404, 409, 502, 503].includes(error.status)) {
+                return res.status(error.status).json(new ResponseModel(
+                    null,
+                    1,
+                    error.message,
+                    error.status
+                ));
+            }
+            return this.respuestaError(res, error);
+        }
+    };
+
+    crearCheckoutPago = async (req, res) => {
+        try {
+            const ventaId = this.leerId(req.params.id, 'venta');
+            const pago = await pagoService.prepararCheckoutVenta(
+                ventaId,
+                this.obtenerEmpresaId(req)
+            );
+            return this.respuestaExito(res, pago, 'Checkout de Mercado Pago listo');
+        } catch (error) {
+            if ([400, 404, 409, 502, 503].includes(error.status)) {
                 return res.status(error.status).json(new ResponseModel(
                     null,
                     1,
@@ -197,8 +195,8 @@ export class VentaController extends BaseController {
                 'Se canceló la venta con éxito'
             );
         } catch (error) {
-            if (error.status === 400) {
-                return res.status(400).json(new ResponseModel(null, 1, error.message, 400));
+            if ([400, 409].includes(error.status)) {
+                return res.status(error.status).json(new ResponseModel(null, 1, error.message, error.status));
             }
             return this.respuestaError(res, error);
         }

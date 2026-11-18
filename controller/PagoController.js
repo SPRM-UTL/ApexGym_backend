@@ -15,7 +15,6 @@ export class PagoController extends BaseController {
     obtenerTodos = async (req, res) => {
         try {
             const empresaId = this.obtenerEmpresaId(req);
-            await pagoService.sincronizarConMercadoPago(empresaId).catch(() => {});
             const filtroEmpresa = this.dao?.useEmpresa ? { empresaId } : {};
             const registros = await this.dao.getAll(filtroEmpresa, { id: 'desc' }, empresaId);
             return this.respuestaExito(res, registros || [], "Registros obtenidos exitosamente");
@@ -110,11 +109,14 @@ export class PagoController extends BaseController {
      */
     recibirWebhook = async (req, res) => {
         try {
-            const resultado = await pagoService.procesarWebhook(req.body, req.headers);
+            const resultado = await pagoService.procesarWebhook(req.query, req.body, req.headers);
             return res.status(200).json({ ok: true, ...resultado });
         } catch (error) {
+            if ([400, 401, 404, 409, 502, 503].includes(error.status)) {
+                return res.status(error.status).json({ ok: false, error: error.message });
+            }
             console.error('[Webhook Pagos Error]:', error);
-            return res.status(500).json({ ok: false, error: error.message });
+            return res.status(500).json({ ok: false, error: 'No se pudo procesar la notificación de pago.' });
         }
     };
 }

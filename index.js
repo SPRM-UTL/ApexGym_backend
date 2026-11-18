@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 import { contextoMiddleware } from './middleware/contextoMiddleware.js';
+import { ventaDao } from './dao/VentaDao.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,13 @@ app.use('/api', api);
 let handler = app;
 
 if (typeof WebSocketPair === 'undefined') {
+    const expiracionPagosTimer = setInterval(() => {
+        ventaDao.expirarVentasDigitalesPendientes().catch((error) => {
+            console.error('No se pudieron expirar las ventas digitales pendientes:', error);
+        });
+    }, 60_000);
+    expiracionPagosTimer.unref?.();
+
     app.listen(port, () => {
         console.log(`Servidor corriendo en http://localhost:${port}`);
     });

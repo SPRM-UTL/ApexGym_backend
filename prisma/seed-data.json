@@ -676,6 +676,7 @@
     "metodosPago": [
       { "nombre": "Efectivo", "codigo": "EFECTIVO", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
       { "nombre": "Tarjeta", "codigo": "TARJETA", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
+      { "nombre": "Mercado Pago", "codigo": "MERCADO_PAGO", "descripcion": "Checkout digital Mercado Pago (sandbox)", "estado": "activo" },
       { "nombre": "Transferencia", "codigo": "TRANSFERENCIA", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
     ],
     "servicios": [

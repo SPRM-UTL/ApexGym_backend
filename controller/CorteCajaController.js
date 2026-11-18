@@ -9,6 +9,7 @@ import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 import currency from 'currency.js';
 import { ventaDao } from '../dao/VentaDao.js';
+import { calcularEfectivoEsperado } from '../utils/calcularEfectivoCaja.js';
 
 export class CorteCajaController extends BaseController {
     constructor() {
@@ -34,7 +35,10 @@ export class CorteCajaController extends BaseController {
             const resultado = await prisma.$transaction(async (tx) => {
                 // 1. Bloquear la fila de la apertura para serializar con ventas y otros cortes
                 const aperturas = await tx.$queryRaw`
-                    SELECT id, estado, monto_inicial AS montoInicial, desglose_inicio AS desgloseInicio, empleado_id AS empleadoId
+                    SELECT id, estado, monto_inicial AS montoInicial,
+                           desglose_inicio AS desgloseInicio,
+                           empleado_id AS empleadoId,
+                           usa_movimientos_cobro AS usaMovimientosCobro
                     FROM aperturas_caja
                     WHERE id = ${Number(aperturaCajaId)} AND deleted_at IS NULL
                     FOR UPDATE
@@ -43,6 +47,29 @@ export class CorteCajaController extends BaseController {
                 if (!apertura) throw new Error('La apertura de caja especificada no existe');
                 if (apertura.estado !== 'ABIERTA') {
                     throw new Error('La apertura de caja ya está cerrada, no se puede generar otro corte');
+                }
+                if (!(apertura.usaMovimientosCobro === true || Number(apertura.usaMovimientosCobro) === 1)) {
+                    const error = new Error('La apertura debe migrarse al registro de movimientos antes de realizar el corte.');
+                    error.status = 409;
+                    throw error;
+                }
+
+                await ventaDao.expirarPagosPendientesEnApertura(
+                    tx,
+                    Number(aperturaCajaId),
+                    new Date()
+                );
+                const ventasPagoPendientes = await tx.venta.count({
+                    where: {
+                        aperturaCajaId: Number(aperturaCajaId),
+                        estado: 'pendiente_pago',
+                        deletedAt: null,
+                    },
+                });
+                if (ventasPagoPendientes > 0) {
+                    const error = new Error(`No se puede realizar el corte: hay ${ventasPagoPendientes} venta(s) con pago digital pendiente.`);
+                    error.status = 409;
+                    throw error;
                 }
 
                 // 2. Verificar que no existan movimientos pendientes de validar
@@ -58,7 +85,12 @@ export class CorteCajaController extends BaseController {
                 }
 
                 // 3. Sumar movimientos, ventas y devoluciones de esta apertura
-                const [sumaEntradas, sumaSalidas, resumenVentas, sumaDevoluciones] = await Promise.all([
+                const [
+                    sumaEntradas,
+                    sumaSalidas,
+                    resumenVentas,
+                    sumaDevoluciones,
+                ] = await Promise.all([
                     tx.movimientoCaja.aggregate({
                         where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
                         _sum: { monto: true },
@@ -79,12 +111,11 @@ export class CorteCajaController extends BaseController {
                 const totalDevoluciones = currency(String(sumaDevoluciones._sum.monto ?? 0)).value;
                 const montoInicial = currency(String(apertura.montoInicial ?? 0)).value;
 
-                // Regla de cálculo: Efectivo esperado = fondo inicial + entradas - salidas + ventas en efectivo brutas
-                const efectivoEsperado = currency(montoInicial)
-                    .add(totalEntradas)
-                    .subtract(totalSalidas)
-                    .add(resumenVentas.totalVentasEfectivoBruto)
-                    .value;
+                const efectivoEsperado = calcularEfectivoEsperado({
+                    montoInicial,
+                    totalEntradas,
+                    totalSalidas,
+                });
 
                 const diferencia = currency(Number(efectivoContado)).subtract(efectivoEsperado).value;
 
@@ -141,6 +172,14 @@ export class CorteCajaController extends BaseController {
 
             return this.respuestaExito(res, resultado, 'Corte de caja registrado y apertura cerrada correctamente');
         } catch (error) {
+            if (error.status === 409) {
+                return res.status(409).json({
+                    data: null,
+                    responseFlag: 1,
+                    message: error.message,
+                    statusCode: 409,
+                });
+            }
             return this.respuestaError(res, error);
         }
     };

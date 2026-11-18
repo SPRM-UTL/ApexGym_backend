@@ -14,6 +14,7 @@ import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 import currency from 'currency.js';
 import { ventaDao } from '../dao/VentaDao.js';
+import { calcularEfectivoEsperado } from '../utils/calcularEfectivoCaja.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
@@ -63,7 +64,8 @@ export class MovimientoCajaController extends BaseController {
             const tipoNormalizado = tipo.trim().toUpperCase();
             const registro = await prisma.$transaction(async (tx) => {
                 const aperturas = await tx.$queryRaw`
-                    SELECT id, estado, monto_inicial AS montoInicial
+                    SELECT id, estado, monto_inicial AS montoInicial,
+                           usa_movimientos_cobro AS usaMovimientosCobro
                     FROM aperturas_caja
                     WHERE id = ${idApertura} AND deleted_at IS NULL
                     FOR UPDATE
@@ -72,9 +74,14 @@ export class MovimientoCajaController extends BaseController {
                 if (!apertura) throw new Error('La apertura de caja especificada no existe');
                 if (apertura.estado !== 'ABIERTA')
                     throw new Error('No se pueden registrar movimientos en una apertura cerrada');
+                if (!(apertura.usaMovimientosCobro === true || Number(apertura.usaMovimientosCobro) === 1)) {
+                    const error = new Error('La apertura debe migrarse al registro de movimientos antes de operar caja.');
+                    error.status = 409;
+                    throw error;
+                }
 
                 if (tipoNormalizado === 'SALIDA') {
-                    const [sumaEntradas, sumaSalidas, resumenVentas] = await Promise.all([
+                    const [sumaEntradas, sumaSalidas] = await Promise.all([
                         tx.movimientoCaja.aggregate({
                             where: { aperturaCajaId: idApertura, tipo: 'ENTRADA', deletedAt: null },
                             _sum: { monto: true },
@@ -83,16 +90,15 @@ export class MovimientoCajaController extends BaseController {
                             where: { aperturaCajaId: idApertura, tipo: 'SALIDA', deletedAt: null },
                             _sum: { monto: true },
                         }),
-                        ventaDao.obtenerResumenVentasPorApertura(idApertura, tx),
                     ]);
 
                     const totalEntradas = currency(String(sumaEntradas._sum.monto ?? 0)).value;
                     const totalSalidas = currency(String(sumaSalidas._sum.monto ?? 0)).value;
-                    const saldoDisponible = currency(String(apertura.montoInicial ?? 0))
-                        .add(totalEntradas)
-                        .subtract(totalSalidas)
-                        .add(resumenVentas.totalVentasEfectivoBruto)
-                        .value;
+                    const saldoDisponible = calcularEfectivoEsperado({
+                        montoInicial: apertura.montoInicial,
+                        totalEntradas,
+                        totalSalidas,
+                    });
 
                     if (Number(monto) > saldoDisponible) {
                         throw new Error(`Saldo insuficiente en caja. El saldo disponible es de ${saldoDisponible.toFixed(2)} y se intentó retirar ${Number(monto).toFixed(2)}`);
@@ -183,7 +189,13 @@ export class MovimientoCajaController extends BaseController {
             });
             if (!apertura) throw new Error('Apertura no encontrada');
 
-            const [sumaEntradas, sumaSalidas, movimientos, resumenVentas] = await Promise.all([
+            const [
+                sumaEntradas,
+                sumaSalidas,
+                movimientos,
+                resumenVentas,
+                corteGuardado,
+            ] = await Promise.all([
                 prisma.movimientoCaja.aggregate({
                     where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
                     _sum: { monto: true },
@@ -194,16 +206,46 @@ export class MovimientoCajaController extends BaseController {
                 }),
                 this.dao.getAllByApertura(aperturaCajaId),
                 ventaDao.obtenerResumenVentasPorApertura(aperturaCajaId),
+                apertura.estado === 'CERRADA'
+                    ? prisma.corteCaja.findFirst({
+                          where: { aperturaCajaId, deletedAt: null },
+                          orderBy: [{ fechaCorte: 'desc' }, { id: 'desc' }],
+                          select: {
+                              efectivoEsperado: true,
+                              efectivoContado: true,
+                              diferencia: true,
+                          },
+                      })
+                    : Promise.resolve(null),
             ]);
 
             const totalEntradas = currency(String(sumaEntradas._sum.monto ?? 0)).value;
             const totalSalidas = currency(String(sumaSalidas._sum.monto ?? 0)).value;
             const montoInicial = currency(String(apertura.montoInicial ?? 0)).value;
-            const saldoDisponible = currency(montoInicial)
-                .add(totalEntradas)
-                .subtract(totalSalidas)
-                .add(resumenVentas.totalVentasEfectivoBruto)
-                .value;
+            let saldoDisponible;
+            if (apertura.estado === 'CERRADA') {
+                if (!corteGuardado) {
+                    throw new Error('No se encontró el corte guardado para consultar el saldo histórico de esta apertura.');
+                }
+                saldoDisponible = corteGuardado.efectivoEsperado !== null
+                    ? currency(String(corteGuardado.efectivoEsperado)).value
+                    : currency(String(corteGuardado.efectivoContado))
+                        .subtract(String(corteGuardado.diferencia))
+                        .value;
+            } else if (apertura.estado === 'ABIERTA') {
+                if (!(apertura.usaMovimientosCobro === true || Number(apertura.usaMovimientosCobro) === 1)) {
+                    const error = new Error('La apertura debe migrarse al registro de movimientos antes de consultar el saldo operativo.');
+                    error.status = 409;
+                    throw error;
+                }
+                saldoDisponible = calcularEfectivoEsperado({
+                    montoInicial,
+                    totalEntradas,
+                    totalSalidas,
+                });
+            } else {
+                throw new Error('La apertura no tiene un estado que permita consultar su saldo.');
+            }
             const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
             const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
 

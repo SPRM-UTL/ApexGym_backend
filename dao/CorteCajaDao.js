@@ -11,6 +11,7 @@ const INCLUDE_DEFAULT = {
             fechaApertura: true,
             montoInicial: true,
             estado: true,
+            usaMovimientosCobro: true,
             caja: { select: { id: true, nombre: true } },
         },
     },

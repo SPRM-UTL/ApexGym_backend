@@ -585,6 +585,7 @@ model AperturaCaja {
   cajaId         Int       @map("caja_id")
   empleadoId     Int       @map("empleado_id")
   montoInicial   Decimal   @map("monto_inicial") @db.Decimal(10, 2)
+  usaMovimientosCobro Boolean @default(false) @map("usa_movimientos_cobro")
   fechaApertura  DateTime  @map("fecha_apertura")
   estado         String    @default("ABIERTA") @db.VarChar(20)
   desgloseInicio String?   @map("desglose_inicio") @db.Text
@@ -613,11 +614,14 @@ model MovimientoCaja {
   aperturaCajaId Int       @map("apertura_caja_id")
   empleadoId     Int       @map("empleado_id")
   tipo           String    @db.VarChar(20)
+  origen         OrigenMovimiento @default(MANUAL)
   monto          Decimal   @db.Decimal(10, 2)
   concepto       String    @db.VarChar(255)
   estado         String    @default("PENDIENTE") @db.VarChar(20)
   desglose       String?   @db.Text
   observaciones  String?   @db.Text
+  ventaId        Int?      @map("venta_id")
+  transaccionPagoId Int?   @map("transaccion_pago_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -627,9 +631,13 @@ model MovimientoCaja {
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   aperturaCaja AperturaCaja @relation(fields: [aperturaCajaId], references: [id], onDelete: Cascade)
   empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  venta        Venta?       @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  transaccionPago TransaccionPago? @relation(fields: [transaccionPagoId], references: [id], onDelete: Restrict)
   devolucionId Int?          @unique @map("devolucion_id")
   devolucion   Devolucion?   @relation(fields: [devolucionId], references: [id], onDelete: Restrict)
 
+  @@unique([transaccionPagoId, origen])
+  @@index([ventaId])
   @@map("movimientos_caja")
 }
 
@@ -728,6 +736,7 @@ model Venta {
   detalleVenta        DetalleVenta[]
   devoluciones       Devolucion[]
   transaccionesPago TransaccionPago[]
+  movimientosCaja   MovimientoCaja[]
 
   @@index([empleadoId])
   @@index([usuarioId])
@@ -826,6 +835,14 @@ enum ProveedorPago {
   EFECTIVO
 }
 
+enum OrigenMovimiento {
+  MANUAL
+  COBRO_VENTA
+  CANCELACION
+  DEVOLUCION
+  REVERSO
+}
+
 model TransaccionPago {
   id                Int                   @id @default(autoincrement())
   ventaId           Int?                  @map("venta_id")
@@ -848,11 +865,13 @@ model TransaccionPago {
 
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   venta   Venta? @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  movimientosCaja MovimientoCaja[]
   sucursalId Int      @default(1) @map("sucursal_id")
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
 
   @@index([ventaId])
   @@index([empresaId, estado])
+  @@unique([empresaId, proveedor, folioVoucher], map: "transacciones_pagos_empresa_proveedor_folio_voucher_key")
   @@map("transacciones_pagos")
 }
 
