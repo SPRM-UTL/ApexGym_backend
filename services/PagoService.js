@@ -712,19 +712,6 @@ export class PagoService {
                 };
             }
 
-            if (!this.mpAccessToken && this.env.NODE_ENV !== 'production') {
-                const urlRetorno = new URL('/registro-de-ventas', this.frontendUrl);
-                urlRetorno.searchParams.set('ventaId', String(ventaId));
-                urlRetorno.searchParams.set('mp_return', '1');
-                urlRetorno.searchParams.set('collection_status', 'approved');
-                urlRetorno.searchParams.set('payment_id', `mock_mp_${ventaId}_${Date.now()}`);
-                return {
-                    estado: transaccion.estado,
-                    urlCheckout: urlRetorno.toString(),
-                    venceEn: venceEn.toISOString(),
-                };
-            }
-
             this.validarConfiguracionSandbox();
             const urlRetorno = new URL('/registro-de-ventas', this.frontendUrl);
             urlRetorno.searchParams.set('ventaId', String(ventaId));
@@ -835,34 +822,9 @@ export class PagoService {
 
     async consultarEstadoVenta(ventaId, empresaId, paymentId = null) {
             if (paymentId) {
-                if (typeof paymentId === 'string' && paymentId.startsWith('mock_mp_')) {
-                    const transaccion = await transaccionPagoDao.model.findFirst({
-                        where: {
-                            ventaId: Number(ventaId),
-                            empresaId: Number(empresaId),
-                            proveedor: 'MERCADO_PAGO',
-                            deletedAt: null,
-                        },
-                    });
-                    if (transaccion) {
-                        await transaccionPagoDao.model.update({
-                            where: { id: transaccion.id },
-                            data: { estado: 'APROBADO', referenciaExterna: paymentId },
-                        });
-                        await transaccionPagoDao.prisma.venta.update({
-                            where: { id: Number(ventaId) },
-                            data: { estado: 'completada' },
-                        });
-                        await transaccionPagoDao.prisma.movimientoCaja.updateMany({
-                            where: { ventaId: Number(ventaId), estado: 'PENDIENTE' },
-                            data: { estado: 'VALIDADO' },
-                        });
-                    }
-                } else {
-                    const paymentData = await this.obtenerPagoMercadoPago(paymentId);
-                    const { ventaDao } = await import('../dao/VentaDao.js');
-                    await ventaDao.resolverPagoMercadoPago(paymentData, Number(empresaId));
-                }
+                const paymentData = await this.obtenerPagoMercadoPago(paymentId);
+                const { ventaDao } = await import('../dao/VentaDao.js');
+                await ventaDao.resolverPagoMercadoPago(paymentData, Number(empresaId));
             } else {
                 const { ventaDao } = await import('../dao/VentaDao.js');
                 await ventaDao.expirarVentasDigitalesPendientes(Number(ventaId));
