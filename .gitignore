@@ -125,3 +125,6 @@ memory/
 repomix-output.xml
 repomix.config.json
 .repomixignore
+
+# Carpeta temporal
+temps/
