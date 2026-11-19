@@ -1,5 +1,5 @@
 import { BaseDao } from "./BaseDao.js";
-import { encriptarContrasena, verificarContrasena } from "../utilidades/utilesSeguridad.js";
+import { encriptarContrasena, verificarContrasena } from "../utils/utilesSeguridad.js";
 
 export class UsuarioDao extends BaseDao {
     constructor() {

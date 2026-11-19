@@ -14,6 +14,28 @@ const INCLUDE_DEFAULT = {
         },
     },
     empleado: INCLUDE_EMPLEADO,
+    venta: {
+        select: {
+            id: true,
+            folioVentaId: true,
+            metodoPago: {
+                select: { id: true, nombre: true, codigo: true },
+            },
+        },
+    },
+    devolucion: {
+        select: {
+            metodoPago: {
+                select: { id: true, nombre: true, codigo: true },
+            },
+        },
+    },
+    transaccionPago: {
+        select: {
+            proveedor: true,
+            folioVoucher: true,
+        },
+    },
 };
 
 export class MovimientoCajaDao extends BaseDao {

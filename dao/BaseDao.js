@@ -5,7 +5,7 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 import { contextStorage } from '../middleware/contextoMiddleware.js';
 
-const pool = mariadb.createPool({
+export const pool = mariadb.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     user: process.env.DB_USER,

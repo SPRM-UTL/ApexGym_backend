@@ -11,7 +11,7 @@ export class PuestoDao extends BaseDao {
             }
         });
     }
-
+    
     async getAll() {
         return this.prisma.puesto.findMany({
             where: { deletedAt: null },
@@ -55,6 +55,7 @@ export class PuestoDao extends BaseDao {
         });
     }
 
+    
     async update(id, data) {
         return this.prisma.puesto.update({
             where: { id },

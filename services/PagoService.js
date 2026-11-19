@@ -2,11 +2,145 @@ import 'dotenv/config';
 import crypto from 'crypto';
 import { transaccionPagoDao } from '../dao/TransaccionPagoDao.js';
 
+const TIPOS_TARJETA_VALIDOS = new Set(['CREDITO', 'DEBITO']);
+const MARCAS_TARJETA_VALIDAS = new Set(['VISA', 'MASTERCARD', 'AMEX', 'CARNET', 'OTRA']);
+export const PROVEEDOR_POR_CODIGO_METODO = Object.freeze({
+    EFECTIVO: 'EFECTIVO',
+    TARJETA: 'TERMINAL_MANUAL',
+    TRANSFERENCIA: 'TRANSFERENCIA',
+});
+
+function crearErrorPago(mensaje, status = 400, code = null) {
+    const error = new Error(mensaje);
+    error.status = status;
+    if (code) error.code = code;
+    return error;
+}
+
+function normalizarValorTarjeta(valor) {
+    return typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+}
+
+export function verificarFirmaMercadoPago({ firma, requestId, paymentId, secreto }) {
+    if (
+        typeof firma !== 'string'
+        || typeof requestId !== 'string'
+        || typeof paymentId !== 'string'
+        || typeof secreto !== 'string'
+        || !secreto
+    ) {
+        return false;
+    }
+
+    const partes = Object.fromEntries(
+        firma.split(',').map((parte) => {
+            const [clave, ...valor] = parte.trim().split('=');
+            return [clave, valor.join('=')];
+        })
+    );
+    if (!partes.ts || !/^[a-f\d]{64}$/i.test(partes.v1 ?? '')) return false;
+
+    const manifiesto = `id:${paymentId};request-id:${requestId};ts:${partes.ts};`;
+    const esperado = crypto.createHmac('sha256', secreto).update(manifiesto).digest();
+    const recibido = Buffer.from(partes.v1, 'hex');
+    return recibido.length === esperado.length && crypto.timingSafeEqual(recibido, esperado);
+}
+
+export function resolverCobroPresencial({
+    proveedor,
+    monto,
+    efectivoRecibido = null,
+    folioVoucher = null,
+    tipoTarjeta = null,
+    marcaTarjeta = null,
+    ultimosDigitos = null,
+    referenciaTransferencia = null,
+    exigirDatosCompletos = false,
+}) {
+    if (proveedor === 'EFECTIVO') {
+        const recibido = efectivoRecibido === null || efectivoRecibido === undefined
+            ? null
+            : Number(efectivoRecibido);
+        if (exigirDatosCompletos
+            && (recibido === null || efectivoRecibido === '' || !Number.isFinite(recibido)
+                || recibido < 0 || (monto > 0 && recibido === 0))) {
+            throw crearErrorPago('Para registrar un cobro en efectivo se requiere un monto recibido válido.');
+        }
+        if (recibido !== null && recibido < monto) {
+            throw crearErrorPago(`Efectivo insuficiente: Se entregaron $${recibido.toFixed(2)} MXN pero el monto es $${monto.toFixed(2)} MXN.`);
+        }
+        return {
+            estado: 'APROBADO',
+            referenciaExterna: `EFECTIVO_${Date.now()}`,
+        };
+    }
+
+    if (proveedor === 'TERMINAL_MANUAL') {
+        const voucher = typeof folioVoucher === 'string' && folioVoucher.trim() ? folioVoucher.trim() : null;
+        if (voucher && voucher.length > 100) {
+            throw crearErrorPago('El folio del voucher no puede exceder 100 caracteres.');
+        }
+
+        if (exigirDatosCompletos) {
+            if (tipoTarjeta && !TIPOS_TARJETA_VALIDOS.has(normalizarValorTarjeta(tipoTarjeta))) {
+                throw crearErrorPago('El tipo de tarjeta debe ser CREDITO o DEBITO.');
+            }
+            if (marcaTarjeta && !MARCAS_TARJETA_VALIDAS.has(normalizarValorTarjeta(marcaTarjeta))) {
+                throw crearErrorPago('La marca de tarjeta no es válida.');
+            }
+            if (ultimosDigitos && !/^\d{4}$/.test(String(ultimosDigitos ?? ''))) {
+                throw crearErrorPago('Los últimos dígitos de la tarjeta deben ser exactamente cuatro números.');
+            }
+        }
+
+        return {
+            estado: 'APROBADO',
+            referenciaExterna: voucher ? `TERM_MANUAL_${voucher}` : `TARJETA_${Date.now()}`,
+        };
+    }
+
+    if (proveedor === 'TRANSFERENCIA') {
+        const ref = referenciaTransferencia?.trim();
+        return {
+            estado: 'PENDIENTE',
+            referenciaExterna: ref ? `TRANSFERENCIA_${ref}` : `TRANSFERENCIA_${Date.now()}`,
+        };
+    }
+
+    throw crearErrorPago('El proveedor no corresponde a un método de pago presencial.');
+}
+
 export class PagoService {
-    constructor() {
-        this.driver = (process.env.PAGOS_DRIVER || 'sandbox').toLowerCase();
-        this.mpAccessToken = process.env.MP_ACCESS_TOKEN?.trim() || null;
-        this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    constructor({ env = process.env, fetchImpl = fetch, clock = () => new Date() } = {}) {
+        this.env = env;
+        this.fetch = fetchImpl;
+        this.clock = clock;
+        this.mpAccessToken = env.MP_ACCESS_TOKEN?.trim() || null;
+        this.frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
+        this.mpWebhookSecret = env.MP_WEBHOOK_SECRET?.trim() || null;
+        this.mpPaymentTtlMinutes = env.MP_PAYMENT_TTL_MINUTES === undefined
+            ? 30
+            : Number(env.MP_PAYMENT_TTL_MINUTES);
+    }
+
+    obtenerExpiracionPagoDigital(fechaCreacion = this.clock()) {
+        if (
+            !Number.isSafeInteger(this.mpPaymentTtlMinutes)
+            || this.mpPaymentTtlMinutes < 1
+            || this.mpPaymentTtlMinutes > 1440
+        ) {
+            throw crearErrorPago('MP_PAYMENT_TTL_MINUTES debe ser un entero entre 1 y 1440.', 503);
+        }
+        return new Date(new Date(fechaCreacion).getTime() + this.mpPaymentTtlMinutes * 60_000);
+    }
+
+    validarConfiguracionSandbox() {
+        if (!this.mpAccessToken) {
+            throw crearErrorPago('Configura MP_ACCESS_TOKEN con un token de prueba de Mercado Pago.', 503);
+        }
+        if (!this.mpAccessToken.startsWith('TEST-') && !this.mpAccessToken.startsWith('APP_USR-')) {
+            throw crearErrorPago('El Access Token de Mercado Pago debe comenzar con TEST- o APP_USR-.', 503);
+        }
     }
 
     /**
@@ -16,475 +150,566 @@ export class PagoService {
         return crypto.randomUUID();
     }
 
-    /**
-     * Crea una intención o preferencia de cobro respetando idempotencia.
-     */
-    async crearCobro({
-        empresaId = 1,
-        concepto,
+    async registrarMovimientoCobro(tx, {
+        empresaId,
+        sucursalId,
+        aperturaCajaId,
+        empleadoId,
+        ventaId,
+        transaccionPagoId = null,
         monto,
-        correoCliente = null,
-        uuidIdempotencia = null,
-        proveedor = 'SANDBOX_SIMULADO',
-        folioVoucher = null,
-        tipoTarjeta = null,
-        marcaTarjeta = null,
-        ultimosDigitos = null,
-        metadatos = null,
+        concepto = null,
+        proveedor = 'EFECTIVO',
+        estado = null,
     }) {
-        if (!concepto || typeof concepto !== 'string' || !concepto.trim()) {
-            throw new Error('El concepto del pago es obligatorio.');
+        if (!tx?.movimientoCaja) {
+            throw crearErrorPago('Se requiere la transacción de base de datos para registrar el movimiento de caja.');
+        }
+
+        for (const [nombre, valor] of Object.entries({ aperturaCajaId, empleadoId })) {
+            if (!Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
+                throw crearErrorPago(`El identificador de ${nombre} no es válido.`);
+            }
         }
 
         const montoNumerico = Number(monto);
         if (!Number.isFinite(montoNumerico) || montoNumerico <= 0) {
-            throw new Error('El monto debe ser un valor numérico mayor a cero.');
+            return null;
         }
 
-        const llaveIdempotencia = uuidIdempotencia?.trim() || this.generarIdempotenciaKey();
-
-        // 1. Verificación de Idempotencia: evitar doble cobro si el cliente reintenta
-        const existente = await transaccionPagoDao.buscarPorIdempotencia(llaveIdempotencia, empresaId);
-        if (existente) {
-            return {
-                idempotente: true,
-                mensaje: 'Transacción recuperada por llave de idempotencia (sin doble cobro)',
-                transaccion: existente,
-                urlCheckout: existente.urlCheckout,
-            };
-        }
-
-        // 2. Verificación estricta de Voucher físico: un voucher no puede registrarse dos veces
-        if (proveedor === 'TERMINAL_MANUAL' && folioVoucher && folioVoucher.trim()) {
-            const voucherExistente = await transaccionPagoDao.model.findFirst({
+        if (transaccionPagoId) {
+            const existente = await tx.movimientoCaja.findFirst({
                 where: {
-                    empresaId,
-                    folioVoucher: folioVoucher.trim(),
+                    transaccionPagoId: Number(transaccionPagoId),
+                    origen: 'COBRO_VENTA',
                     deletedAt: null,
                 },
-                orderBy: { id: 'desc' },
+                select: { id: true, estado: true },
             });
-
-            if (voucherExistente) {
-                return {
-                    idempotente: true,
-                    mensaje: `El folio ${folioVoucher.trim()} ya fue registrado en la transacción #${voucherExistente.id}`,
-                    transaccion: voucherExistente,
-                };
+            if (existente) {
+                if (estado && estado !== existente.estado) {
+                    return tx.movimientoCaja.update({
+                        where: { id: existente.id },
+                        data: { estado },
+                    });
+                }
+                return existente;
             }
         }
 
-        // 3. Ventana de protección anti-doble clic rápido (Deduplicación por huella en los últimos 8 segundos)
-        const ventanaSeguridad = new Date(Date.now() - 8000);
-        const transaccionReciente = await transaccionPagoDao.model.findFirst({
-            where: {
-                empresaId,
-                concepto: concepto.trim(),
+        const esEfectivo = proveedor === 'EFECTIVO';
+        const estadoMovimiento = estado ?? (proveedor === 'TRANSFERENCIA' ? 'PENDIENTE' : 'VALIDADO');
+
+        return tx.movimientoCaja.create({
+            data: {
+                empresaId: Number(empresaId),
+                sucursalId: Number(sucursalId),
+                aperturaCajaId: Number(aperturaCajaId),
+                empleadoId: Number(empleadoId),
+                tipo: 'ENTRADA',
+                origen: 'COBRO_VENTA',
                 monto: montoNumerico,
-                proveedor,
-                createdAt: {
-                    gte: ventanaSeguridad,
-                },
-                deletedAt: null,
+                concepto: concepto || `Cobro de venta (${proveedor})`,
+                estado: estadoMovimiento,
+                afectaEfectivo: esEfectivo,
+                ventaId: ventaId ? Number(ventaId) : null,
+                transaccionPagoId: transaccionPagoId ? Number(transaccionPagoId) : null,
             },
-            orderBy: { id: 'desc' },
+        });
+    }
+
+    async registrarCobroVenta(tx, {
+        empresaId,
+        sucursalId,
+        ventaId,
+        aperturaCajaId,
+        empleadoId,
+        folioVenta,
+        proveedor,
+        monto,
+        efectivoRecibido = null,
+        cambio = 0,
+        folioVoucher = null,
+        tipoTarjeta = null,
+        marcaTarjeta = null,
+        ultimosDigitos = null,
+        referenciaTransferencia = null,
+    }) {
+        if (!tx?.transaccionPago) {
+            throw crearErrorPago('Se requiere la transacción de base de datos de la venta.');
+        }
+
+        for (const [nombre, valor] of Object.entries({ empresaId, sucursalId, ventaId })) {
+            if (!Number.isSafeInteger(Number(valor)) || Number(valor) < 1) {
+                throw crearErrorPago(`El identificador de ${nombre} no es válido.`);
+            }
+        }
+
+        const montoNumerico = Number(monto);
+        if (!Number.isFinite(montoNumerico) || montoNumerico < 0) {
+            throw crearErrorPago('El monto del cobro no es válido.');
+        }
+        const cobro = resolverCobroPresencial({
+            proveedor,
+            monto: montoNumerico,
+            efectivoRecibido,
+            folioVoucher,
+            tipoTarjeta,
+            marcaTarjeta,
+            ultimosDigitos,
+            referenciaTransferencia,
+            exigirDatosCompletos: true,
         });
 
-        if (transaccionReciente) {
-            return {
-                idempotente: true,
-                mensaje: `Se detectó un cobro idéntico en curso. Se recuperó la transacción #${transaccionReciente.id} para evitar duplicados`,
-                transaccion: transaccionReciente,
-                urlCheckout: transaccionReciente.urlCheckout,
-            };
-        }
-
-        let estadoInicial = 'PENDIENTE';
-        let referenciaExterna = null;
-        let urlCheckout = null;
-
-        // 4. Procesamiento según método de pago
-        if (proveedor === 'EFECTIVO') {
-            const efectivoRecibido = metadatos?.efectivoRecibido !== undefined ? Number(metadatos.efectivoRecibido) : null;
-            if (efectivoRecibido !== null && efectivoRecibido < montoNumerico) {
-                throw new Error(`Efectivo insuficiente: Se entregaron $${efectivoRecibido.toFixed(2)} MXN pero el monto es $${montoNumerico.toFixed(2)} MXN.`);
-            }
-            estadoInicial = 'APROBADO';
-            referenciaExterna = `EFECTIVO_${Date.now()}`;
-        } else if (proveedor === 'TERMINAL_MANUAL') {
-            if (!folioVoucher || !folioVoucher.trim()) {
-                throw new Error('Para cobros en terminal física manual se requiere el folio/autorización del voucher.');
-            }
-            estadoInicial = 'APROBADO';
-            referenciaExterna = `TERM_MANUAL_${folioVoucher.trim()}`;
-        } else {
-            // Cobro Digital / En Línea: verificar si existe Access Token de Mercado Pago
-            const tokenMercadoPago = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
-            const tieneTokenMercadoPago = Boolean(tokenMercadoPago && tokenMercadoPago.length > 20);
-
-            if (tieneTokenMercadoPago) {
-                proveedor = 'MERCADO_PAGO';
-                try {
-                    const preferenceBody = {
-                        items: [
-                            {
-                                id: `apex_${Date.now()}`,
-                                title: concepto.trim(),
-                                quantity: 1,
-                                currency_id: 'MXN',
-                                unit_price: montoNumerico,
-                            },
-                        ],
-                        ...(correoCliente?.trim()
-                            ? {
-                                  payer: {
-                                      email: correoCliente.trim(),
-                                  },
-                              }
-                            : {}),
-                        back_urls: {
-                            success: `${this.frontendUrl}/pagos-experimentacion?estado=aprobado`,
-                            failure: `${this.frontendUrl}/pagos-experimentacion?estado=fallido`,
-                            pending: `${this.frontendUrl}/pagos-experimentacion?estado=pendiente`,
-                        },
-                        external_reference: `APEX_${empresaId}_${Date.now()}`,
-                        statement_descriptor: 'APEXGYM',
-                    };
-
-                    // auto_return solo es válido en Mercado Pago con dominios HTTPS públicos; en localhost se omite para evitar error 400
-                    if (this.frontendUrl.startsWith('https://')) {
-                        preferenceBody.auto_return = 'approved';
-                    }
-
-                    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${tokenMercadoPago}`,
-                            'Content-Type': 'application/json',
-                            'X-Idempotency-Key': llaveIdempotencia,
-                        },
-                        body: JSON.stringify(preferenceBody),
-                    });
-
-                    const mpData = await mpResponse.json();
-                    if (mpResponse.ok && (mpData.init_point || mpData.sandbox_init_point)) {
-                        referenciaExterna = mpData.id;
-                        urlCheckout = mpData.init_point || mpData.sandbox_init_point;
-                        estadoInicial = 'PENDIENTE';
-                    } else {
-                        console.error('Error al generar preferencia en Mercado Pago:', mpData);
-                        referenciaExterna = `FALLBACK_MP_${Date.now()}`;
-                        urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
-                    }
-                } catch (mpErr) {
-                    console.error('Fallo de conexión con API de Mercado Pago:', mpErr);
-                    referenciaExterna = `ERROR_MP_${Date.now()}`;
-                    urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
-                }
-            } else {
-                // Modo Sandbox Simulado local por defecto
-                referenciaExterna = `SANDBOX_REF_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-                urlCheckout = `${this.frontendUrl}/pagos-experimentacion?ref=${referenciaExterna}`;
+        const voucher = proveedor === 'TERMINAL_MANUAL' && typeof folioVoucher === 'string' && folioVoucher.trim()
+            ? folioVoucher.trim()
+            : null;
+        if (voucher) {
+            const existente = await tx.transaccionPago.findFirst({
+                where: {
+                    empresaId: Number(empresaId),
+                    proveedor,
+                    folioVoucher: voucher,
+                },
+                select: { id: true },
+            });
+            if (existente) {
+                throw crearErrorPago(`El folio ${voucher} ya fue registrado en otra transacción.`, 409);
             }
         }
-
-        const metadatosGuardados = {
-            ...(metadatos || {}),
-            ...(tipoTarjeta ? { tipoTarjeta } : {}),
-            ...(marcaTarjeta ? { marcaTarjeta } : {}),
-            ...(ultimosDigitos ? { ultimosDigitos } : {}),
-            pasarelaReal: Boolean(this.mpAccessToken && this.mpAccessToken.length > 20),
-        };
 
         try {
-            const nuevaTransaccion = await transaccionPagoDao.create({
-                empresaId,
-                uuidIdempotencia: llaveIdempotencia,
-                proveedor,
-                referenciaExterna,
-                monto: montoNumerico,
-                moneda: 'MXN',
-                estado: estadoInicial,
-                concepto: concepto.trim(),
-                correoCliente: correoCliente?.trim() || null,
-                folioVoucher: folioVoucher?.trim() || null,
-                urlCheckout,
-                metadatos: metadatosGuardados,
+            const transaccion = await tx.transaccionPago.create({
+                data: {
+                    ventaId: Number(ventaId),
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    uuidIdempotencia: this.generarIdempotenciaKey(),
+                    proveedor,
+                    referenciaExterna: cobro.referenciaExterna,
+                    monto: montoNumerico,
+                    moneda: 'MXN',
+                    estado: cobro.estado,
+                    concepto: `Venta folio ${folioVenta}`,
+                    folioVoucher: voucher,
+                    metadatos: proveedor === 'EFECTIVO'
+                        ? {
+                              efectivoRecibido: Number(efectivoRecibido),
+                              cambio: Number(cambio),
+                          }
+                        : (proveedor === 'TERMINAL_MANUAL'
+                            ? {
+                                  tipoTarjeta: normalizarValorTarjeta(tipoTarjeta) || 'DEBITO',
+                                  marcaTarjeta: normalizarValorTarjeta(marcaTarjeta) || 'VISA',
+                                  ultimosDigitos: String(ultimosDigitos || ''),
+                              }
+                            : {
+                                  metodo: 'TRANSFERENCIA',
+                                  ...(referenciaTransferencia?.trim() ? { referencia: referenciaTransferencia.trim() } : {}),
+                                  confirmada: false,
+                              }),
+                },
             });
 
-            // Auto-registro en Caja Activa si el cobro se liquidó en Efectivo físico
-            if (proveedor === 'EFECTIVO' && estadoInicial === 'APROBADO') {
-                try {
-                    let aperturaActiva = null;
-                    if (metadatos?.aperturaCajaId) {
-                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                            where: {
-                                id: Number(metadatos.aperturaCajaId),
-                                empresaId,
-                                estado: 'ABIERTA',
-                                deletedAt: null,
-                            },
-                        });
-                    }
-                    if (!aperturaActiva) {
-                        aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                            where: {
-                                empresaId,
-                                estado: 'ABIERTA',
-                                deletedAt: null,
-                            },
-                            orderBy: { id: 'desc' },
-                        });
-                    }
-
-                    if (aperturaActiva) {
-                        const movimiento = await transaccionPagoDao.prisma.movimientoCaja.create({
-                            data: {
-                                empresaId,
-                                aperturaCajaId: aperturaActiva.id,
-                                empleadoId: aperturaActiva.empleadoId,
-                                tipo: 'ENTRADA',
-                                monto: montoNumerico,
-                                concepto: `Cobro de Venta / Membresía - Transacción #${nuevaTransaccion.id}`,
-                                estado: 'VALIDADO',
-                                observaciones: `Registro automático generado por cobro en mostrador (Transacción #${nuevaTransaccion.id})`,
-                            },
-                        });
-
-                        await transaccionPagoDao.prisma.transaccionPago.update({
-                            where: { id: nuevaTransaccion.id },
-                            data: {
-                                metadatos: {
-                                    ...metadatosGuardados,
-                                    movimientoCajaId: movimiento.id,
-                                    aperturaCajaId: aperturaActiva.id,
-                                },
-                            },
-                        });
-                    }
-                } catch (movErr) {
-                    console.error('No se pudo registrar el movimiento automático de caja para el pago en efectivo:', movErr);
-                }
+            if (montoNumerico > 0 && (cobro.estado === 'APROBADO' || cobro.estado === 'PENDIENTE')) {
+                const nombreMetodo = proveedor === 'EFECTIVO'
+                    ? 'en efectivo'
+                    : (proveedor === 'TRANSFERENCIA' ? 'por transferencia' : 'con tarjeta');
+                await this.registrarMovimientoCobro(tx, {
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    aperturaCajaId: Number(aperturaCajaId),
+                    empleadoId: Number(empleadoId),
+                    ventaId: Number(ventaId),
+                    transaccionPagoId: transaccion.id,
+                    monto: montoNumerico,
+                    concepto: `Cobro ${nombreMetodo} de venta folio ${folioVenta}`,
+                    proveedor,
+                });
             }
 
-            return {
-                idempotente: false,
-                mensaje: estadoInicial === 'APROBADO' ? 'Pago procesado de inmediato' : 'Orden de cobro generada en espera de confirmación',
-                transaccion: nuevaTransaccion,
-                urlCheckout,
-            };
+            return transaccion;
         } catch (error) {
-            if (error?.code === 'P2002' || error?.message?.includes('uuid_idempotencia')) {
-                const transaccionExistente = await transaccionPagoDao.buscarPorIdempotencia(llaveIdempotencia, empresaId);
-                if (transaccionExistente) {
-                    return {
-                        idempotente: true,
-                        mensaje: 'Transacción recuperada por llave de idempotencia (concurrencia prevenida)',
-                        transaccion: transaccionExistente,
-                        urlCheckout: transaccionExistente.urlCheckout,
-                    };
-                }
+            if (voucher && error?.code === 'P2002') {
+                throw crearErrorPago(`El folio ${voucher} ya fue registrado en otra transacción.`, 409);
             }
             throw error;
         }
     }
 
-    /**
-     * Simula la resolución asíncrona de un pago (Aprobado / Rechazado).
-     */
-    async simularResolucion(id, nuevoEstado, empresaId = 1) {
-        const estadosValidos = ['APROBADO', 'RECHAZADO', 'EXPIRADO'];
-        if (!estadosValidos.includes(nuevoEstado)) {
-            throw new Error(`Estado no válido para simulación. Válidos: ${estadosValidos.join(', ')}`);
-        }
-
-        const transaccion = await transaccionPagoDao.getById(id, empresaId);
-        if (!transaccion) {
-            throw new Error('La transacción de pago no existe.');
-        }
-
-        if (transaccion.estado === 'REEMBOLSADO') {
-            throw new Error('No se puede cambiar el estado de una transacción ya reembolsada.');
-        }
-
-        const datosRespuesta = {
-            simulado: true,
-            fechaResolucion: new Date().toISOString(),
-            mensaje: `Transacción resuelta a ${nuevoEstado} mediante el Simulador de Pruebas`,
-        };
-
-        const actualizada = await transaccionPagoDao.actualizarEstado(id, nuevoEstado, datosRespuesta, empresaId);
-
-        return {
-            mensaje: `Transacción ${id} actualizada exitosamente a ${nuevoEstado}`,
-            transaccion: actualizada,
-        };
-    }
-
-    /**
-     * Aplica un reembolso a una transacción previamente aprobada.
-     */
-    async reembolsar(id, motivo = 'Reembolso solicitado en mostrador', empresaId = 1) {
-        const transaccion = await transaccionPagoDao.getById(id, empresaId);
-        if (!transaccion) {
-            throw new Error('La transacción no existe.');
-        }
-
-        if (transaccion.estado !== 'APROBADO') {
-            throw new Error(`Solo se pueden reembolsar transacciones en estado APROBADO. Estado actual: ${transaccion.estado}`);
-        }
-
-        const datosRespuesta = {
-            reembolso: true,
-            motivo,
-            fechaReembolso: new Date().toISOString(),
-        };
-
-        const actualizada = await transaccionPagoDao.actualizarEstado(id, 'REEMBOLSADO', datosRespuesta, empresaId);
-
-        // Si la transacción reembolsada fue en efectivo, registrar la salida automática en la caja activa
-        if (transaccion.proveedor === 'EFECTIVO') {
-            try {
-                const aperturaActiva = await transaccionPagoDao.prisma.aperturaCaja.findFirst({
-                    where: {
-                        empresaId,
-                        estado: 'ABIERTA',
-                        deletedAt: null,
-                    },
-                    orderBy: { id: 'desc' },
-                });
-
-                if (aperturaActiva) {
-                    await transaccionPagoDao.prisma.movimientoCaja.create({
-                        data: {
-                            empresaId,
-                            aperturaCajaId: aperturaActiva.id,
-                            empleadoId: aperturaActiva.empleadoId,
-                            tipo: 'SALIDA',
-                            monto: Number(transaccion.monto),
-                            concepto: `Reembolso de Transacción #${transaccion.id}: ${transaccion.concepto}`,
-                            estado: 'VALIDADO',
-                            observaciones: `Salida de efectivo por reembolso en mostrador (Transacción #${transaccion.id}). Motivo: ${motivo}`,
-                        },
-                    });
-                }
-            } catch (movErr) {
-                console.error('No se pudo registrar la salida automática de efectivo por reembolso:', movErr);
+    async registrarCobroDigitalVenta(tx, {
+            empresaId,
+            sucursalId,
+            aperturaCajaId = null,
+            empleadoId = null,
+            ventaId,
+            folioVenta,
+            monto,
+            correoCliente = null,
+            uuidIdempotencia,
+            requestHash,
+        }) {
+            if (!tx?.transaccionPago) {
+                throw crearErrorPago('Se requiere la transacción de base de datos de la venta.');
             }
-        }
+            if (!/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(uuidIdempotencia ?? '')) {
+                throw crearErrorPago('La llave de idempotencia para Mercado Pago no es válida.');
+            }
 
-        return {
-            mensaje: `Transacción ${id} reembolsada exitosamente`,
-            transaccion: actualizada,
-        };
-    }
+            const montoNumerico = Number(monto);
+            if (!Number.isFinite(montoNumerico) || montoNumerico <= 0) {
+                throw crearErrorPago('El monto debe ser mayor a cero para cobrar con Mercado Pago.');
+            }
 
-    /**
-     * Sincroniza automáticamente transacciones pendientes con pagos aprobados en Mercado Pago.
-     */
-    async sincronizarConMercadoPago(empresaId = 1) {
-        const token = process.env.MP_ACCESS_TOKEN?.trim() || this.mpAccessToken;
-        if (!token) return;
-
-        try {
-            const resp = await fetch('https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=10', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const venceEn = this.obtenerExpiracionPagoDigital();
+            const transaccion = await tx.transaccionPago.create({
+                data: {
+                    ventaId: Number(ventaId),
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    uuidIdempotencia,
+                    proveedor: 'MERCADO_PAGO',
+                    referenciaExterna: uuidIdempotencia,
+                    monto: montoNumerico,
+                    moneda: 'MXN',
+                    estado: 'PENDIENTE',
+                    concepto: `Venta folio ${folioVenta}`,
+                    correoCliente: correoCliente?.trim() || null,
+                    metadatos: {
+                        expiresAt: venceEn.toISOString(),
+                        requestHash,
+                    },
+                },
             });
 
-            if (!resp.ok) return;
-            const data = await resp.json();
-            const pagos = data.results || [];
+            if (aperturaCajaId && empleadoId) {
+                await this.registrarMovimientoCobro(tx, {
+                    empresaId: Number(empresaId),
+                    sucursalId: Number(sucursalId),
+                    aperturaCajaId: Number(aperturaCajaId),
+                    empleadoId: Number(empleadoId),
+                    ventaId: Number(ventaId),
+                    transaccionPagoId: transaccion.id,
+                    monto: montoNumerico,
+                    concepto: `Cobro digital Mercado Pago de venta folio ${folioVenta}`,
+                    proveedor: 'MERCADO_PAGO',
+                    estado: 'PENDIENTE',
+                });
+            }
 
-            for (const pago of pagos) {
-                if (pago.status === 'approved') {
-                    const extRef = pago.external_reference;
-                    const transaccion = await transaccionPagoDao.model.findFirst({
-                        where: {
-                            empresaId,
-                            estado: 'PENDIENTE',
-                            deletedAt: null,
-                            OR: [
-                                ...(extRef ? [{ referenciaExterna: extRef }] : []),
-                                { monto: Number(pago.transaction_amount) }
-                            ]
-                        },
-                        orderBy: { id: 'desc' }
-                    });
+            return transaccion;
+        }
 
-                    if (transaccion) {
-                        await transaccionPagoDao.actualizarEstado(
-                            transaccion.id,
-                            'APROBADO',
-                            {
-                                mercadoPagoPaymentId: pago.id,
-                                metodo: pago.payment_method_id,
-                                status: pago.status,
-                                statusDetail: pago.status_detail,
-                                fechaAprobado: pago.date_approved
-                            },
-                            empresaId
-                        );
+    async prepararCheckoutVenta(ventaId, empresaId) {
+            const transaccion = await transaccionPagoDao.model.findFirst({
+                where: {
+                    ventaId: Number(ventaId),
+                    empresaId: Number(empresaId),
+                    proveedor: 'MERCADO_PAGO',
+                    deletedAt: null,
+                },
+                include: { venta: { select: { estado: true } } },
+            });
+            if (!transaccion) {
+                throw crearErrorPago('No se encontró el cobro digital asociado a la venta.', 404);
+            }
+            if (['completada', 'completado'].includes(String(transaccion.venta?.estado ?? '').toLowerCase())) {
+                return { estado: transaccion.estado, urlCheckout: null, yaPagada: true };
+            }
+            if (transaccion.venta?.estado !== 'pendiente_pago') {
+                throw crearErrorPago('La venta ya no puede continuar en el checkout.', 409);
+            }
+
+            const venceEn = new Date(
+                transaccion.metadatos?.expiresAt
+                    ?? this.obtenerExpiracionPagoDigital(transaccion.createdAt)
+            );
+            if (venceEn <= this.clock()) {
+                const { ventaDao } = await import('../dao/VentaDao.js');
+                await ventaDao.expirarVentaPendientePago(transaccion.ventaId, this.clock());
+                throw crearErrorPago('El tiempo para pagar venció. Inicia una nueva venta.', 409);
+            }
+
+            if (transaccion.urlCheckout) {
+                if (transaccion.metadatos?.sandbox !== true) {
+                    throw crearErrorPago('El checkout asociado no está identificado como sandbox.', 409);
+                }
+                return {
+                    estado: transaccion.estado,
+                    urlCheckout: transaccion.urlCheckout,
+                    venceEn: venceEn.toISOString(),
+                };
+            }
+
+            this.validarConfiguracionSandbox();
+            const urlRetorno = new URL('/registro-de-ventas/nueva', this.frontendUrl);
+            urlRetorno.searchParams.set('ventaId', String(ventaId));
+            urlRetorno.searchParams.set('mp_return', '1');
+
+            const preferenceBody = {
+                items: [{
+                    id: `venta_${ventaId}`,
+                    title: transaccion.concepto,
+                    quantity: 1,
+                    currency_id: 'MXN',
+                    unit_price: Number(transaccion.monto),
+                }],
+                external_reference: transaccion.uuidIdempotencia,
+                statement_descriptor: 'APEXGYM',
+                back_urls: {
+                    success: urlRetorno.toString(),
+                    failure: urlRetorno.toString(),
+                    pending: urlRetorno.toString(),
+                },
+            };
+
+            if (urlRetorno.protocol === 'https:') {
+                preferenceBody.auto_return = 'approved';
+            }
+            if (transaccion.correoCliente) {
+                preferenceBody.payer = { email: transaccion.correoCliente };
+            }
+
+            const rawNotificationUrl = this.env.MP_NOTIFICATION_URL?.trim()
+                || (urlRetorno.protocol === 'https:' ? `${urlRetorno.origin}/api/pagos/webhook` : null);
+            if (rawNotificationUrl) {
+                try {
+                    const urlNotificacion = new URL(rawNotificationUrl);
+                    if (urlNotificacion.protocol === 'https:') {
+                        preferenceBody.notification_url = urlNotificacion.toString();
                     }
+                } catch {
+                    // Ignorar si URL de notificación no es válida
                 }
             }
-        } catch (err) {
-            console.error('Error al sincronizar con Mercado Pago:', err.message);
+
+            let response;
+            try {
+                response = await this.fetch('https://api.mercadopago.com/checkout/preferences', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${this.mpAccessToken}`,
+                        'Content-Type': 'application/json',
+                        'X-Idempotency-Key': transaccion.uuidIdempotencia,
+                    },
+                    body: JSON.stringify(preferenceBody),
+                });
+            } catch {
+                throw crearErrorPago('No se pudo conectar con Mercado Pago. Reintenta la misma venta para recuperar el checkout.', 502);
+            }
+
+            const mpData = await response.json().catch(() => null);
+            const checkoutUrl = mpData?.init_point || mpData?.sandbox_init_point;
+            if (!response.ok || !checkoutUrl || !mpData?.id) {
+                const detalle = mpData?.message || mpData?.error || `HTTP ${response.status}`;
+                throw crearErrorPago(`Mercado Pago no pudo crear el checkout: ${detalle}`, 502);
+            }
+
+            await transaccionPagoDao.model.update({
+                where: { id: transaccion.id },
+                data: {
+                    referenciaExterna: String(mpData.id),
+                    urlCheckout: checkoutUrl,
+                    metadatos: {
+                        ...(transaccion.metadatos ?? {}),
+                        sandbox: true,
+                    },
+                    datosRespuesta: JSON.stringify({
+                        preferenceId: String(mpData.id),
+                        sandbox: true,
+                        createdAt: this.clock().toISOString(),
+                    }),
+                },
+            });
+
+            return {
+                estado: transaccion.estado,
+                urlCheckout: checkoutUrl,
+                venceEn: venceEn.toISOString(),
+            };
         }
+
+    async obtenerPagoMercadoPago(paymentId) {
+            this.validarConfiguracionSandbox();
+            if (!/^\d+$/.test(String(paymentId ?? ''))) {
+                throw crearErrorPago('El identificador del pago de Mercado Pago no es válido.');
+            }
+
+            let response;
+            try {
+                response = await this.fetch(
+                    `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
+                    { headers: { Authorization: `Bearer ${this.mpAccessToken}` } }
+                );
+            } catch {
+                throw crearErrorPago('No se pudo consultar el pago en Mercado Pago.', 502);
+            }
+            const pago = await response.json().catch(() => null);
+            if (!response.ok || !pago?.id) {
+                throw crearErrorPago('Mercado Pago no pudo confirmar el estado del pago.', 502);
+            }
+            return pago;
+        }
+
+    async buscarPagoMercadoPagoPorReferencia(externalReference) {
+        this.validarConfiguracionSandbox();
+        if (!externalReference) return null;
+
+        let response;
+        try {
+            response = await this.fetch(
+                `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}`,
+                { headers: { Authorization: `Bearer ${this.mpAccessToken}` } }
+            );
+        } catch {
+            return null;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(data?.results) || data.results.length === 0) {
+            return null;
+        }
+
+        const pagos = data.results.sort((a, b) => new Date(b.date_created) - new Date(a.date_created));
+        return pagos[0] ?? null;
     }
 
-    /**
-     * Procesa una notificación HTTP entrante de pasarela (Webhook de Mercado Pago).
-     */
-    async procesarWebhook(query = {}, body = {}) {
-        const paymentId = query['data.id'] || query.id || body?.data?.id || body?.id;
-        const topic = query.type || query.topic || body?.type || body?.action;
+    async consultarEstadoVenta(ventaId, empresaId, paymentId = null) {
+        const { ventaDao } = await import('../dao/VentaDao.js');
 
-        if (paymentId && this.mpAccessToken) {
-            try {
-                const resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${this.mpAccessToken}`,
+        let transaccion = await transaccionPagoDao.model.findFirst({
+            where: {
+                ventaId: Number(ventaId),
+                empresaId: Number(empresaId),
+                proveedor: 'MERCADO_PAGO',
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                uuidIdempotencia: true,
+                estado: true,
+                monto: true,
+                urlCheckout: true,
+                metadatos: true,
+            },
+        });
+        if (!transaccion) {
+            throw crearErrorPago('No se encontró el pago digital de esta venta.', 404);
+        }
+
+        if (transaccion.estado === 'PENDIENTE') {
+            let paymentData = null;
+            if (paymentId) {
+                paymentData = await this.obtenerPagoMercadoPago(paymentId).catch(() => null);
+            } else if (transaccion.uuidIdempotencia) {
+                paymentData = await this.buscarPagoMercadoPagoPorReferencia(transaccion.uuidIdempotencia);
+            }
+
+            if (paymentData) {
+                await ventaDao.resolverPagoMercadoPago(paymentData, Number(empresaId));
+                transaccion = await transaccionPagoDao.model.findFirst({
+                    where: { id: transaccion.id },
+                    select: {
+                        id: true,
+                        uuidIdempotencia: true,
+                        estado: true,
+                        monto: true,
+                        urlCheckout: true,
+                        metadatos: true,
                     },
                 });
-
-                if (resp.ok) {
-                    const paymentData = await resp.json();
-                    const status = paymentData.status; // 'approved', 'rejected', 'pending'
-                    const externalRef = paymentData.external_reference;
-
-                    let nuevoEstado = 'PENDIENTE';
-                    if (status === 'approved') nuevoEstado = 'APROBADO';
-                    else if (status === 'rejected' || status === 'cancelled') nuevoEstado = 'RECHAZADO';
-                    else if (status === 'refunded') nuevoEstado = 'REEMBOLSADO';
-
-                    // Buscar transacción local por referencia o id
-                    const transaccion = await transaccionPagoDao.model.findFirst({
-                        where: {
-                            OR: [
-                                { referenciaExterna: externalRef },
-                                { id: Number(externalRef?.split('_')[2]) || -1 },
-                            ],
-                            deletedAt: null,
-                        },
-                    });
-
-                    if (transaccion) {
-                        await transaccionPagoDao.actualizarEstado(
-                            transaccion.id,
-                            nuevoEstado,
-                            { webhookMercadoPago: paymentData },
-                            transaccion.empresaId
-                        );
-                    }
-                }
-            } catch (err) {
-                console.error('Error procesando webhook en vivo:', err);
+            } else {
+                await ventaDao.expirarVentasDigitalesPendientes(Number(ventaId));
             }
         }
 
+        const venta = await transaccionPagoDao.prisma.venta.findFirst({
+            where: { id: Number(ventaId), deletedAt: null },
+            select: { id: true, estado: true, motivoCancelacion: true },
+        });
+        if (!venta) throw crearErrorPago('La venta no existe.', 404);
+
+        return {
+            venta,
+            pago: {
+                estado: transaccion.estado,
+                monto: Number(transaccion.monto),
+                urlCheckout: transaccion.urlCheckout,
+                venceEn: transaccion.metadatos?.expiresAt ?? null,
+                requiereReembolsoManual: transaccion.metadatos?.requiereReembolsoManual === true,
+            },
+        };
+    }
+
+    async procesarWebhook(query = {}, body = {}, headers = {}) {
+        const paymentId = String(
+            query['data.id'] ?? body?.data?.id ?? query.id ?? body?.id ?? ''
+        );
+        if (!paymentId) {
+            return { recibido: true, procesado: false, motivo: 'Notificación sin paymentId' };
+        }
+
+        if (this.mpWebhookSecret) {
+            const firmaValida = verificarFirmaMercadoPago({
+                firma: headers['x-signature'],
+                requestId: headers['x-request-id'],
+                paymentId,
+                secreto: this.mpWebhookSecret,
+            });
+            if (!firmaValida) {
+                throw crearErrorPago('La firma de la notificación de Mercado Pago no es válida.', 401);
+            }
+        }
+
+        const paymentData = await this.obtenerPagoMercadoPago(paymentId);
+        const transaccion = await transaccionPagoDao.model.findFirst({
+            where: {
+                uuidIdempotencia: paymentData.external_reference,
+                proveedor: 'MERCADO_PAGO',
+                deletedAt: null,
+            },
+        });
+        if (!transaccion) {
+            throw crearErrorPago('No existe una transacción local asociada a este pago.', 404);
+        }
+
+        let resultado;
+        if (transaccion.ventaId != null) {
+            const { ventaDao } = await import('../dao/VentaDao.js');
+            resultado = await ventaDao.resolverPagoMercadoPago(paymentData, transaccion.empresaId);
+        } else {
+            if (
+                !Number.isFinite(Number(paymentData.transaction_amount))
+                || Math.round(Number(paymentData.transaction_amount) * 100) !== Math.round(Number(transaccion.monto) * 100)
+                || paymentData.currency_id !== transaccion.moneda
+            ) {
+                throw crearErrorPago('El monto o la moneda del pago no coincide con la transacción.', 409);
+            }
+            const estado = paymentData.status === 'approved'
+                ? 'APROBADO'
+                : ['rejected', 'cancelled'].includes(paymentData.status)
+                    ? 'RECHAZADO'
+                    : paymentData.status === 'refunded'
+                        ? 'REEMBOLSADO'
+                        : 'PENDIENTE';
+            await transaccionPagoDao.actualizarEstado(
+                transaccion.id,
+                estado,
+                {
+                    paymentId: String(paymentData.id),
+                    status: paymentData.status,
+                    statusDetail: paymentData.status_detail ?? null,
+                    amount: Number(paymentData.transaction_amount),
+                    currency: paymentData.currency_id,
+                },
+                transaccion.empresaId
+            );
+            resultado = { procesado: true, estado };
+        }
         return {
             recibido: true,
-            timestamp: new Date().toISOString(),
+            procesado: resultado.procesado,
+            estado: resultado.estado,
         };
     }
 }

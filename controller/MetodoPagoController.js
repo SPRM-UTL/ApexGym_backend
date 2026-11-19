@@ -6,6 +6,15 @@ export class MetodoPagoController extends BaseController{
         super(metodoPagoDao);
     }
 
+    obtenerActivos = async (req, res) => {
+        try {
+            const metodos = await metodoPagoDao.obtenerActivos();
+            return this.respuestaExito(res, metodos, "Métodos de pago activos obtenidos correctamente");
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     crear = async(req,res)=>{
         const {
             nombre, 
@@ -41,7 +50,7 @@ export class MetodoPagoController extends BaseController{
     }
 
     eliminar = async(req,res)=>{
-       const id = Number(req.params.id);
+        const id = Number(req.params.id);
         try{
             const metodoEliminado = await metodoPagoDao.delete(id);
             return this.respuestaExito(res,metodoEliminado,"El método de pago fue eliminado exitosamente.");

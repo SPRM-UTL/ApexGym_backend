@@ -1,6 +1,6 @@
 import { empleadoDao } from '../dao/EmpleadoDao.js';
 import { BaseController } from './BaseController.js';
-import { guardarImagenServidor } from '../utilidades/guardarImagen.js';
+import { guardarImagenServidor } from '../utils/guardarImagen.js';
 
 export class EmpleadoController extends BaseController {
     constructor() {
@@ -103,7 +103,9 @@ export class EmpleadoController extends BaseController {
             });
 
             // Si se envió imagen base64, se guarda como archivo físico en /public/imagenes/empleados/
-            const rutaImagen = imagenUrl !== undefined ? guardarImagenServidor(imagenUrl, 'empleados') : undefined;
+            const rutaImagen = imagenUrl !== undefined
+                ? guardarImagenServidor(imagenUrl, 'empleados')
+                : undefined;
 
             const registro = await this.dao.update(id, {
                 puestoId: Number(puestoId),
@@ -118,7 +120,7 @@ export class EmpleadoController extends BaseController {
                 direccion: direccion ? direccion.trim() : null,
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
-                imagenUrl: rutaImagen,
+                ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
                 imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
             });
 

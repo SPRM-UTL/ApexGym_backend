@@ -31,8 +31,10 @@ import { ClienteMembresiaController } from '../controller/ClienteMembresiaContro
 import { MetodoPagoController } from '../controller/MetodoPagoController.js';
 import { ServicioController } from '../controller/ServicioController.js';
 import { EmpresaController } from '../controller/EmpresaController.js';
+import { uploadImagen } from '../middleware/uploadMiddleware.js';
+import { VentaController } from '../controller/VentaController.js';
+import { DevolucionController } from '../controller/DevolucionController.js';
 import { SucursalController } from '../controller/SucursalController.js';
-import { uploadFotoUsuario } from '../middleware/uploadMiddleware.js';
 import { AsistenciaController } from '../controller/AsistenciaController.js';
 import { VisitaController } from '../controller/VisitaController.js';
 
@@ -40,6 +42,10 @@ import { VisitaController } from '../controller/VisitaController.js';
 import { PagoController } from '../controller/PagoController.js';
 
 const router = express.Router();
+const uploadImagenUsuario = uploadImagen('usuarios', {
+    transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
+});
+const uploadImagenProducto = uploadImagen('productos');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -55,6 +61,8 @@ const tipoMembresiaController = new TipoMembresiaController();
 const tipoVisitaController = new TipoVisitaController();
 const clienteMembresiaController = new ClienteMembresiaController();
 const metodoPagoController = new MetodoPagoController();
+const ventaController = new VentaController();
+const devolucionController = new DevolucionController();
 
 const productoRoutes = express.Router();
 const CategoriaProductoRoutes = express.Router();
@@ -86,6 +94,7 @@ const aperturaCajaRoutes = express.Router();
 const movimientoCajaRoutes = express.Router();
 const corteCajaRoutes = express.Router();
 const metodoPagoRoutes = express.Router();
+const ventaRoutes = express.Router();
 const servicioController = new ServicioController();
 const servicioRoutes = express.Router();
 const empresaController = new EmpresaController();
@@ -116,7 +125,7 @@ usuarioRoutes.post(
     '/registrarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Crear'),
-    uploadFotoUsuario,
+    uploadImagenUsuario,
     usuarioController.registrarUsuario.bind(usuarioController)
 );
 
@@ -124,7 +133,7 @@ usuarioRoutes.put(
     '/actualizarUsuario',
     autenticarUsuario,
     verificarPermiso('Usuarios', 'Editar'),
-    uploadFotoUsuario,
+    uploadImagenUsuario,
     usuarioController.actualizarUsuario.bind(usuarioController)
 );
 
@@ -404,6 +413,12 @@ empleadoRoutes.delete(
 
 // ── Rutas de Categorías de Productos ───────────────────────────────────────
 CategoriaProductoRoutes.get(
+    '/filtro-venta',
+    autenticarUsuario,
+    verificarPermiso('Categorías de Productos', 'Listar'),
+    categoriaProductoController.obtenerParaVenta.bind(categoriaProductoController)
+);
+CategoriaProductoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Categorías de Productos', 'Listar'),
@@ -432,6 +447,18 @@ CategoriaProductoRoutes.delete(
 );
 //------Productos ------------------
 productoRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    productoController.obtenerDisponiblesParaVenta.bind(productoController)
+);
+productoRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Productos','Listar'),
+    productoController.obtenerCatalogoPaginado.bind(productoController)
+);
+productoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Listar'),
@@ -442,6 +469,7 @@ productoRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Crear'),
+    uploadImagenProducto,
     productoController.crear.bind(productoController)
 );
 
@@ -449,6 +477,7 @@ productoRoutes.put(
     '/',
     autenticarUsuario,
     verificarPermiso('Productos','Editar'),
+    uploadImagenProducto,
     productoController.actualizar.bind(productoController)
 );
 
@@ -465,6 +494,12 @@ aperturaCajaRoutes.get(
     autenticarUsuario,
     verificarPermiso('Apertura de Caja', 'Listar'),
     aperturaCajaController.obtenerTodos.bind(aperturaCajaController)
+);
+aperturaCajaRoutes.get(
+    '/abierta',
+    autenticarUsuario,
+    verificarPermiso('Apertura de Caja', 'Listar'),
+    aperturaCajaController.obtenerAbiertas.bind(aperturaCajaController)
 );
 aperturaCajaRoutes.get(
     '/:id',
@@ -623,6 +658,12 @@ estadoClienteRoutes.delete(
 
 // ── Rutas de Clientes ────────────────────────────────────────────────────────
 clienteRoutes.get(
+    '/buscar',
+    autenticarUsuario,
+    verificarPermiso('Clientes', 'Listar'),
+    clienteController.buscarPorNombreOId.bind(clienteController)
+);
+clienteRoutes.get(
     '/mi-perfil',
     autenticarUsuario,
     clienteController.obtenerMiPerfil.bind(clienteController)
@@ -684,6 +725,18 @@ estadoMembresiaRoutes.delete(
 );
 
 // ── Rutas de Tipos de Membresía ──────────────────────────────────────────────
+tipoMembresiaRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
+);
+tipoMembresiaRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Tipos de Membresía', 'Listar'),
+    tipoMembresiaController.obtenerCatalogoPaginado.bind(tipoMembresiaController)
+);
 tipoMembresiaRoutes.get(
     '/membresiasCliente',
     tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
@@ -802,6 +855,12 @@ clienteMembresiaRoutes.delete(
 //---Rutas Médodos de Pago-------------------------
 
 metodoPagoRoutes.get(
+    '/activos',
+    autenticarUsuario,
+    verificarPermiso('Metodos de Pago','Listar'),
+    metodoPagoController.obtenerActivos.bind(metodoPagoController)
+);
+metodoPagoRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Metodos de Pago','Listar'),
@@ -829,7 +888,90 @@ metodoPagoRoutes.delete(
     metodoPagoController.eliminar.bind(metodoPagoController)
 );
 
+
+ventaRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.obtenerTodos.bind(ventaController)
+)
+
+ventaRoutes.get(
+    '/resumen',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.obtenerResumen.bind(ventaController)
+)
+
+ventaRoutes.get(
+    '/:id/pago',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.consultarEstadoPago.bind(ventaController)
+)
+
+ventaRoutes.post(
+    '/:id/pago/checkout',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Crear'),
+    ventaController.crearCheckoutPago.bind(ventaController)
+)
+
+ventaRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    ventaController.obtenerPorId.bind(ventaController)
+)
+
+ventaRoutes.get(
+    '/:id/devoluciones/disponibilidad',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    devolucionController.obtenerDisponibilidad.bind(devolucionController)
+)
+
+ventaRoutes.post(
+    '/:id/devoluciones/previsualizar',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Crear'),
+    devolucionController.previsualizar.bind(devolucionController)
+)
+
+ventaRoutes.post(
+    '/:id/devoluciones',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Crear'),
+    devolucionController.crear.bind(devolucionController)
+)
+
+ventaRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Crear'),
+    ventaController.create.bind(ventaController)
+)
+
+ventaRoutes.post(
+    '/:id/cancelar',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Eliminar'),
+    ventaController.cancel.bind(ventaController)
+)
+
 //---Rutas Servicios-------------------------
+servicioRoutes.get(
+    '/venta/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Listar'),
+    servicioController.obtenerDisponiblesParaVenta.bind(servicioController)
+);
+servicioRoutes.get(
+    '/catalogo',
+    autenticarUsuario,
+    verificarPermiso('Servicios', 'Listar'),
+    servicioController.obtenerCatalogoPaginado.bind(servicioController)
+);
 servicioRoutes.get(
     '/',
     autenticarUsuario,
@@ -1061,17 +1203,13 @@ router.use('/aperturas-caja', aperturaCajaRoutes);
 router.use('/movimientos-caja', movimientoCajaRoutes);
 router.use('/cortes-caja', corteCajaRoutes);
 router.use('/empleados', empleadoRoutes);
+router.use('/metodos-pago',metodoPagoRoutes);
+router.use('/ventas', ventaRoutes)
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
 
-// ─── Rutas de Pagos y Pasarelas (Experimentación y Motor Móvil) ────────────
+// ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
-pagoRoutes.post('/crear-cobro', autenticarUsuario, verificarEmpleado, pagoController.crearCobro.bind(pagoController));
-pagoRoutes.post('/simular-resolucion/:id', autenticarUsuario, verificarEmpleado, pagoController.simularResolucion.bind(pagoController));
-pagoRoutes.post('/reembolsar/:id', autenticarUsuario, verificarEmpleado, pagoController.reembolsar.bind(pagoController));
-pagoRoutes.get('/resumen', autenticarUsuario, verificarEmpleado, pagoController.obtenerResumen.bind(pagoController));
-pagoRoutes.get('/transacciones', autenticarUsuario, verificarEmpleado, pagoController.obtenerTodos.bind(pagoController));
-pagoRoutes.get('/transacciones/:id', autenticarUsuario, verificarEmpleado, pagoController.obtenerPorId.bind(pagoController));
 router.use('/pagos', pagoRoutes);
 
 export { router as api };
