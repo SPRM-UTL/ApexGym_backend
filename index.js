@@ -46,8 +46,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', api);
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Servidor corriendo en http://localhost:${port}`);
 });
 
-export default httpServerHandler(app);
+export default httpServerHandler(server);
