@@ -12,6 +12,9 @@ const pool = mariadb.createPool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     allowPublicKeyRetrieval: true,
+    ssl: process.env.DB_HOST && !['localhost', '127.0.0.1'].includes(process.env.DB_HOST)
+        ? { rejectUnauthorized: true }
+        : undefined,
 });
 
 const adapter = new PrismaMariaDb(pool);
