@@ -6,6 +6,15 @@ export class CategoriaProductoController extends BaseController {
         super(categoriaProductoDao);
     }
 
+    obtenerParaVenta = async (req, res) => {
+        try {
+            const categorias = await this.dao.obtenerParaVenta();
+            return this.respuestaExito(res, categorias, 'Categorías de productos obtenidas correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     crear = async (req, res) => {
         const { nombre, descripcion } = req.body;
         try {

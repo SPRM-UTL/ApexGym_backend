@@ -2,7 +2,7 @@ import { prisma } from '../dao/BaseDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
 import { tokenDao } from '../dao/TokenDao.js';
 import { usuarioDao } from '../dao/UsuarioDao.js';
-import { verificarContrasena } from '../utilidades/utilesSeguridad.js';
+import { verificarContrasena } from '../utils/utilesSeguridad.js';
 
 export class ClienteService {
 

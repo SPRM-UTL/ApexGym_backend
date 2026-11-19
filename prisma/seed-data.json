@@ -1,4 +1,4 @@
-{
+﻿{
   "acciones": [
     {
       "nombre": "Listar",
@@ -90,6 +90,195 @@
             "Eliminar"
           ],
           "orden": 5
+        }
+        
+      ]
+    },
+    {
+      "nombre": "Rendimiento Laboral",
+      "descripcion": "Catálogos para el seguimiento del rendimiento laboral",
+      "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Tipos de Actividad",
+          "descripcion": "Gestión de tipos de actividad laboral",
+          "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Ventas y Caja",
+      "descripcion": "Gestión de ventas, aperturas y movimiento de cajas",
+      "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Cajas",
+          "descripcion": "Gestión de cajas del establecimiento",
+          "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Apertura de Caja",
+          "descripcion": "Registro de apertura de turno y fondo de caja",
+          "imagenUrl": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Movimientos de Caja",
+          "descripcion": "Entradas y salidas manuales de efectivo durante el turno",
+          "imagenUrl": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Corte de Caja",
+          "descripcion": "Arqueo final, cálculo de faltantes/sobrantes y cierre de turno",
+          "imagenUrl": "https://images.unsplash.com/photo-1579621970795-87facc2f976d?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Métodos de Pago",
+          "descripcion": "Diferentes métodos de pago",
+          "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Servicios",
+          "descripcion": "Gestión de servicios del gimnasio",
+          "imagenUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Empleados",
+      "descripcion": "Gestión de personal, puestos, áreas y estados laborales",
+      "imagenUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Áreas de Trabajo",
+          "descripcion": "Gestión de áreas de trabajo",
+          "imagenUrl": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Puestos",
+          "descripcion": "Gestión de puestos de trabajo",
+          "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Estados de Empleado",
+          "descripcion": "Gestión de estados de empleados",
+          "imagenUrl": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Empleados",
+          "descripcion": "Gestión de la información del personal",
+          "imagenUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Inventario",
+      "descripcion": "Gestión de productos y categorías",
+      "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+      "imagenPublicId": null,
+      "modulos": [
+        {
+          "nombre": "Categorías de Productos",
+          "descripcion": "Administración de categorías de productos",
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
+        },
+        {
+          "nombre": "Productos",
+          "descripcion": "Administración de productos",
+          "imagenUrl": "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ]
         }
       ]
     },
@@ -233,8 +422,8 @@
           ]
         },
         {
-          "nombre": "Metodos de Pago",
-          "descripcion": "Diferentes metodos de Pago",
+          "nombre": "Métodos de Pago",
+          "descripcion": "Diferentes métodos de pago",
           "imagenUrl": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80",
           "imagenPublicId": null,
           "acciones": [
@@ -568,6 +757,8 @@
       ]
     }
   ],
+  
+  
   "usuarios": [
     {
       "nombre": "Admin Dev",
@@ -642,18 +833,19 @@
       { "nombre": "Ropa", "descripcion": "Playeras y shorts del gimnasio", "estado": "activo" }
     ],
     "productos": [
-      { "categoria": "Suplementos", "codigoBarras": "7501234567001", "nombre": "Proteína whey 1 kg", "descripcion": "Proteína de suero sabor vainilla", "precioVenta": 899, "precioCompra": 620, "stockActual": 12, "stockMinimo": 3, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Suplementos", "codigoBarras": "7501234567002", "nombre": "Creatina monohidratada 300 g", "descripcion": "Creatina en polvo sin sabor", "precioVenta": 450, "precioCompra": 280, "stockActual": 8, "stockMinimo": 2, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Bebidas", "codigoBarras": "7501234567003", "nombre": "Agua natural 600 ml", "descripcion": "Agua embotellada", "precioVenta": 20, "precioCompra": 8, "stockActual": 48, "stockMinimo": 12, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Bebidas", "codigoBarras": "7501234567004", "nombre": "Bebida isotónica 500 ml", "descripcion": "Bebida para reposición de electrolitos", "precioVenta": 35, "precioCompra": 18, "stockActual": 4, "stockMinimo": 6, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Accesorios", "codigoBarras": "7501234567005", "nombre": "Toalla Apex", "descripcion": "Toalla de entrenamiento", "precioVenta": 180, "precioCompra": 95, "stockActual": 15, "stockMinimo": 4, "estado": "activo", "disponibleCompra": true },
-      { "categoria": "Accesorios", "codigoBarras": "7501234567006", "nombre": "Guantes de entrenamiento", "descripcion": "Guantes con muñequera", "precioVenta": 320, "precioCompra": 170, "stockActual": 2, "stockMinimo": 3, "estado": "activo", "disponibleCompra": false },
-      { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "activo", "disponibleCompra": false }
+      { "categoria": "Suplementos", "codigoBarras": "7501234567001", "nombre": "Proteína whey 1 kg", "descripcion": "Proteína de suero sabor vainilla", "precioVenta": 899, "precioCompra": 620, "stockActual": 12, "stockMinimo": 3, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Suplementos", "codigoBarras": "7501234567002", "nombre": "Creatina monohidratada 300 g", "descripcion": "Creatina en polvo sin sabor", "precioVenta": 450, "precioCompra": 280, "stockActual": 8, "stockMinimo": 2, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567003", "nombre": "Agua natural 600 ml", "descripcion": "Agua embotellada", "precioVenta": 20, "precioCompra": 8, "stockActual": 48, "stockMinimo": 12, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Bebidas", "codigoBarras": "7501234567004", "nombre": "Bebida isotónica 500 ml", "descripcion": "Bebida para reposición de electrolitos", "precioVenta": 35, "precioCompra": 18, "stockActual": 4, "stockMinimo": 6, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567005", "nombre": "Toalla Apex", "descripcion": "Toalla de entrenamiento", "precioVenta": 180, "precioCompra": 95, "stockActual": 15, "stockMinimo": 4, "estado": "ACTIVO", "disponibleCompra": true },
+      { "categoria": "Accesorios", "codigoBarras": "7501234567006", "nombre": "Guantes de entrenamiento", "descripcion": "Guantes con muñequera", "precioVenta": 320, "precioCompra": 170, "stockActual": 2, "stockMinimo": 3, "estado": "ACTIVO", "disponibleCompra": false },
+      { "categoria": "Ropa", "codigoBarras": "7501234567007", "nombre": "Playera dry-fit", "descripcion": "Playera deportiva talla M", "precioVenta": 399, "precioCompra": 210, "stockActual": 0, "stockMinimo": 2, "estado": "ACTIVO", "disponibleCompra": false }
     ],
     "metodosPago": [
-      { "nombre": "Efectivo", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
-      { "nombre": "Tarjeta", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
-      { "nombre": "Transferencia", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
+      { "nombre": "Efectivo", "codigo": "EFECTIVO", "descripcion": "Pago en caja con efectivo", "estado": "activo" },
+      { "nombre": "Tarjeta", "codigo": "TARJETA", "descripcion": "Pago con tarjeta de débito o crédito", "estado": "activo" },
+      { "nombre": "Mercado Pago", "codigo": "MERCADO_PAGO", "descripcion": "Checkout digital Mercado Pago (sandbox)", "estado": "activo" },
+      { "nombre": "Transferencia", "codigo": "TRANSFERENCIA", "descripcion": "Pago por transferencia bancaria", "estado": "activo" }
     ],
     "servicios": [
       { "nombre": "Evaluación física", "descripcion": "Medición inicial de composición corporal", "precio": "150.00", "estado": "ACTIVO", "disponibleCompra": true },
@@ -885,4 +1077,3 @@
     ]
   }
 }
-

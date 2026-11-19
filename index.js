@@ -3,10 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { httpServerHandler } from 'cloudflare:node';
 import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 import { contextoMiddleware } from './middleware/contextoMiddleware.js';
+import { ventaDao } from './dao/VentaDao.js';
 
 const __filename = import.meta.url ? fileURLToPath(import.meta.url) : '';
 const __dirname = __filename ? path.dirname(__filename) : process.cwd();
@@ -46,8 +46,26 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', api);
 
-const server = app.listen(port, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`);
-});
+let handler = app;
 
-export default httpServerHandler(server);
+if (typeof WebSocketPair === 'undefined') {
+    const expiracionPagosTimer = setInterval(() => {
+        ventaDao.expirarVentasDigitalesPendientes().catch((error) => {
+            console.error('No se pudieron expirar las ventas digitales pendientes:', error);
+        });
+    }, 60_000);
+    expiracionPagosTimer.unref?.();
+
+    app.listen(port, () => {
+        console.log(`Servidor corriendo en http://localhost:${port}`);
+    });
+} else {
+    // Cloudflare Workers: 'cloudflare:node' solo existe alli, por eso se importa dinamicamente.
+    const { httpServerHandler } = await import('cloudflare:node');
+    const server = app.listen(port, () => {
+        console.log(`Servidor corriendo en http://localhost:${port}`);
+    });
+    handler = httpServerHandler(server);
+}
+
+export default handler;

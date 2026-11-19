@@ -1,6 +1,6 @@
 import { usuarioDao } from "../dao/UsuarioDao.js";
 import { tokenDao } from "../dao/TokenDao.js";
-import { eliminarArchivoSubido } from "../middleware/uploadMiddleware.js";
+import { eliminarImagen } from "../middleware/uploadMiddleware.js";
 
 export class UsuarioService {
 
@@ -36,7 +36,7 @@ export class UsuarioService {
     };
 
     registrarUsuario = async (data) => {
-        const { nombre, email, contrasenia, rolId, fotoUrl } = data;
+        const { nombre, email, contrasenia, rolId, fotoUrl, imagenSubida } = data;
 
         try {
             const datos = {
@@ -53,23 +53,29 @@ export class UsuarioService {
             return await this.dao.create(datos);
 
         } catch (error) {
-            if (fotoUrl) {
-                eliminarArchivoSubido(fotoUrl);
+            let errorFinal = error;
+            if (imagenSubida) {
+                try {
+                    await eliminarImagen('usuarios', imagenSubida);
+                } catch (errorLimpieza) {
+                    console.error('[Usuarios] No se pudo limpiar la imagen subida:', errorLimpieza);
+                    errorFinal = new Error(
+                        `${error instanceof Error ? error.message : String(error)}. No se pudo limpiar la imagen subida: ${errorLimpieza.message}`
+                    );
+                }
             }
 
-            throw error;
+            throw errorFinal;
         }
     };
 
     actualizarUsuario = async (id, data) => {
-        const { nombre, email, contrasenia, rolId, nuevaFotoUrl } = data;
-
-        console.log("Foto service: " + nuevaFotoUrl)
+        const { nombre, email, contrasenia, rolId, nuevaImagen } = data;
 
         try {
             const usuarioId = Number(id);
 
-            const usuarioPrevio = nuevaFotoUrl
+            const usuarioPrevio = nuevaImagen
                 ? await this.dao.getById(usuarioId)
                 : null;
 
@@ -80,28 +86,40 @@ export class UsuarioService {
                 rolId
             };
 
-            if (nuevaFotoUrl !== undefined) {
-                datos.fotoUrl = nuevaFotoUrl;
+            if (nuevaImagen) {
+                datos.fotoUrl = nuevaImagen.url;
             }
 
             const nuevoUsuario = await this.dao.update(usuarioId, datos);
 
             if (
-                nuevaFotoUrl &&
+                nuevaImagen &&
                 usuarioPrevio?.fotoUrl &&
-                usuarioPrevio.fotoUrl !== nuevaFotoUrl
+                usuarioPrevio.fotoUrl !== nuevaImagen.url
             ) {
-                eliminarArchivoSubido(usuarioPrevio.fotoUrl);
+                try {
+                    await eliminarImagen('usuarios', { url: usuarioPrevio.fotoUrl });
+                } catch (errorLimpieza) {
+                    console.error(`[Usuarios] No se pudo eliminar la foto anterior del usuario ${usuarioId}:`, errorLimpieza);
+                }
             }
 
             return nuevoUsuario;
 
         } catch (error) {
-            if (nuevaFotoUrl) {
-                eliminarArchivoSubido(nuevaFotoUrl);
+            let errorFinal = error;
+            if (nuevaImagen) {
+                try {
+                    await eliminarImagen('usuarios', nuevaImagen);
+                } catch (errorLimpieza) {
+                    console.error('[Usuarios] No se pudo limpiar la nueva foto subida:', errorLimpieza);
+                    errorFinal = new Error(
+                        `${error instanceof Error ? error.message : String(error)}. No se pudo limpiar la nueva foto: ${errorLimpieza.message}`
+                    );
+                }
             }
 
-            throw error;
+            throw errorFinal;
         }
     };
 
