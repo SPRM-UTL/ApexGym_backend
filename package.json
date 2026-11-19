@@ -9,6 +9,7 @@
     "dev": "wrangler dev",
     "test": "node --test",
     "postinstall": "prisma generate",
+    "deploy": "prisma db push && wrangler deploy",
     "seed": "node prisma/seed.js"
   },
   "prisma": {
