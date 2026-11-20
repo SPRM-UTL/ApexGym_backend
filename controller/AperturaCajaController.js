@@ -2,10 +2,34 @@ import { aperturaCajaDao } from '../dao/AperturaCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
 
+function procesarFechaApertura(fechaApertura) {
+    if (!fechaApertura) return new Date();
+    if (typeof fechaApertura === 'string') {
+        const trimmed = fechaApertura.trim();
+        // Si viene en formato YYYY-MM-DD sin hora, asignamos la hora local actual para evitar desfases UTC
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            const ahora = new Date();
+            const [y, m, d] = trimmed.split('-').map(Number);
+            return new Date(y, m - 1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+        }
+    }
+    const d = new Date(fechaApertura);
+    return !isNaN(d.getTime()) ? d : new Date();
+}
+
 export class AperturaCajaController extends BaseController {
     constructor() {
         super(aperturaCajaDao);
     }
+
+    obtenerAbiertas = async (req, res) => {
+        try {
+            const registros = await this.dao.getAbiertas();
+            return this.respuestaExito(res, registros, 'Aperturas de caja abiertas obtenidas correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
 
     crear = async (req, res) => {
         try {
@@ -29,7 +53,7 @@ export class AperturaCajaController extends BaseController {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
-                fechaApertura: new Date(fechaApertura),
+                fechaApertura: procesarFechaApertura(fechaApertura),
                 estado: 'ABIERTA',
                 desgloseInicio: typeof desgloseInicio === 'object' ? JSON.stringify(desgloseInicio) : (desgloseInicio || null),
                 observaciones: observaciones ? observaciones.trim() : null,
@@ -55,7 +79,7 @@ export class AperturaCajaController extends BaseController {
                 cajaId: Number(cajaId),
                 empleadoId: Number(empleadoId),
                 montoInicial: Number(montoInicial),
-                fechaApertura: new Date(fechaApertura),
+                fechaApertura: procesarFechaApertura(fechaApertura),
                 observaciones: observaciones !== undefined ? (observaciones ? observaciones.trim() : null) : undefined,
             });
 

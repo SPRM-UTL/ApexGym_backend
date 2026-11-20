@@ -7,8 +7,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test",
+    "dev:cf": "wrangler dev",
+    "test": "node tests/api/run.js",
+    "test:api": "node tests/api/run.js",
     "postinstall": "prisma generate",
+    "deploy": "prisma db push && npx wrangler deploy",
     "seed": "node prisma/seed.js"
   },
   "prisma": {
@@ -26,6 +29,7 @@
     "cookie-parse": "^0.4.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "currency.js": "^2.0.4",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "mariadb": "^3.5.4",
@@ -39,3 +43,5 @@
     "repomix": "^1.18.1"
   }
 }
+
+

@@ -12,7 +12,8 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 import 'dotenv/config';
 import seedData from './seed-data.json' with { type: 'json' };
-import { encriptarContrasena } from '../utilidades/utilesSeguridad.js';
+import { encriptarContrasena } from '../utils/utilesSeguridad.js';
+import { normalizarEstadoCatalogo } from '../utils/constantes.js';
 
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
@@ -25,6 +26,204 @@ const pool = mariadb.createPool({
 
 const adapter = new PrismaMariaDb(pool);
 const prisma = new PrismaClient({ adapter });
+
+const seccionesSeed = new Map();
+const modulosSeedPorSeccion = new Map();
+for (const seccion of seedData.secciones) {
+    seccionesSeed.set(seccion.nombre, seccion);
+    const modulos = modulosSeedPorSeccion.get(seccion.nombre) ?? new Map();
+    for (const modulo of seccion.modulos) {
+        modulos.set(modulo.nombre, modulo);
+    }
+    modulosSeedPorSeccion.set(seccion.nombre, modulos);
+}
+
+const repararMojibake = (valor) => {
+    if (typeof valor !== 'string' || !/[ÃÂ]/.test(valor)) return valor;
+    const reparado = Buffer.from(valor, 'latin1').toString('utf8');
+    return reparado.includes('\uFFFD') ? valor : reparado;
+};
+
+const combinarPermisosModulo = async (tx, moduloOrigenId, moduloDestinoId) => {
+    const permisosOrigen = await tx.permiso.findMany({
+        where: { moduloId: moduloOrigenId },
+    });
+    const ahora = new Date();
+
+    for (const permisoOrigen of permisosOrigen) {
+        let permisoDestino = await tx.permiso.findFirst({
+            where: {
+                moduloId: moduloDestinoId,
+                accionId: permisoOrigen.accionId,
+                metodo: permisoOrigen.metodo,
+            },
+        });
+
+        if (!permisoDestino) {
+            permisoDestino = await tx.permiso.create({
+                data: {
+                    moduloId: moduloDestinoId,
+                    accionId: permisoOrigen.accionId,
+                    metodo: permisoOrigen.metodo,
+                    descripcion: permisoOrigen.descripcion,
+                    deletedAt: permisoOrigen.deletedAt,
+                },
+            });
+        } else if (permisoOrigen.deletedAt === null && permisoDestino.deletedAt !== null) {
+            permisoDestino = await tx.permiso.update({
+                where: { id: permisoDestino.id },
+                data: { deletedAt: null },
+            });
+        }
+
+        if (permisoOrigen.deletedAt === null) {
+            const roles = await tx.rolPermiso.findMany({
+                where: { permisoId: permisoOrigen.id, deletedAt: null },
+            });
+            for (const rol of roles) {
+                await tx.rolPermiso.upsert({
+                    where: {
+                        rolId_permisoId: {
+                            rolId: rol.rolId,
+                            permisoId: permisoDestino.id,
+                        },
+                    },
+                    update: { deletedAt: null },
+                    create: { rolId: rol.rolId, permisoId: permisoDestino.id },
+                });
+            }
+
+            const usuarios = await tx.usuarioPermiso.findMany({
+                where: { permisoId: permisoOrigen.id, deletedAt: null },
+            });
+            for (const usuario of usuarios) {
+                await tx.usuarioPermiso.upsert({
+                    where: {
+                        usuarioId_permisoId: {
+                            usuarioId: usuario.usuarioId,
+                            permisoId: permisoDestino.id,
+                        },
+                    },
+                    update: { deletedAt: null },
+                    create: { usuarioId: usuario.usuarioId, permisoId: permisoDestino.id },
+                });
+            }
+        }
+
+        await tx.rolPermiso.updateMany({
+            where: { permisoId: permisoOrigen.id, deletedAt: null },
+            data: { deletedAt: ahora },
+        });
+        await tx.usuarioPermiso.updateMany({
+            where: { permisoId: permisoOrigen.id, deletedAt: null },
+            data: { deletedAt: ahora },
+        });
+        await tx.permiso.update({
+            where: { id: permisoOrigen.id },
+            data: { deletedAt: ahora },
+        });
+    }
+
+    await tx.modulo.update({
+        where: { id: moduloOrigenId },
+        data: { deletedAt: ahora },
+    });
+};
+
+const repararTextoDeModulos = async () => {
+    let registrosReparados = 0;
+    const secciones = await prisma.seccion.findMany({
+        where: { deletedAt: null },
+        include: { modulos: { where: { deletedAt: null } } },
+    });
+
+    for (const seccion of secciones) {
+        const nombreCorregido = repararMojibake(seccion.nombre);
+        const seccionSeed = seccionesSeed.get(nombreCorregido);
+        if (!seccionSeed || nombreCorregido === seccion.nombre) continue;
+
+        const seccionCorrecta = await prisma.seccion.findUnique({
+            where: { nombre: nombreCorregido },
+        });
+
+        if (!seccionCorrecta) {
+            await prisma.seccion.update({
+                where: { id: seccion.id },
+                data: { nombre: nombreCorregido, descripcion: seccionSeed.descripcion },
+            });
+            registrosReparados += 1;
+            continue;
+        }
+
+        if (seccionCorrecta.id === seccion.id) continue;
+
+        for (const modulo of seccion.modulos) {
+            const nombreModulo = repararMojibake(modulo.nombre);
+            const moduloCorrecto = await prisma.modulo.findFirst({
+                where: { seccionId: seccionCorrecta.id, nombre: nombreModulo },
+            });
+
+            if (moduloCorrecto) {
+                await prisma.$transaction((tx) =>
+                    combinarPermisosModulo(tx, modulo.id, moduloCorrecto.id)
+                );
+            } else {
+                const moduloSeed = modulosSeedPorSeccion.get(nombreCorregido)?.get(nombreModulo);
+                await prisma.modulo.update({
+                    where: { id: modulo.id },
+                    data: {
+                        seccionId: seccionCorrecta.id,
+                        nombre: nombreModulo,
+                        ...(moduloSeed ? { descripcion: moduloSeed.descripcion } : {}),
+                    },
+                });
+            }
+            registrosReparados += 1;
+        }
+
+        await prisma.seccion.update({
+            where: { id: seccion.id },
+            data: { deletedAt: new Date() },
+        });
+        registrosReparados += 1;
+    }
+
+    const seccionesCorrectas = await prisma.seccion.findMany({
+        where: {
+            nombre: { in: [...seccionesSeed.keys()] },
+            deletedAt: null,
+        },
+        include: { modulos: { where: { deletedAt: null } } },
+    });
+
+    for (const seccion of seccionesCorrectas) {
+        const modulosSeed = modulosSeedPorSeccion.get(seccion.nombre);
+        for (const modulo of seccion.modulos) {
+            const nombreCorregido = repararMojibake(modulo.nombre);
+            const moduloSeed = modulosSeed?.get(nombreCorregido);
+            if (!moduloSeed || nombreCorregido === modulo.nombre) continue;
+
+            const moduloCorrecto = await prisma.modulo.findFirst({
+                where: { seccionId: seccion.id, nombre: nombreCorregido },
+            });
+            if (moduloCorrecto) {
+                await prisma.$transaction((tx) =>
+                    combinarPermisosModulo(tx, modulo.id, moduloCorrecto.id)
+                );
+            } else {
+                await prisma.modulo.update({
+                    where: { id: modulo.id },
+                    data: { nombre: nombreCorregido, descripcion: moduloSeed.descripcion },
+                });
+            }
+            registrosReparados += 1;
+        }
+    }
+
+    if (registrosReparados > 0) {
+        console.log(`Textos y registros duplicados reparados: ${registrosReparados}`);
+    }
+};
 
 const upsertEmpresaDefault = async () => {
     const empresa = await prisma.empresa.upsert({
@@ -129,6 +328,28 @@ const upsertModulo = async (seccionId, modulo) => {
             imagenPublicId: modulo.imagenPublicId,
         },
     });
+};
+
+const migrarModuloRegistroVentas = async () => {
+    const modulosLegados = await prisma.modulo.findMany({
+        where: { nombre: 'Registro de ventas', deletedAt: null },
+    });
+    if (modulosLegados.length === 0) return;
+
+    const moduloVentas = await prisma.modulo.findFirst({
+        where: { nombre: 'Ventas', deletedAt: null },
+    });
+    if (!moduloVentas) {
+        throw new Error('No se encontró el módulo "Ventas" para migrar los permisos anteriores.');
+    }
+
+    for (const moduloLegado of modulosLegados) {
+        await prisma.$transaction((tx) =>
+            combinarPermisosModulo(tx, moduloLegado.id, moduloVentas.id)
+        );
+    }
+
+    console.log(`Módulos legados de ventas migrados: ${modulosLegados.length}`);
 };
 
 const upsertAccion = (accion) => prisma.accion.upsert({
@@ -285,7 +506,14 @@ async function sembrarEjemplos(ejemplos) {
 
     const estadosCliente = await sembrarCatalogo('estadoCliente', ejemplos.estadosCliente, ['nombre', 'descripcion', 'color']);
     const estadosMembresia = await sembrarCatalogo('estadoMembresia', ejemplos.estadosMembresia, ['nombre', 'descripcion', 'color']);
-    const tiposMembresia = await sembrarCatalogo('tipoMembresia', ejemplos.tiposMembresia, ['nombre', 'descripcion', 'duracionDias', 'precio', 'estado']);
+    const tiposMembresia = await sembrarCatalogo(
+        'tipoMembresia',
+        ejemplos.tiposMembresia?.map((item) => ({
+            ...item,
+            estado: normalizarEstadoCatalogo(item.estado),
+        })),
+        ['nombre', 'descripcion', 'duracionDias', 'precio', 'estado']
+    );
     const tiposVisita = await sembrarCatalogo('tipoVisita', ejemplos.tiposVisita, ['nombre', 'descripcion', 'costo', 'estado']);
     const estadosEmpleado = await sembrarCatalogo('estadoEmpleado', ejemplos.estadosEmpleado, ['nombre', 'descripcion']);
     const areas = await sembrarCatalogo('areaTrabajo', ejemplos.areasTrabajo, ['nombre', 'descripcion', 'estado']);
@@ -304,7 +532,8 @@ async function sembrarEjemplos(ejemplos) {
     for (const item of ejemplos.productos ?? []) {
         const categoria = exigir(categorias, item.categoria, 'categorías de producto');
         const data = {
-            ...tomar(item, ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockActual', 'stockMinimo', 'estado', 'disponibleCompra']),
+            ...tomar(item, ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockActual', 'stockMinimo', 'disponibleCompra']),
+            estado: normalizarEstadoCatalogo(item.estado),
             categoriaProductoId: categoria.id,
         };
         await prisma.producto.upsert({
@@ -315,7 +544,7 @@ async function sembrarEjemplos(ejemplos) {
     }
 
     for (const item of ejemplos.metodosPago ?? []) {
-        const data = tomar(item, ['descripcion', 'estado']);
+        const data = tomar(item, ['codigo', 'descripcion', 'estado']);
         await prisma.metodoPago.upsert({
             where: { nombre: item.nombre },
             update: { ...data, deletedAt: null },
@@ -324,7 +553,10 @@ async function sembrarEjemplos(ejemplos) {
     }
 
     for (const item of ejemplos.servicios ?? []) {
-        const data = tomar(item, ['descripcion', 'precio', 'estado', 'disponibleCompra']);
+        const data = {
+            ...tomar(item, ['descripcion', 'precio', 'disponibleCompra']),
+            estado: normalizarEstadoCatalogo(item.estado),
+        };
         await prisma.servicio.upsert({
             where: { nombre: item.nombre },
             update: { ...data, deletedAt: null },
@@ -467,7 +699,9 @@ async function sembrarEjemplos(ejemplos) {
         };
         apertura = apertura
             ? await prisma.aperturaCaja.update({ where: { id: apertura.id }, data: { ...dataApertura, deletedAt: null } })
-            : await prisma.aperturaCaja.create({ data: dataApertura });
+            : await prisma.aperturaCaja.create({
+                  data: dataApertura,
+              });
 
         for (const movimiento of item.movimientos ?? []) {
             const notaMovimiento = marcaEjemplo(movimiento.clave);
@@ -505,6 +739,17 @@ async function sembrarEjemplos(ejemplos) {
 async function main() {
     console.log('Iniciando seed declarativo...');
 
+    await repararTextoDeModulos();
+
+    await prisma.metodoPago.upsert({
+        where: { codigo: 'EFECTIVO' },
+        update: { estado: 'activo', deletedAt: null },
+        create: {
+            nombre: 'Efectivo',
+            codigo: 'EFECTIVO',
+            descripcion: 'Pago en efectivo',
+        },
+    });
     // 1. UPSERT OBLIGATORIO DE LA EMPRESA PRINCIPAL (id = 1)
     await upsertEmpresaDefault();
 
@@ -554,6 +799,8 @@ async function main() {
             console.log(`  Módulo: ${modulo.nombre}`);
         }
     }
+
+    await migrarModuloRegistroVentas();
 
     // Las secciones fuera del JSON que ya no tienen módulos activos se desactivan.
     const nombresSecciones = seedData.secciones.map((seccion) => seccion.nombre);

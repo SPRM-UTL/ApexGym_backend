@@ -115,7 +115,7 @@ export const autenticarUsuario = async (req, res, next) => {
  *
  * El método HTTP se toma automáticamente de req.method.
  */
-export const verificarPermiso = (modulo, accion) => async (req, res, next) => {
+export const verificarPermiso = (modulo, accion, metodoForzado = null) => async (req, res, next) => {
 
     try {
 
@@ -126,8 +126,13 @@ export const verificarPermiso = (modulo, accion) => async (req, res, next) => {
             return res.status(401).json(response);
         }
 
-        const metodo = req.method.toUpperCase();
-        const tiene = await permisoDao.tienePermiso(usuarioId, modulo, accion, metodo);
+        const metodo = (metodoForzado ?? req.method).toUpperCase();
+        let tiene = await permisoDao.tienePermiso(usuarioId, modulo, accion, metodo);
+
+        if (!tiene && !metodoForzado) {
+            const metodoPorDefecto = accion === 'Listar' ? 'GET' : (accion === 'Eliminar' ? 'DELETE' : (accion === 'Editar' ? 'PUT' : 'POST'));
+            tiene = await permisoDao.tienePermiso(usuarioId, modulo, accion, metodoPorDefecto);
+        }
 
         if (!tiene) {
             const response = new ResponseModel(

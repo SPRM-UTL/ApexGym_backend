@@ -1,6 +1,8 @@
 import { servicioDao } from "../dao/ServicioDao.js";
 import { BaseController } from "./BaseController.js";
-import { guardarImagenServidor } from "../utilidades/guardarImagen.js";
+import { guardarImagenServidor } from "../utils/guardarImagen.js";
+import { ResponseModel } from "../modelos/ResponseModel.js";
+import { validarEstadoCatalogo } from "../utils/constantes.js";
 
 export class ServicioController extends BaseController {
     constructor() {
@@ -18,7 +20,7 @@ export class ServicioController extends BaseController {
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
                 precio: Number(precio),
-                estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
+                estado: validarEstadoCatalogo(estado),
                 disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
                 imagenUrl: rutaImagen,
                 imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
@@ -39,13 +41,15 @@ export class ServicioController extends BaseController {
             const { nombre, descripcion, precio, estado, disponibleCompra, imagenUrl, imagenPublicId } = req.body;
             this.validar({ nombre, precio, estado });
 
-            const rutaImagen = imagenUrl !== undefined ? guardarImagenServidor(imagenUrl, 'servicios') : undefined;
+            const rutaImagen = imagenUrl !== undefined
+                ? guardarImagenServidor(imagenUrl, 'servicios')
+                : undefined;
 
             const servicioActualizado = await this.dao.update(id, {
                 nombre: nombre.trim(),
                 descripcion: descripcion ? descripcion.trim() : null,
                 precio: Number(precio),
-                estado: estado ? estado.trim().toUpperCase() : 'ACTIVO',
+                estado: validarEstadoCatalogo(estado),
                 disponibleCompra: disponibleCompra !== undefined ? Boolean(disponibleCompra) : true,
                 ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
                 ...(imagenPublicId !== undefined && { imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null }),
@@ -78,19 +82,33 @@ export class ServicioController extends BaseController {
         if (!estado?.trim()) throw new Error('El estado es requerido');
     }
 
-    getServiciosCliente = async (req, res) => {
+    obtenerDisponiblesParaVenta = async (req, res) => {
         try {
+            const sucursalId = this.obtenerSucursalId(req);
+            if (sucursalId === 'todas') {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'Selecciona una sucursal específica para consultar servicios de venta',
+                    400
+                ));
+            }
             const servicios = await servicioDao.getAll(
-                { disponibleCompra: true },
+                {
+                    disponibleCompra: true,
+                    estado: 'ACTIVO',
+                },
                 { id: 'desc' },
                 this.obtenerEmpresaId(req),
-                { sucursalId: req.query.sucursalId ?? null }
+                sucursalId
             );
             return this.respuestaExito(res, servicios, "Servicios cargados con exito");
         } catch (error) {
             return this.respuestaError(res, error);
         }
     };
+
+    getServiciosCliente = async (req, res) => this.obtenerDisponiblesParaVenta(req, res);
 }
 
 export const servicioController = new ServicioController();

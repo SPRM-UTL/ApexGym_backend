@@ -5,13 +5,17 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mariadb from 'mariadb';
 import { contextStorage } from '../middleware/contextoMiddleware.js';
 
-const pool = mariadb.createPool({
+export const pool = mariadb.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     allowPublicKeyRetrieval: true,
+    connectTimeout: 10000,
+    ssl: process.env.DB_HOST && !['localhost', '127.0.0.1'].includes(process.env.DB_HOST)
+        ? { rejectUnauthorized: false }
+        : undefined,
 });
 
 const adapter = new PrismaMariaDb(pool);

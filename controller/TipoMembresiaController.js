@@ -1,5 +1,7 @@
 import { tipoMembresiaDao } from '../dao/TipoMembresiaDao.js';
 import { BaseController } from './BaseController.js';
+import { ResponseModel } from '../modelos/ResponseModel.js';
+import { validarEstadoCatalogo } from '../utils/constantes.js';
 
 export class TipoMembresiaController extends BaseController {
     constructor() {
@@ -16,7 +18,7 @@ export class TipoMembresiaController extends BaseController {
                 descripcion: descripcion ? descripcion.trim() : null,
                 duracionDias: Number(duracionDias),
                 precio: Number(precio),
-                estado: estado.trim().toUpperCase()
+                estado: validarEstadoCatalogo(estado)
             });
             
             return this.respuestaExito(res, registro, 'Tipo de membresía creado correctamente');
@@ -36,7 +38,7 @@ export class TipoMembresiaController extends BaseController {
                 descripcion: descripcion ? descripcion.trim() : null,
                 duracionDias: Number(duracionDias),
                 precio: Number(precio),
-                estado: estado.trim().toUpperCase()
+                estado: validarEstadoCatalogo(estado)
             });
             
             return this.respuestaExito(res, registro, 'Tipo de membresía actualizado correctamente');
@@ -63,16 +65,20 @@ export class TipoMembresiaController extends BaseController {
 
     getTiposMembresiaCliente = async (req, res) => {
         try {
-            const todos = await this.dao.getAll(
-                {},
-                { id: 'desc' },
+            const sucursalId = this.obtenerSucursalId(req);
+            if (sucursalId === 'todas') {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'Selecciona una sucursal específica para consultar membresías de venta',
+                    400
+                ));
+            }
+            const disponibles = await this.dao.obtenerDisponiblesParaVenta(
                 this.obtenerEmpresaId(req),
-                { sucursalId: req.query.sucursalId ?? null }
+                sucursalId
             );
-            const activos = (todos || [])
-                .filter((item) => (item.estado || '').toUpperCase() === 'ACTIVO')
-                .sort((a, b) => Number(a.precio) - Number(b.precio));
-            return this.respuestaExito(res, activos, 'Planes de membresía cargados con éxito');
+            return this.respuestaExito(res, disponibles, 'Planes de membresía disponibles cargados con éxito');
         } catch (error) {
             return this.respuestaError(res, error);
         }

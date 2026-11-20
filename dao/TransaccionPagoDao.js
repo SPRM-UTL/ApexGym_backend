@@ -42,41 +42,6 @@ export class TransaccionPagoDao extends BaseDao {
         });
     }
 
-    /**
-     * Obtiene estadísticas rápidas de pagos para auditoría.
-     */
-    async obtenerResumen(empresaId = 1) {
-        const idEmpresa = this.resolverEmpresaId(empresaId);
-        const transacciones = await this.model.findMany({
-            where: {
-                empresaId: idEmpresa,
-                deletedAt: null,
-            },
-            select: {
-                monto: true,
-                estado: true,
-                proveedor: true,
-            },
-        });
-
-        const resumen = {
-            totalAprobado: 0,
-            totalPendiente: 0,
-            totalReembolsado: 0,
-            conteoPorProveedor: {},
-        };
-
-        for (const t of transacciones) {
-            const montoNum = Number(t.monto) || 0;
-            if (t.estado === 'APROBADO') resumen.totalAprobado += montoNum;
-            else if (t.estado === 'PENDIENTE') resumen.totalPendiente += montoNum;
-            else if (t.estado === 'REEMBOLSADO') resumen.totalReembolsado += montoNum;
-
-            resumen.conteoPorProveedor[t.proveedor] = (resumen.conteoPorProveedor[t.proveedor] || 0) + 1;
-        }
-
-        return resumen;
-    }
 }
 
 export const transaccionPagoDao = new TransaccionPagoDao();

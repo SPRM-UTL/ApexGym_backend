@@ -1,6 +1,9 @@
 import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
+import currency from 'currency.js';
+import { ventaDao } from '../dao/VentaDao.js';
+import { calcularEfectivoEsperado, obtenerTotalesMovimientos } from '../utils/calcularEfectivoCaja.js';
 
 const TIPOS_VALIDOS = ['ENTRADA', 'SALIDA'];
 
@@ -8,53 +11,56 @@ export class MovimientoCajaController extends BaseController {
     constructor() {
         super(movimientoCajaDao);
     }
-
     crear = async (req, res) => {
         try {
             const { aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones } = req.body;
 
             this.validarCampos({ aperturaCajaId, empleadoId, tipo, monto, concepto, observaciones });
 
-            // Verificar que la apertura exista y esté ABIERTA
-            const apertura = await prisma.aperturaCaja.findUnique({
-                where: { id: Number(aperturaCajaId), deletedAt: null },
-            });
-            if (!apertura) throw new Error('La apertura de caja especificada no existe');
-            if (apertura.estado !== 'ABIERTA')
-                throw new Error('No se pueden registrar movimientos en una apertura cerrada');
-
+            const idApertura = Number(aperturaCajaId);
             const tipoNormalizado = tipo.trim().toUpperCase();
+            const registro = await prisma.$transaction(async (tx) => {
+                const aperturas = await tx.$queryRaw`
+                    SELECT id, estado, monto_inicial AS montoInicial
+                    FROM aperturas_caja
+                    WHERE id = ${idApertura} AND deleted_at IS NULL
+                    FOR UPDATE
+                `;
+                const apertura = aperturas[0];
+                if (!apertura) throw new Error('La apertura de caja especificada no existe');
+                if (apertura.estado !== 'ABIERTA')
+                    throw new Error('No se pueden registrar movimientos en una apertura cerrada');
 
-            // Si es SALIDA, verificar que haya suficiente efectivo disponible en caja
-            if (tipoNormalizado === 'SALIDA') {
-                const [sumaEntradas, sumaSalidas] = await Promise.all([
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'ENTRADA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                    prisma.movimientoCaja.aggregate({
-                        where: { aperturaCajaId: Number(aperturaCajaId), tipo: 'SALIDA', deletedAt: null },
-                        _sum: { monto: true },
-                    }),
-                ]);
+                if (tipoNormalizado === 'SALIDA') {
+                    const totalesEfectivo = await obtenerTotalesMovimientos({
+                        aperturaCajaId: idApertura,
+                        soloEfectivo: true,
+                        client: tx,
+                    });
 
-                const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-                const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-                const saldoDisponible = Number(apertura.montoInicial) + totalEntradas - totalSalidas;
+                    const saldoDisponible = calcularEfectivoEsperado({
+                        montoInicial: apertura.montoInicial,
+                        totalEntradas: totalesEfectivo.totalEntradas,
+                        totalSalidas: totalesEfectivo.totalSalidas,
+                    });
 
-                if (Number(monto) > saldoDisponible) {
-                    throw new Error(`Saldo insuficiente en caja. El saldo disponible es de $${saldoDisponible.toFixed(2)} y se intentó retirar $${Number(monto).toFixed(2)}`);
+                    if (Number(monto) > saldoDisponible) {
+                        throw new Error(`Saldo insuficiente en caja. El saldo disponible es de ${saldoDisponible.toFixed(2)} y se intentó retirar ${Number(monto).toFixed(2)}`);
+                    }
                 }
-            }
 
-            const registro = await this.dao.create({
-                aperturaCajaId: Number(aperturaCajaId),
-                empleadoId: Number(empleadoId),
-                tipo: tipoNormalizado,
-                monto: Number(monto),
-                concepto: concepto.trim(),
-                estado: 'PENDIENTE',
-                observaciones: observaciones ? observaciones.trim() : null,
+                return tx.movimientoCaja.create({
+                    data: {
+                        aperturaCajaId: idApertura,
+                        empleadoId: Number(empleadoId),
+                        tipo: tipoNormalizado,
+                        monto: Number(monto),
+                        concepto: concepto.trim(),
+                        estado: 'PENDIENTE',
+                        afectaEfectivo: true,
+                        observaciones: observaciones ? observaciones.trim() : null,
+                    },
+                });
             });
 
             return this.respuestaExito(res, registro, 'Movimiento de caja registrado correctamente');
@@ -129,6 +135,20 @@ export class MovimientoCajaController extends BaseController {
                 data: { estado: 'VALIDADO' },
             });
 
+            if (movimientoExistente.transaccionPagoId) {
+                await prisma.transaccionPago.updateMany({
+                    where: { id: movimientoExistente.transaccionPagoId, estado: 'PENDIENTE' },
+                    data: { estado: 'APROBADO' },
+                });
+            }
+
+            if (movimientoExistente.ventaId) {
+                await prisma.venta.updateMany({
+                    where: { id: movimientoExistente.ventaId, estado: 'pendiente_pago' },
+                    data: { estado: 'completada' },
+                });
+            }
+
             return this.respuestaExito(res, registro, 'Movimiento de caja validado correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
@@ -157,91 +177,54 @@ export class MovimientoCajaController extends BaseController {
             });
             if (!apertura) throw new Error('Apertura no encontrada');
 
-            const [sumaEntradas, sumaSalidas, movimientos] = await Promise.all([
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'ENTRADA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
-                prisma.movimientoCaja.aggregate({
-                    where: { aperturaCajaId, tipo: 'SALIDA', deletedAt: null },
-                    _sum: { monto: true },
-                }),
+            const [
+                totalesGenerales,
+                totalesEfectivo,
+                movimientos,
+                resumenVentas,
+                corteGuardado,
+            ] = await Promise.all([
+                obtenerTotalesMovimientos({ aperturaCajaId }),
+                obtenerTotalesMovimientos({ aperturaCajaId, soloEfectivo: true }),
                 this.dao.getAllByApertura(aperturaCajaId),
+                ventaDao.obtenerResumenVentasPorApertura(aperturaCajaId),
+                apertura.estado === 'CERRADA'
+                    ? prisma.corteCaja.findFirst({
+                          where: { aperturaCajaId, deletedAt: null },
+                          orderBy: [{ fechaCorte: 'desc' }, { id: 'desc' }],
+                          select: {
+                              efectivoEsperado: true,
+                              efectivoContado: true,
+                              diferencia: true,
+                          },
+                      })
+                    : Promise.resolve(null),
             ]);
 
-            const totalEntradas = Number(sumaEntradas._sum.monto ?? 0);
-            const totalSalidas = Number(sumaSalidas._sum.monto ?? 0);
-            const montoInicial = Number(apertura.montoInicial);
-            const saldoDisponible = montoInicial + totalEntradas - totalSalidas;
+            const totalEntradas = totalesGenerales.totalEntradas;
+            const totalSalidas = totalesGenerales.totalSalidas;
+            const montoInicial = currency(String(apertura.montoInicial ?? 0)).value;
+            let saldoDisponible;
+            if (apertura.estado === 'CERRADA') {
+                if (!corteGuardado) {
+                    throw new Error('No se encontró el corte guardado para consultar el saldo histórico de esta apertura.');
+                }
+                saldoDisponible = corteGuardado.efectivoEsperado !== null
+                    ? currency(String(corteGuardado.efectivoEsperado)).value
+                    : currency(String(corteGuardado.efectivoContado))
+                        .subtract(String(corteGuardado.diferencia))
+                        .value;
+            } else if (apertura.estado === 'ABIERTA') {
+                saldoDisponible = calcularEfectivoEsperado({
+                    montoInicial,
+                    totalEntradas: totalesEfectivo.totalEntradas,
+                    totalSalidas: totalesEfectivo.totalSalidas,
+                });
+            } else {
+                throw new Error('La apertura no tiene un estado que permita consultar su saldo.');
+            }
             const movimientosPendientes = movimientos.filter((m) => m.estado !== 'VALIDADO').length;
             const movimientosValidados = movimientos.filter((m) => m.estado === 'VALIDADO').length;
-
-            // Transacciones financieras del turno (Efectivo, Terminal con voucher y Mercado Pago)
-            const corteAsociado = await prisma.corteCaja.findFirst({
-                where: { aperturaCajaId, deletedAt: null },
-                orderBy: { id: 'desc' },
-            });
-
-            const filtroFecha = {
-                gte: apertura.fechaApertura,
-                ...(corteAsociado?.fechaCorte ? { lte: corteAsociado.fechaCorte } : {}),
-            };
-
-            const transaccionesTurno = await prisma.transaccionPago.findMany({
-                where: {
-                    empresaId: apertura.empresaId,
-                    estado: 'APROBADO',
-                    createdAt: filtroFecha,
-                    deletedAt: null,
-                },
-                orderBy: { id: 'desc' },
-            });
-
-            let totalVentasEfectivo = 0;
-            let opsEfectivo = 0;
-            let totalVentasTerminal = 0;
-            let opsTerminal = 0;
-            let totalVentasDigital = 0;
-            let opsDigital = 0;
-
-            for (const t of transaccionesTurno) {
-                const monto = Number(t.monto);
-                if (t.proveedor === 'EFECTIVO') {
-                    totalVentasEfectivo += monto;
-                    opsEfectivo++;
-                } else if (t.proveedor === 'TERMINAL_MANUAL') {
-                    totalVentasTerminal += monto;
-                    opsTerminal++;
-                } else {
-                    totalVentasDigital += monto;
-                    opsDigital++;
-                }
-            }
-
-            const totalVentas = totalVentasEfectivo + totalVentasTerminal + totalVentasDigital;
-            const transaccionesVentas = transaccionesTurno.length;
-            const ticketPromedio = transaccionesVentas > 0 ? totalVentas / transaccionesVentas : 0;
-
-            const ventasPorMetodoPago = [
-                {
-                    metodoPagoId: 1,
-                    nombre: 'Efectivo en Caja',
-                    total: totalVentasEfectivo,
-                    transacciones: opsEfectivo,
-                },
-                {
-                    metodoPagoId: 2,
-                    nombre: 'Tarjeta en Terminal (Vouchers)',
-                    total: totalVentasTerminal,
-                    transacciones: opsTerminal,
-                },
-                {
-                    metodoPagoId: 3,
-                    nombre: 'Mercado Pago Digital / En Línea',
-                    total: totalVentasDigital,
-                    transacciones: opsDigital,
-                },
-            ];
 
             return this.respuestaExito(
                 res,
@@ -250,21 +233,30 @@ export class MovimientoCajaController extends BaseController {
                     montoInicial,
                     totalEntradas,
                     totalSalidas,
+                    totalEntradasEfectivo: totalesEfectivo.totalEntradas,
+                    totalSalidasEfectivo: totalesEfectivo.totalSalidas,
                     saldoDisponible,
-                    totalVentasEfectivo,
+                    efectivoEsperado: saldoDisponible,
                     movimientos,
                     movimientosPendientes,
                     movimientosValidados,
+                    
+                    totalVentas: resumenVentas.totalVentas,
+                    totalVentasEfectivo: resumenVentas.totalVentasEfectivo,
+                    totalVentasCanceladas: resumenVentas.totalVentasCanceladas,
+                    totalVentasEfectivoCanceladas: resumenVentas.totalVentasEfectivoCanceladas,
+                    cantidadVentas: resumenVentas.cantidadVentas,
+                    promedioVentas: resumenVentas.promedioVentas,
+                    ventasPorMetodoPago: resumenVentas.ventasPorMetodoPago,
                     totales: {
-                        totalVentas,
-                        transaccionesVentas,
-                        ticketPromedio,
-                        totalVentasEfectivo,
-                        totalVentasTerminal,
-                        totalVentasDigital,
-                        ventasPorMetodoPago,
+                        totalVentas: resumenVentas.totalVentas,
+                        transaccionesVentas: resumenVentas.cantidadVentas,
+                        ticketPromedio: resumenVentas.promedioVentas,
+                        ventasPorMetodoPago: resumenVentas.ventasPorMetodoPago,
+                        totalVentasCanceladas: resumenVentas.totalVentasCanceladas,
+                        cantidadVentasCanceladas: resumenVentas.cantidadVentasCanceladas,
+                        totalVentasEfectivo: resumenVentas.totalVentasEfectivo,
                     },
-                    transacciones: transaccionesTurno,
                 },
                 'Resumen de apertura obtenido correctamente'
             );
