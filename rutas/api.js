@@ -47,6 +47,7 @@ const router = express.Router();
 const uploadImagenUsuario = uploadImagen('usuarios', {
     transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
 });
+const uploadImagenEmpleado = uploadImagen('empleados');
 const uploadImagenProducto = uploadImagen('productos');
 const uploadImagenServicio = uploadImagen('servicios');
 const usuarioController = new UsuarioController();
@@ -399,12 +400,14 @@ empleadoRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Empleados', 'Crear'),
+    uploadImagenEmpleado,
     empleadoController.crear.bind(empleadoController)
 );
 empleadoRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Empleados', 'Editar'),
+    uploadImagenEmpleado,
     empleadoController.actualizar.bind(empleadoController)
 );
 empleadoRoutes.delete(
