@@ -32,6 +32,17 @@ export class ClienteDao extends BaseDao {
         });
     }
 
+    async getByUser(usuarioId) {
+        return this.model.findFirst({
+            where: {
+                usuarioId: Number(usuarioId),
+                deletedAt: null,
+            },
+            include: {
+                estadoCliente: true
+            },
+            });
+    }
     async getByEmail(email) {
         return this.model.findFirst({
             where: {

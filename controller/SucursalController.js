@@ -9,12 +9,32 @@ export class SucursalController extends BaseController {
     obtenerActual = async (req, res) => {
         try {
             const empresaId = this.obtenerEmpresaId(req);
-            const sucursalId = req.headers['x-sucursal-id'] ?? req.query.sucursalId ?? 1;
+            const puedeCambiarSucursal = Boolean(req.usuario?.puedeCambiarSucursal);
+            const sucursalId = puedeCambiarSucursal
+                ? (req.headers['x-sucursal-id'] ?? req.query.sucursalId ?? req.usuario?.sucursalId ?? 1)
+                : (req.usuario?.sucursalId ?? 1);
             const sucursal = await this.dao.obtenerActual(Number(sucursalId), empresaId);
             if (!sucursal) {
                 return this.respuestaNoEncontrado(res, 'Sucursal no encontrada');
             }
-            return this.respuestaExito(res, sucursal, 'Datos de la sucursal obtenidos correctamente');
+            return this.respuestaExito(
+                res,
+                {
+                    ...sucursal,
+                    puedeCambiarSucursal,
+                },
+                'Datos de la sucursal obtenidos correctamente'
+            );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    obtenerDisponibles = async (req, res) => {
+        try {
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursales = await this.dao.getAll({ activo: true }, { id: 'asc' }, empresaId);
+            return this.respuestaExito(res, sucursales, 'Sucursales disponibles obtenidas correctamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }

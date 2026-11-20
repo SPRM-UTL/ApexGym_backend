@@ -1059,6 +1059,13 @@ sucursalRoutes.get(
 );
 
 sucursalRoutes.get(
+    '/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Cambiar sucursal'),
+    sucursalController.obtenerDisponibles.bind(sucursalController)
+);
+
+sucursalRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Sucursales', 'Listar'),
@@ -1207,6 +1214,8 @@ router.use('/metodos-pago',metodoPagoRoutes);
 router.use('/ventas', ventaRoutes)
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+router.use('/asistencias', asistenciaRoutes);
+router.use('/visitas', visitaRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
