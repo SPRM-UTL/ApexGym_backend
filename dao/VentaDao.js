@@ -1206,6 +1206,7 @@ async create(data) {
         if (proveedor) {
             await pagoService.registrarCobroVenta(tx, {
                 ...pago,
+                referenciaTransferencia: pago?.referenciaTransferencia ?? pago?.referencia,
                 empresaId: Number(cajaAbierta.empresaId),
                 sucursalId: Number(cajaAbierta.sucursalId),
                 aperturaCajaId: Number(cajaAbierta.id),

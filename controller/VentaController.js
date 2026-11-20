@@ -203,19 +203,22 @@ export class VentaController extends BaseController {
 
             this.validar(idAperturaFinal, clienteId, detalleVenta);
 
+            const rawUuid = req.get('x-idempotency-key') ?? req.body.uuidIdempotencia;
+            const uuidIdempotencia = this.sanitizarUuid(rawUuid);
+
             const registro = await this.dao.create({
                 empleadoId: this.leerId(idEmpleadoFinal, 'empleado'),
                 aperturaCajaId: Number(idAperturaFinal),
                 clienteId: Number(clienteId),
                 usuarioId: this.leerId(req.usuario?.id, 'usuario autenticado'),
                 empresaId: this.obtenerEmpresaId(req),
-                uuidIdempotencia: req.get('x-idempotency-key') ?? req.body.uuidIdempotencia,
+                uuidIdempotencia,
                 metodoPagoId: this.leerId(metodoPagoId, 'método de pago'),
                 subtotal: this.leerMonto(subtotal, 'subtotal'),
                 total: this.leerMonto(total, 'total'),
                 montoRecibido: montoRecibido === undefined ? undefined : this.leerMonto(montoRecibido, 'monto recibido'),
                 detalleVenta: this.normalizarDetalles(detalleVenta),
-                pago: req.body.pago,
+                pago: this.sanitizarPago(req.body.pago),
             });
 
             return this.respuestaExito(
@@ -351,7 +354,9 @@ normalizarDetalles(detalleVenta) {
         const detalle = {
             tipoItem,
             cantidad,
-            descripcion: d.descripcion ?? null,
+            descripcion: typeof d.descripcion === 'string'
+                ? d.descripcion.replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, 255)
+                : null,
             productoId: null,
             servicioId: null,
             tipoMembresiaId: null
@@ -467,6 +472,29 @@ normalizarDetalles(detalleVenta) {
 
         if (nombre === 'fecha hasta') fecha.setUTCHours(23, 59, 59, 999);
         return fecha;
+    };
+
+    sanitizarPago = (pago) => {
+        if (!pago || typeof pago !== 'object' || Array.isArray(pago)) return pago;
+        const sanitizado = {};
+        for (const [clave, valor] of Object.entries(pago)) {
+            if (typeof valor === 'string') {
+                sanitizado[clave] = valor
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/[\x00-\x1F\x7F]/g, '')
+                    .trim()
+                    .slice(0, 255);
+            } else {
+                sanitizado[clave] = valor;
+            }
+        }
+        return sanitizado;
+    };
+
+    sanitizarUuid = (uuid) => {
+        if (typeof uuid !== 'string') return undefined;
+        const limpio = uuid.trim().replace(/[^a-zA-Z0-9\-_]/g, '').slice(0, 100);
+        return limpio.length > 0 ? limpio : undefined;
     };
 }
 
