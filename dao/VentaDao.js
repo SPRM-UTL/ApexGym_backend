@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { ESTADOS_ACTIVOS_CATALOGO, TASA_IVA } from "../utils/constantes.js";
 import { pagoService, PROVEEDOR_POR_CODIGO_METODO } from "../services/PagoService.js";
 import { completarReembolso, validarReembolso } from "./DevolucionDao.js";
+import { clienteMembresiaDao } from "./ClienteMembresiaDao.js";
 
 const ESTADO_CAJA = { ABIERTA: "ABIERTA" };
 const ESTADO_VENTA = { COMPLETADA : "completada" , CANCELADA : "cancelada"}
@@ -67,6 +68,31 @@ export class VentaDao extends BaseDao {
                 }
             }
         );
+    }
+
+    async activarMembresiasDeVenta(tx, ventaId, clienteId, { empresaId, sucursalId } = {}) {
+        const detalles = await tx.detalleVenta.findMany({
+            where: {
+                ventaId: Number(ventaId),
+                tipoItem: 'MEMBRESIA',
+                clienteMembresiaId: null,
+            },
+            orderBy: { id: 'asc' },
+        });
+
+        for (const detalle of detalles) {
+            const membresia = await clienteMembresiaDao.asignarEnTransaccion(tx, {
+                clienteId,
+                tipoMembresiaId: detalle.tipoMembresiaId,
+                empresaId,
+                sucursalId,
+            });
+
+            await tx.detalleVenta.update({
+                where: { id: detalle.id },
+                data: { clienteMembresiaId: membresia.id },
+            });
+        }
     }
 
 aplicarContextoVenta(where, empresaId, sucursalId) {
@@ -777,6 +803,10 @@ async resolverPagoMercadoPago(paymentData, empresaId = null) {
                 where: { id: venta.id },
                 data: { estado: ESTADO_VENTA.COMPLETADA },
             });
+            await this.activarMembresiasDeVenta(tx, venta.id, venta.clienteId, {
+                empresaId: Number(transaccion.empresaId),
+                sucursalId: Number(transaccion.sucursalId),
+            });
             if (referenciaVenta.aperturaCajaId) {
                 await pagoService.registrarMovimientoCobro(tx, {
                     empresaId: Number(transaccion.empresaId),
@@ -1155,6 +1185,13 @@ async create(data) {
             },
             include : {folioVenta : true}
         });
+
+        if (!esDigital) {
+            await this.activarMembresiasDeVenta(tx, nuevaVenta.id, cliente.id, {
+                empresaId: Number(cajaAbierta.empresaId),
+                sucursalId: Number(cajaAbierta.sucursalId),
+            });
+        }
 
         const proveedor = Object.prototype.hasOwnProperty.call(
             PROVEEDOR_POR_CODIGO_METODO,

@@ -46,6 +46,7 @@ const uploadImagenUsuario = uploadImagen('usuarios', {
     transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
 });
 const uploadImagenProducto = uploadImagen('productos');
+const uploadImagenServicio = uploadImagen('servicios');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -990,6 +991,7 @@ servicioRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Servicios', 'Crear'),
+    uploadImagenServicio,
     servicioController.crear.bind(servicioController)
 );
 
@@ -997,6 +999,7 @@ servicioRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Servicios', 'Editar'),
+    uploadImagenServicio,
     servicioController.actualizar.bind(servicioController)
 );
 
@@ -1207,6 +1210,8 @@ router.use('/metodos-pago',metodoPagoRoutes);
 router.use('/ventas', ventaRoutes)
 router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
+router.use('/asistencias', asistenciaRoutes);
+router.use('/visitas', visitaRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));

@@ -1,6 +1,5 @@
 import { clienteMembresiaDao } from '../dao/ClienteMembresiaDao.js';
 import { tipoMembresiaDao } from '../dao/TipoMembresiaDao.js';
-import { estadoMembresiaDao } from '../dao/EstadoMembresiaDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
 import { BaseController } from './BaseController.js';
 import { prisma } from '../dao/BaseDao.js';
@@ -21,60 +20,17 @@ export class ClienteMembresiaController extends BaseController {
                 throw new Error('El cliente especificado no existe');
             }
 
-            const tipo = await tipoMembresiaDao.getById(Number(tipoMembresiaId));
-            if (!tipo) {
-                throw new Error('El tipo de membresía especificado no existe');
-            }
-
-            const fechaInicioStr = typeof fechaInicio === 'string' && fechaInicio.trim() !== ''
-                ? fechaInicio.split('T')[0]
-                : new Date().toISOString().split('T')[0];
-
-            const [y, m, d] = fechaInicioStr.split('-').map(Number);
-            const inicioDate = new Date(Date.UTC(y, m - 1, d));
-            const finDate = new Date(inicioDate);
-            finDate.setUTCDate(finDate.getUTCDate() + Number(tipo.duracionDias));
-
-            let estadoVigente = await prisma.estadoMembresia.findFirst({ where: { nombre: 'Vigente' } });
-            if (!estadoVigente) {
-                estadoVigente = await prisma.estadoMembresia.create({
-                    data: { nombre: 'Vigente', descripcion: 'Membresía activa' }
-                });
-            }
-
-            let estadoVencida = await prisma.estadoMembresia.findFirst({ where: { nombre: 'Vencida' } });
-            if (!estadoVencida) {
-                estadoVencida = await prisma.estadoMembresia.create({
-                    data: { nombre: 'Vencida', descripcion: 'Membresía vencida' }
-                });
-            }
-
-            await prisma.clienteMembresia.updateMany({
-                where: {
-                    clienteId: Number(clienteId),
-                    estadoMembresiaId: estadoVigente.id,
-                    deletedAt: null
-                },
-                data: {
-                    estadoMembresiaId: estadoVencida.id
-                }
-            });
-
-            const hoyUTC = new Date();
-            hoyUTC.setUTCHours(0, 0, 0, 0);
-            const estadoFinalId = finDate < hoyUTC ? estadoVencida.id : estadoVigente.id;
-
-            const nuevaMembresia = await this.dao.create({
-                clienteId: Number(clienteId),
-                tipoMembresiaId: Number(tipoMembresiaId),
-                estadoMembresiaId: estadoFinalId,
-                fechaInicio: inicioDate,
-                fechaFin: finDate,
-                renovacionAutomatica: Boolean(renovacionAutomatica)
-            });
-
-            const registroCompleto = await this.dao.getById(nuevaMembresia.id);
-            return this.respuestaExito(res, registroCompleto, 'Membresía asignada exitosamente');
+            const nuevaMembresia = await prisma.$transaction((tx) => (
+                this.dao.asignarEnTransaccion(tx, {
+                    clienteId,
+                    tipoMembresiaId,
+                    fechaInicio,
+                    renovacionAutomatica,
+                    empresaId: this.obtenerEmpresaId(req),
+                    sucursalId: this.obtenerSucursalId(req),
+                })
+            ));
+            return this.respuestaExito(res, nuevaMembresia, 'Membresía asignada exitosamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
