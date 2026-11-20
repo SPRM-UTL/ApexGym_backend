@@ -48,6 +48,7 @@ const uploadImagenUsuario = uploadImagen('usuarios', {
     transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
 });
 const uploadImagenProducto = uploadImagen('productos');
+const uploadImagenServicio = uploadImagen('servicios');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -992,6 +993,7 @@ servicioRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Servicios', 'Crear'),
+    uploadImagenServicio,
     servicioController.crear.bind(servicioController)
 );
 
@@ -999,6 +1001,7 @@ servicioRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Servicios', 'Editar'),
+    uploadImagenServicio,
     servicioController.actualizar.bind(servicioController)
 );
 

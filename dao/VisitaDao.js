@@ -33,10 +33,15 @@ export class VisitaDao extends BaseDao {
      * @param {Date|string} fechaFin
      */
     async obtenerVisitasPorPeriodo(fechaInicio, fechaFin, { sucursalId: _sucursalId = null } = {}) {
-        const inicio = new Date(fechaInicio);
-        inicio.setHours(0, 0, 0, 0);
-        const fin = new Date(fechaFin);
-        fin.setHours(23, 59, 59, 999);
+        // Las fechas del historial son días calendario de México (UTC-6).
+        // Construir los límites explícitamente evita que el huso horario del
+        // servidor convierta una visita nocturna al día siguiente.
+        const inicio = new Date(`${fechaInicio}T00:00:00.000-06:00`);
+        const fin = new Date(`${fechaFin}T23:59:59.999-06:00`);
+
+        if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) {
+            throw new Error('El rango de fechas de visitas no es válido');
+        }
 
         return this.model.findMany({
             where: {
