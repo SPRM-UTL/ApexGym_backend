@@ -1,4 +1,4 @@
-# Dependencias
+﻿# Dependencias
 node_modules/
 
 # Variables de entorno y secretos
@@ -26,7 +26,7 @@ pnpm-debug.log*
 # Repomix
 repomix-output.xml
 
-# Directorios de imágenes y archivos subidos
+# Directorios de imÃ¡genes y archivos subidos
 uploads/
 /public/uploads/
 /uploads/productos/
@@ -37,10 +37,8 @@ imagenes/
 /imagenes/
 usuarios/
 /usuarios/
-tests/
 test/
 scripts/
-/tests/
 /test/
 /scripts/
 
@@ -64,7 +62,7 @@ backend/migrations/
 /migrations-copy/
 /backend/migrations-copy/
 
-# Directorios de imágenes
+# Directorios de imÃ¡genes
 /public/imagenes/
 /imagenes/
 /usuarios/
@@ -81,9 +79,52 @@ public/uploads/.vs/
 /migrations-copy/
 /backend/migrations-copy/
 
-# Directorios de imágenes
+# Directorios de imÃ¡genes
 /public/imagenes/
 /imagenes/
 /usuarios/
 /memory
 CLAUDE.MD
+
+# ---- Archivos y carpetas de asistentes de IA ----
+CLAUDE.md
+CLAUDE.MD
+AGENTS.md
+GEMINI.md
+QWEN.md
+COPILOT.md
+.cursorrules
+.clinerules
+.windsurfrules
+.mcp.json
+.agent/
+.agents/
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.continue/
+.cline/
+.roo/
+.kiro/
+.aider*
+.opencode/
+.freebuff/
+.pi/
+.thinkrail/
+.copilot/
+.gemini/
+.antigravity/
+.devin/
+.brain/
+memory/
+.github/copilot-instructions.md
+
+# ---- Herramientas locales ----
+.wrangler/
+repomix-output.xml
+repomix.config.json
+.repomixignore
+
+# Carpeta temporal
+temps/

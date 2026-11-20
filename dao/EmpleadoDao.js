@@ -17,7 +17,7 @@ export class EmpleadoDao extends BaseDao {
             where: this.aplicarFiltrosContexto({ deletedAt: null, ...additionalWhere }, empresaId, sucursalId),
             omit: this.omit,
             include: {
-                puesto: { select: { id: true, nombre: true } },
+                puesto: { select: { id: true, nombre: true, salarioBase: true } },
                 areaTrabajo: { select: { id: true, nombre: true } },
                 estadoEmpleado: { select: { id: true, nombre: true } },
                 usuario: { select: { id: true, nombre: true, email: true } },
@@ -31,7 +31,7 @@ export class EmpleadoDao extends BaseDao {
             where: this.aplicarFiltrosContexto({ id: Number(id), deletedAt: null }, empresaId, sucursalId),
             omit: this.omit,
             include: {
-                puesto: { select: { id: true, nombre: true } },
+                puesto: { select: { id: true, nombre: true, salarioBase: true } },
                 areaTrabajo: { select: { id: true, nombre: true } },
                 estadoEmpleado: { select: { id: true, nombre: true } },
                 usuario: { select: { id: true, nombre: true, email: true } },
@@ -59,7 +59,7 @@ export class EmpleadoDao extends BaseDao {
             }, empresaId, sucursalId),
             omit: this.omit,
             include: {
-                puesto: { select: { id: true, nombre: true } },
+                puesto: { select: { id: true, nombre: true, salarioBase: true } },
                 areaTrabajo: { select: { id: true, nombre: true } },
                 estadoEmpleado: { select: { id: true, nombre: true } },
                 usuario: { select: { id: true, nombre: true, email: true } },
@@ -88,7 +88,7 @@ export class EmpleadoDao extends BaseDao {
             },
             omit: this.omit,
             include: {
-                puesto: { select: { id: true, nombre: true } },
+                puesto: { select: { id: true, nombre: true, salarioBase: true } },
                 areaTrabajo: { select: { id: true, nombre: true } },
                 estadoEmpleado: { select: { id: true, nombre: true } },
                 usuario: { select: { id: true, nombre: true, email: true } },

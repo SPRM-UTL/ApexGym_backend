@@ -1062,6 +1062,13 @@ sucursalRoutes.get(
 );
 
 sucursalRoutes.get(
+    '/disponibles',
+    autenticarUsuario,
+    verificarPermiso('Sucursales', 'Cambiar sucursal'),
+    sucursalController.obtenerDisponibles.bind(sucursalController)
+);
+
+sucursalRoutes.get(
     '/',
     autenticarUsuario,
     verificarPermiso('Sucursales', 'Listar'),

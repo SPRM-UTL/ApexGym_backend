@@ -8,7 +8,9 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
 const ES_CLOUDFLARE = process.env.CLOUDFLARE === 'true' || process.env.NODE_ENV === 'production';
 
-const RAIZ_BACKEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// import.meta.url puede no existir en Cloudflare Workers; se usa cwd como respaldo.
+const __dirname_backend = import.meta.url ? path.dirname(fileURLToPath(import.meta.url)) : process.cwd();
+const RAIZ_BACKEND = path.resolve(__dirname_backend, '..');
 const DIRECTORIO_IMAGENES = path.join(RAIZ_BACKEND, 'uploads');
 
 // Configurar Cloudinary para producción/contenedores

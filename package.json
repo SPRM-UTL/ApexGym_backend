@@ -7,8 +7,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test",
+    "dev:cf": "wrangler dev",
+    "test": "node tests/api/run.js",
+    "test:api": "node tests/api/run.js",
     "postinstall": "prisma generate",
+    "deploy": "prisma db push && npx wrangler deploy",
     "seed": "node prisma/seed.js"
   },
   "prisma": {
@@ -40,3 +43,5 @@
     "repomix": "^1.18.1"
   }
 }
+
+
