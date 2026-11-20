@@ -1,6 +1,8 @@
 import { prisma } from '../dao/BaseDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
+import { tokenDao } from '../dao/TokenDao.js';
 import { clienteService } from '../services/ClienteService.js';
+import { usuarioService } from '../services/UsuarioService.js';
 import { BaseController } from './BaseController.js';
 
 export class ClienteController extends BaseController {

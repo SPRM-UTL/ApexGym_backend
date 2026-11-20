@@ -53,6 +53,30 @@ export class ClienteDao extends BaseDao {
         });
     }
 
+    async getByCodigoQr(codigoQr) {
+        return this.model.findFirst({
+            where: {
+                codigoQr: String(codigoQr).trim(),
+                deletedAt: null,
+            },
+            include: {
+                estadoCliente: true
+            },
+            omit: this.omit
+        });
+    }
+
+    async actualizarCodigoQr(clienteId, codigoQr) {
+        return this.model.update({
+            where: { id: Number(clienteId) },
+            data: { codigoQr: String(codigoQr).trim() },
+            include: {
+                estadoCliente: true
+            },
+            omit: this.omit
+        });
+    }
+
     async buscarPorNombreOId(termino, { pagina = 1, limite = 20 } = {}) {
         const consulta = String(termino ?? '').trim();
         const idNumerico = /^\d+$/.test(consulta) ? Number(consulta) : null;
@@ -102,13 +126,26 @@ export class ClienteDao extends BaseDao {
      * @param {string} termino
      */
     async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
+        const consulta = String(termino ?? '').trim();
+        const palabras = consulta.split(/\s+/).filter(Boolean);
         return this.model.findMany({
             where: {
                 deletedAt: null,
                 OR: [
-                    { nombre:          { contains: termino } },
-                    { apellidoPaterno: { contains: termino } },
-                    { apellidoMaterno: { contains: termino } },
+                    { nombre:          { contains: consulta } },
+                    { apellidoPaterno: { contains: consulta } },
+                    { apellidoMaterno: { contains: consulta } },
+                    { correo:          { contains: consulta } },
+                    { telefono:        { contains: consulta } },
+                    ...(palabras.length > 1 ? [{
+                        AND: palabras.map((p) => ({
+                            OR: [
+                                { nombre:          { contains: p } },
+                                { apellidoPaterno: { contains: p } },
+                                { apellidoMaterno: { contains: p } },
+                            ]
+                        }))
+                    }] : []),
                 ]
             },
             include: { estadoCliente: true },

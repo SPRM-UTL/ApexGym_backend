@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma } from '../dao/BaseDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
 import { tokenDao } from '../dao/TokenDao.js';
@@ -62,6 +63,7 @@ export class ClienteService {
             genero: genero.trim(),
             telefono: telefono.trim(),
             correo: correo?.trim() || null,
+            codigoQr: `APX-${crypto.randomBytes(6).toString('hex').toUpperCase()}`,
             direccion: direccion?.trim() || null,
             contactoEmergenciaNombre: contactoEmergenciaNombre?.trim() || null,
             contactoEmergenciaTelefono: contactoEmergenciaTelefono?.trim() || null,
