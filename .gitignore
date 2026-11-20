@@ -72,6 +72,7 @@ backend/migrations/
 !prisma/migrations/**
 public/uploads/.vs/
 /prisma/migrations
+/prisma/migrations/*
 
 /migrations/
 /backend/migrations/

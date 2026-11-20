@@ -8,7 +8,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "dev:cf": "wrangler dev",
-    "test": "node tests/api/run.js",
+    "test": "node --test tests/unit/notificacionesFcm.test.js && node tests/api/run.js",
     "test:api": "node tests/api/run.js",
     "postinstall": "prisma generate",
     "deploy": "prisma db push && npx wrangler deploy",
@@ -32,6 +32,7 @@
     "currency.js": "^2.0.4",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
+    "firebase-admin": "^14.5.1",
     "mariadb": "^3.5.4",
     "multer": "^2.4.0",
     "multer-storage-cloudinary": "^4.0.0",
@@ -43,5 +44,3 @@
     "repomix": "^1.18.1"
   }
 }
-
-

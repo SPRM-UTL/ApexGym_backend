@@ -18,3 +18,18 @@ CLOUDINARY_API_SECRET="8JePAoiHksmkb43DLlgO_5mEOes"
 #Necesita metodo https por lo que sujiero usar en produccion
 MP_ACCESS_TOKEN="APP_USR-322858"
 MP_ACCESS_KEY="APP_USR-1c30a16b-363f"
+
+#Cuenta de servicio de Firebase para notificaciones push
+FIREBASE_SERVICE_ACCOUNT_JSON='{
+  "type": "type",
+  "project_id": "project_id",
+  "private_key_id": "private_key_id",
+  "private_key": "private_key",
+  "client_email": "client_email",
+  "client_id": "client_id",
+  "auth_uri": "auth_uri",
+  "token_uri": "token_uri",
+  "auth_provider_x509_cert_url": "auth_provider_x509_cert_url",
+  "client_x509_cert_url": "client_x509_cert_url",
+  "universe_domain": "universe_domain"
+}'
