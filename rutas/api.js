@@ -44,6 +44,19 @@ import { notificacionRoutes } from './notificacionRoutes.js';
 import { dispositivoRoutes } from './dispositivoRoutes.js';
 
 const router = express.Router();
+
+const esClienteRequest = (req) => {
+    return Boolean(
+        req.usuario?.esCliente ||
+        req.user?.esCliente ||
+        req.usuario?.clienteId ||
+        req.user?.clienteId ||
+        req.usuario?.roles?.some((r) => r.nombre?.toLowerCase() === 'cliente') ||
+        req.user?.roles?.some((r) => r.nombre?.toLowerCase() === 'cliente')
+    );
+};
+
+
 const uploadImagenUsuario = uploadImagen('usuarios', {
     transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
 });
@@ -455,7 +468,10 @@ CategoriaProductoRoutes.delete(
 productoRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     productoController.obtenerDisponiblesParaVenta.bind(productoController)
 );
 productoRoutes.get(
@@ -734,7 +750,10 @@ estadoMembresiaRoutes.delete(
 tipoMembresiaRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.get(
@@ -860,16 +879,24 @@ clienteMembresiaRoutes.delete(
 );
 //---Rutas Médodos de Pago-------------------------
 
+
+
 metodoPagoRoutes.get(
     '/activos',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago','Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+    },
     metodoPagoController.obtenerActivos.bind(metodoPagoController)
 );
 metodoPagoRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago','Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+    },
     metodoPagoController.obtenerTodos.bind(metodoPagoController)
 );
 
@@ -913,9 +940,7 @@ ventaRoutes.get(
     '/:id/pago',
     autenticarUsuario,
     (req, res, next) => {
-        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
-            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
-        if (esCliente) return next();
+        if (esClienteRequest(req)) return next();
         return verificarPermiso('Ventas', 'Listar')(req, res, next);
     },
     ventaController.consultarEstadoPago.bind(ventaController)
@@ -925,9 +950,7 @@ ventaRoutes.post(
     '/:id/pago/checkout',
     autenticarUsuario,
     (req, res, next) => {
-        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
-            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
-        if (esCliente) return next();
+        if (esClienteRequest(req)) return next();
         return verificarPermiso('Ventas', 'Crear')(req, res, next);
     },
     ventaController.crearCheckoutPago.bind(ventaController)
@@ -936,7 +959,10 @@ ventaRoutes.post(
 ventaRoutes.get(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.obtenerPorId.bind(ventaController)
 )
 
@@ -965,9 +991,7 @@ ventaRoutes.post(
     '/',
     autenticarUsuario,
     (req, res, next) => {
-        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
-            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
-        if (esCliente) return next();
+        if (esClienteRequest(req)) return next();
         return verificarPermiso('Ventas', 'Crear')(req, res, next);
     },
     ventaController.create.bind(ventaController)
@@ -984,7 +1008,10 @@ ventaRoutes.post(
 servicioRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     servicioController.obtenerDisponiblesParaVenta.bind(servicioController)
 );
 servicioRoutes.get(

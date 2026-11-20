@@ -1820,6 +1820,11 @@ async ajustarStock(tx, detallesViejos, detallesNuevos) {
 
         if (!coincide(calculados.subtotal, subtotalEnviado)
             || !coincide(calculados.total, totalEnviado)) {
+            // Si la app móvil o cliente envió el subtotal como total (sin desglosar IVA 16% en frontend),
+            // se acepta y el servidor aplicará el total oficial con IVA calculado.
+            if (coincide(calculados.subtotal, totalEnviado) || coincide(calculados.subtotal, subtotalEnviado)) {
+                return;
+            }
             throw new Error(
                 `Los montos enviados no coinciden con el cálculo del servidor. Subtotal esperado: ${calculados.subtotal}, total esperado: ${calculados.total}`
             );

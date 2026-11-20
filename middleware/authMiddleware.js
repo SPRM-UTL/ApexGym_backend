@@ -66,13 +66,34 @@ export const autenticarUsuario = async (req, res, next) => {
         const contextoActual = contextStorage.getStore() || { empresaId, sucursalId: 1 };
         let sucursalEfectiva = contextoActual.sucursalId ?? 1;
 
-        if (!puedeCambiarSucursal && usuarioId) {
+        let roles = [];
+        let clienteId = null;
+        let esCliente = false;
+        let empleadoId = null;
+
+        if (usuarioId) {
+            const rolesUsuario = await prisma.usuarioRol.findMany({
+                where: { usuarioId },
+                include: { rol: true }
+            });
+            roles = rolesUsuario.map((ur) => ur.rol).filter(Boolean);
+
+            const cliente = await prisma.cliente.findFirst({
+                where: { usuarioId, deletedAt: null },
+                select: { id: true }
+            });
+            clienteId = cliente?.id ?? null;
+            esCliente = Boolean(clienteId || roles.some((r) => r.nombre?.toLowerCase() === 'cliente'));
+
             const empleado = await prisma.empleado.findFirst({
                 where: { usuarioId, deletedAt: null },
-                select: { sucursalId: true },
+                select: { id: true, sucursalId: true },
             });
-            if (empleado?.sucursalId) {
-                sucursalEfectiva = empleado.sucursalId;
+            if (empleado) {
+                empleadoId = empleado.id;
+                if (!puedeCambiarSucursal && empleado.sucursalId) {
+                    sucursalEfectiva = empleado.sucursalId;
+                }
             }
         }
 
@@ -81,6 +102,11 @@ export const autenticarUsuario = async (req, res, next) => {
             empresaId,
             sucursalId: sucursalEfectiva,
             puedeCambiarSucursal,
+            roles,
+            clienteId,
+            esCliente,
+            empleadoId,
+            esEmpleado: Boolean(empleadoId),
         };
 
         req.token = token;
