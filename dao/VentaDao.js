@@ -1152,9 +1152,10 @@ async create(data) {
         );
         const esPagoEfectivo = metodoPago.codigo === 'EFECTIVO';
         const esDigital = metodoPago.codigo === 'MERCADO_PAGO';
-        const efectivoAValidar = (montoRecibidoEnviado !== undefined && montoRecibidoEnviado !== null && montoRecibidoEnviado !== '')
-            ? montoRecibidoEnviado
-            : total;
+        let efectivoAValidar = montoRecibidoEnviado;
+        if (!efectivoAValidar || currency(efectivoAValidar).intValue < currency(total).intValue) {
+            efectivoAValidar = total;
+        }
         const montoRecibido = esDigital
             ? null
             : esPagoEfectivo
