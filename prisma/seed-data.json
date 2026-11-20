@@ -1047,11 +1047,7 @@
         "fechaRegistro": "2026-11-12"
       }
     ],
-    "visitas": [
-      { "clave": "visita-andrea", "nombreVisitante": "Andrea Guzmán", "tipo": "Pase de día", "costo": "80.00", "fechaHora": "2026-11-12T10:20:00-06:00", "observaciones": "Visita de prueba en horario matutino" },
-      { "clave": "visita-roberto", "nombreVisitante": "Roberto Salinas", "tipo": "Pase de semana", "costo": "350.00", "fechaHora": "2026-11-11T16:45:00-06:00", "observaciones": "Pase semanal pagado en efectivo" },
-      { "clave": "visita-irene", "nombreVisitante": "Irene Campos", "tipo": "Clase de prueba", "costo": "0.00", "fechaHora": "2026-11-10T19:00:00-06:00", "observaciones": "Clase de spinning de cortesía" }
-    ],
+    "visitas": [],
     "aperturasCaja": [
       {
         "clave": "apertura-recepcion-abierta",

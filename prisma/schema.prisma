@@ -465,6 +465,7 @@ model Cliente {
   genero                     String    @db.VarChar(50)
   telefono                   String    @db.VarChar(20)
   correo                     String?   @db.VarChar(150)
+  codigoQr                   String?   @unique @map("codigo_qr") @db.VarChar(64)
   direccion                  String?   @db.Text
   contactoEmergenciaNombre   String?   @map("contacto_emergencia_nombre") @db.VarChar(150)
   contactoEmergenciaTelefono String?   @map("contacto_emergencia_telefono") @db.VarChar(20)
