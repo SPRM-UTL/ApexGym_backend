@@ -1,5 +1,6 @@
 import { BaseDao, prisma } from './BaseDao.js';
 
+
 function obtenerFechaMexico() {
     const partes = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Mexico_City',
@@ -55,6 +56,76 @@ export class ClienteMembresiaDao extends BaseDao {
         const estadoVigente = await buscarOCrearEstado('Vigente', 'Membresía activa');
         const estadoVencida = await buscarOCrearEstado('Vencida', 'Membresía vencida');
 
+        const hoyTexto = obtenerFechaMexico();
+        const hoy = new Date(`${hoyTexto}T00:00:00.000Z`);
+        
+
+        const ultimaMembresia = await client.clienteMembresia.findFirst({
+            where : {
+                clienteId : clienteIdNumerico,
+                deletedAt : null,
+                estadoMembresia : {
+                    nombre : {
+                        not : 'Cancelada',
+                    },
+                },
+                ...(contexto.empresaId ? { empresaId : contexto.empresaId } : {}),
+                ...(contexto.sucursalId ? { sucursalId : contexto.sucursalId } : {})
+            },
+            orderBy : {
+                fechaFin : 'desc'
+            }
+        })
+
+        let fechaInicioTexto = fechaInicio ? String (fechaInicio).split('T')[0] : hoyTexto;
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicioTexto)) {
+            throw new Error('La fecha de inicio de la membresía no es válida');
+        }
+
+        if (fechaInicioTexto < hoyTexto){
+            fechaInicioTexto = hoyTexto;
+        }
+        
+        if(ultimaMembresia){
+            const ultimaFin = new Date(ultimaMembresia.fechaFin);
+            ultimaFin.setUTCHours(0, 0, 0, 0);  
+
+
+            if (ultimaFin >= hoy){
+                const siguienteInicio = new Date(ultimaMembresia.fechaFin)
+                siguienteInicio.setUTCDate(
+                    siguienteInicio.getUTCDate() + 1
+                )
+                const siguienteTexto = siguienteInicio
+                    .toISOString()
+                    .slice(0,10);
+                
+                if(siguienteTexto > fechaInicioTexto){
+                    fechaInicioTexto = siguienteTexto;
+                }
+            }
+        }
+
+        const [anio, mes, dia] = fechaInicioTexto.split('-').map(Number);
+        const inicio = new Date(Date.UTC(anio, mes - 1, dia));
+
+        const duracionDias = Number(tipo.duracionDias);
+
+        if(!Number.isInteger(duracionDias) || duracionDias <= 0) {
+            throw new Error('La duración del tipo de membresía no es válida');
+        }
+
+        const fin = new Date(inicio);
+
+        fin.setUTCDate(
+            fin.getUTCDate() + duracionDias -1
+        );
+
+
+
+        const estadoFinal = fin < hoy ? estadoVencida : estadoVigente
+        /** 
         const fechaInicioTexto = typeof fechaInicio === 'string' && fechaInicio.trim()
             ? fechaInicio.split('T')[0]
             : obtenerFechaMexico();
@@ -83,7 +154,8 @@ export class ClienteMembresiaDao extends BaseDao {
             },
             data: { estadoMembresiaId: estadoVencida.id },
         });
-
+        **/
+        
         return client.clienteMembresia.create({
             data: {
                 clienteId: clienteIdNumerico,
@@ -130,8 +202,14 @@ export class ClienteMembresiaDao extends BaseDao {
                     }
 
                     const nuevaInicio = new Date(item.fechaFin);
+                    nuevaInicio.setUTCHours(0, 0, 0, 0);
+                    nuevaInicio.setUTCDate(nuevaInicio.getUTCDate() + 1);
+
                     const nuevaFin = new Date(nuevaInicio);
-                    nuevaFin.setDate(nuevaFin.getDate() + Number(item.tipoMembresia.duracionDias));
+                    nuevaFin.setUTCDate(
+                        nuevaFin.getUTCDate() + Number(item.tipoMembresia.duracionDias) - 1
+                    );
+
 
                     await this.model.create({
                         data: {
@@ -211,7 +289,39 @@ export class ClienteMembresiaDao extends BaseDao {
         });
     }
 
-    async getActivaPorCliente(clienteId) {
+
+async getActivaPorCliente(clienteId) {
+    await this.sincronizarEstadosVencidos();
+
+    const hoy = new Date(
+        `${obtenerFechaMexico()}T00:00:00.000Z`
+    );
+
+    return this.model.findFirst({
+        where: {
+            clienteId: Number(clienteId),
+            estadoMembresia: {
+                nombre: 'Vigente'
+            },
+            fechaInicio: {
+                lte: hoy
+            },
+            fechaFin: {
+                gte: hoy
+            },
+            deletedAt: null
+        },
+        include: {
+            tipoMembresia: true,
+            estadoMembresia: true
+        },
+        orderBy: {
+            fechaInicio: 'desc'
+        },
+        omit: this.omit
+    });
+
+        /** 
         await this.sincronizarEstadosVencidos();
 
         return this.model.findFirst({
@@ -229,6 +339,7 @@ export class ClienteMembresiaDao extends BaseDao {
             },
             omit: this.omit
         });
+        **/
     }
 }
 

@@ -40,6 +40,8 @@ import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
+import { notificacionRoutes } from './notificacionRoutes.js';
+import { dispositivoRoutes } from './dispositivoRoutes.js';
 
 const router = express.Router();
 const uploadImagenUsuario = uploadImagen('usuarios', {
@@ -1219,6 +1221,8 @@ router.use('/metodos-pago', metodoPagoRoutes);
 router.use('/servicios', servicioRoutes);
 router.use('/asistencias', asistenciaRoutes);
 router.use('/visitas', visitaRoutes);
+router.use('/notificaciones', notificacionRoutes);
+router.use('/dispositivos', dispositivoRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));

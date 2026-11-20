@@ -118,6 +118,7 @@ model Usuario {
   deletedAt       DateTime?        @map("deleted_at")
   empresa         Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   tokens          Token[]
+  dispositivos    Dispositivo[]
   usuarioRols     UsuarioRol[]
   usuarioPermisos UsuarioPermiso[]
   empleados       Empleado[]
@@ -965,4 +966,56 @@ model DevolucionDetalle {
   @@index([devolucionId])
   @@index([detalleVentaId])
   @@map("devolucion_detalle")
+}
+
+enum TipoDestinatarioNotificacion {
+  CLIENTE
+  EMPLEADO
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  LEIDA
+  IGNORADA
+}
+
+enum TipoDestinatarioDispositivo {
+  CLIENTE
+  EMPLEADO
+}
+
+model Notificacion {
+  id               Int                          @id @default(autoincrement())
+  empresaId        Int                          @default(1) @map("empresa_id")
+  titulo           String                       @db.VarChar(150)
+  mensaje          String                       @db.Text
+  tipo             String                       @default("GENERAL") @db.VarChar(50)
+  destinatarioId   Int                          @map("destinatario_id")
+  destinatarioTipo TipoDestinatarioNotificacion @map("destinatario_tipo")
+  remitenteId      Int?                         @map("remitente_id")
+  sucursalId       Int?                         @map("sucursal_id")
+  estado           EstadoNotificacion           @default(PENDIENTE)
+  leidaAt          DateTime?                    @map("leida_at")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  @@index([empresaId, destinatarioTipo, destinatarioId, createdAt], map: "idx_notificaciones_destinatario")
+  @@index([empresaId, destinatarioTipo, destinatarioId, estado], map: "idx_notificaciones_estado")
+  @@map("notificaciones")
+}
+
+model Dispositivo {
+  id         Int                         @id @default(autoincrement())
+  empresaId  Int                         @default(1) @map("empresa_id")
+  usuarioId  Int                         @map("usuario_id")
+  tipo       TipoDestinatarioDispositivo
+  token      String                      @unique @db.VarChar(191)
+  plataforma String                      @db.VarChar(20)
+  createdAt  DateTime                    @default(now()) @map("created_at")
+  updatedAt  DateTime                    @updatedAt @map("updated_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, usuarioId, tipo], map: "idx_dispositivos_usuario")
+  @@map("dispositivos")
 }

@@ -7,6 +7,7 @@ import { api } from './rutas/api.js';
 import cookieParser from 'cookie-parser';
 import { contextoMiddleware } from './middleware/contextoMiddleware.js';
 import { ventaDao } from './dao/VentaDao.js';
+import './services/firebaseAdmin.js';
 
 const __filename = import.meta.url ? fileURLToPath(import.meta.url) : '';
 const __dirname = __filename ? path.dirname(__filename) : process.cwd();

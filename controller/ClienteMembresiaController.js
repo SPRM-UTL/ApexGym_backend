@@ -69,7 +69,8 @@ export class ClienteMembresiaController extends BaseController {
     renovar = async (req, res) => {
         try {
             const id = Number(req.params.id);
-            if (isNaN(id)) {
+
+            if (!Number.isInteger(id) || id <= 0) {
                 throw new Error('ID de membresía no válido');
             }
 
@@ -78,45 +79,20 @@ export class ClienteMembresiaController extends BaseController {
                 return this.respuestaNoEncontrado(res, 'La membresía no existe');
             }
 
-            const tipoId = req.body.tipoMembresiaId ? Number(req.body.tipoMembresiaId) : membresiaAnterior.tipoMembresiaId;
-            const tipo = await tipoMembresiaDao.getById(tipoId);
-            if (!tipo) {
-                throw new Error('Tipo de membresía no válido');
-            }
+            const tipoMembresiaId = req.body?.tipoMembresiaId ? Number(req.body.tipoMembresiaId) : membresiaAnterior.tipoMembresiaId;
+            const renovacionAutomatica = req.body?.renovacionAutomatica !== undefined ? req.body.renovacionAutomatica : membresiaAnterior.renovacionAutomatica;
 
-            let estadoVigente = await prisma.estadoMembresia.findFirst({ where: { nombre: 'Vigente' } });
-            let estadoVencida = await prisma.estadoMembresia.findFirst({ where: { nombre: 'Vencida' } });
-
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-
-            let nuevaInicio;
-            if (membresiaAnterior.estadoMembresia?.nombre === 'Vigente' && new Date(membresiaAnterior.fechaFin) >= hoy) {
-                nuevaInicio = new Date(membresiaAnterior.fechaFin);
-            } else {
-                nuevaInicio = new Date(hoy);
-            }
-
-            const nuevaFin = new Date(nuevaInicio);
-            nuevaFin.setDate(nuevaFin.getDate() + Number(tipo.duracionDias));
-
-            if (estadoVencida) {
-                await this.dao.update(id, { estadoMembresiaId: estadoVencida.id });
-            }
-
-            const nuevaMembresia = await this.dao.create({
+            const nuevaMembresia = await prisma.$transaction((tx) =>
+            this.dao.asignarEnTransaccion(tx, {
                 clienteId: membresiaAnterior.clienteId,
-                tipoMembresiaId: tipo.id,
-                estadoMembresiaId: estadoVigente.id,
-                fechaInicio: nuevaInicio,
-                fechaFin: nuevaFin,
-                renovacionAutomatica: req.body.renovacionAutomatica !== undefined
-                    ? Boolean(req.body.renovacionAutomatica)
-                    : Boolean(membresiaAnterior.renovacionAutomatica)
-            });
+                tipoMembresiaId,
+                renovacionAutomatica,
+                empresaId: this.obtenerEmpresaId(req),
+                sucursalId: this.obtenerSucursalId(req),
+            })
+        );
 
-            const registroCompleto = await this.dao.getById(nuevaMembresia.id);
-            return this.respuestaExito(res, registroCompleto, 'Membresía renovada exitosamente');
+            return this.respuestaExito(res, nuevaMembresia, 'Membresía renovada exitosamente');
         } catch (error) {
             return this.respuestaError(res, error);
         }
