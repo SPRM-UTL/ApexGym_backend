@@ -1,6 +1,8 @@
+import { prisma } from "../dao/BaseDao.js";
 import { tokenDao } from "../dao/TokenDao.js";
 import { permisoDao } from "../dao/PermisoDao.js";
 import { ResponseModel } from "../modelos/ResponseModel.js";
+import { contextStorage } from "./contextoMiddleware.js";
 const COOKIE_OPTIONS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -55,14 +57,41 @@ export const autenticarUsuario = async (req, res, next) => {
             return res.status(401).json(response);
         }
 
+        const usuarioId = resultado.token.usuario?.id;
+        const empresaId = resultado.token.usuario?.empresaId ?? 1;
+        const puedeCambiarSucursal = usuarioId
+            ? await permisoDao.tienePermiso(usuarioId, 'Sucursales', 'Cambiar sucursal', 'GET')
+            : false;
+
+        const contextoActual = contextStorage.getStore() || { empresaId, sucursalId: 1 };
+        let sucursalEfectiva = contextoActual.sucursalId ?? 1;
+
+        if (!puedeCambiarSucursal && usuarioId) {
+            const empleado = await prisma.empleado.findFirst({
+                where: { usuarioId, deletedAt: null },
+                select: { sucursalId: true },
+            });
+            if (empleado?.sucursalId) {
+                sucursalEfectiva = empleado.sucursalId;
+            }
+        }
+
         const usuarioAutenticado = {
             ...resultado.token.usuario,
-            empresaId: resultado.token.usuario?.empresaId ?? 1,
+            empresaId,
+            sucursalId: sucursalEfectiva,
+            puedeCambiarSucursal,
         };
 
         req.token = token;
         req.usuario = usuarioAutenticado;
         req.user = usuarioAutenticado;
+
+        if (sucursalEfectiva !== contextoActual.sucursalId || empresaId !== contextoActual.empresaId) {
+            return contextStorage.run({ empresaId, sucursalId: sucursalEfectiva }, () => {
+                next();
+            });
+        }
 
         next();
 

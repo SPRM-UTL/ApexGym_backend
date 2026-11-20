@@ -92,11 +92,12 @@ export class ProductoController extends BaseController {
 
     getProductosCliente = async (req, res) => {
         try {
+            const sucursalId = req.query.sucursalId ? Number(req.query.sucursalId) : undefined;
             const productos = await productoDao.getAll(
                 { disponibleCompra: true },
                 { id: 'desc' },
                 this.obtenerEmpresaId(req),
-                { sucursalId: req.query.sucursalId ?? null }
+                sucursalId
             );
             return this.respuestaExito(res, productos, "Productos cargados con exito");
         } catch (error) {

@@ -19,6 +19,11 @@
       "nombre": "Eliminar",
       "descripcion": "Eliminar registros",
       "metodo": "DELETE"
+    },
+    {
+      "nombre": "Cambiar sucursal",
+      "descripcion": "Cambiar entre sucursales disponibles",
+      "metodo": "GET"
     }
   ],
   "secciones": [
@@ -87,7 +92,8 @@
             "Listar",
             "Crear",
             "Editar",
-            "Eliminar"
+            "Eliminar",
+            "Cambiar sucursal"
           ],
           "orden": 5
         }
