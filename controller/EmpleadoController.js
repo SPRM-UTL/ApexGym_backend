@@ -1,6 +1,7 @@
 import { empleadoDao } from '../dao/EmpleadoDao.js';
 import { BaseController } from './BaseController.js';
 import { guardarImagenServidor } from '../utils/guardarImagen.js';
+import { obtenerImagen } from '../middleware/uploadMiddleware.js';
 
 export class EmpleadoController extends BaseController {
     constructor() {
@@ -24,7 +25,7 @@ export class EmpleadoController extends BaseController {
                 fechaIngreso,
                 imagenUrl,
                 imagenPublicId,
-            } = req.body;
+            } = req.body ?? {};
 
             this.validar({
                 puestoId,
@@ -41,7 +42,10 @@ export class EmpleadoController extends BaseController {
             });
 
             // Si se envió imagen base64, se guarda como archivo físico en /public/imagenes/empleados/
-            const rutaImagen = imagenUrl ? guardarImagenServidor(imagenUrl, 'empleados') : null;
+            const imagenSubida = req.file ? obtenerImagen('empleados', req.file) : null;
+            const rutaImagen = imagenSubida?.url
+                ?? (imagenUrl ? guardarImagenServidor(imagenUrl, 'empleados') : null);
+            const publicIdImagen = imagenSubida?.publicId ?? (imagenPublicId || null);
 
             const registro = await this.dao.create({
                 puestoId: Number(puestoId),
@@ -57,7 +61,7 @@ export class EmpleadoController extends BaseController {
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
                 imagenUrl: rutaImagen,
-                imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
+                imagenPublicId: publicIdImagen ? publicIdImagen.trim() : null,
             });
 
             return this.respuestaExito(res, registro, 'Empleado creado correctamente');
@@ -86,7 +90,7 @@ export class EmpleadoController extends BaseController {
                 fechaIngreso,
                 imagenUrl,
                 imagenPublicId,
-            } = req.body;
+            } = req.body ?? {};
 
             this.validar({
                 puestoId,
@@ -103,9 +107,10 @@ export class EmpleadoController extends BaseController {
             });
 
             // Si se envió imagen base64, se guarda como archivo físico en /public/imagenes/empleados/
-            const rutaImagen = imagenUrl !== undefined
-                ? guardarImagenServidor(imagenUrl, 'empleados')
-                : undefined;
+            const imagenSubida = req.file ? obtenerImagen('empleados', req.file) : null;
+            const rutaImagen = imagenSubida?.url
+                ?? (imagenUrl ? guardarImagenServidor(imagenUrl, 'empleados') : undefined);
+            const publicIdImagen = imagenSubida?.publicId ?? (imagenPublicId || undefined);
 
             const registro = await this.dao.update(id, {
                 puestoId: Number(puestoId),
@@ -121,7 +126,9 @@ export class EmpleadoController extends BaseController {
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
                 ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
-                imagenPublicId: imagenPublicId ? imagenPublicId.trim() : null,
+                ...(publicIdImagen !== undefined && {
+                    imagenPublicId: publicIdImagen ? publicIdImagen.trim() : null,
+                }),
             });
 
             return this.respuestaExito(res, registro, 'Empleado actualizado correctamente');
