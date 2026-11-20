@@ -142,13 +142,70 @@ export class VentaController extends BaseController {
                 montoRecibido,
             } = req.body;
 
-            const clienteId = req.body.clienteId ?? req.body.clientId;
+            let clienteId = req.body.clienteId ?? req.body.clientId;
 
-            this.validar(aperturaCajaId, clienteId, detalleVenta);
+            // Si es un cliente autenticado o no se envió clienteId, resolver cliente asociado
+            if (!clienteId && req.usuario?.id) {
+                const clienteAsociado = await this.dao.prisma.cliente.findFirst({
+                    where: { usuarioId: Number(req.usuario.id), deletedAt: null },
+                    select: { id: true },
+                });
+                if (clienteAsociado) {
+                    clienteId = clienteAsociado.id;
+                }
+            }
+
+            // Si aún no hay clienteId (ej. venta rápida en mostrador), tomar el primer cliente activo
+            if (!clienteId) {
+                const primerCliente = await this.dao.prisma.cliente.findFirst({
+                    where: { deletedAt: null },
+                    orderBy: { id: 'asc' },
+                    select: { id: true },
+                });
+                if (primerCliente) {
+                    clienteId = primerCliente.id;
+                }
+            }
+
+            // Si es pedido en línea (sin caja o empleado explícito), asociar a la caja abierta de la sucursal
+            let idAperturaFinal = aperturaCajaId ? Number(aperturaCajaId) : null;
+            let idEmpleadoFinal = empleadoId ? Number(empleadoId) : null;
+
+            if (!idAperturaFinal || !idEmpleadoFinal) {
+                const sucursalId = this.obtenerSucursalId(req);
+                const cajaActiva = await this.dao.prisma.aperturaCaja.findFirst({
+                    where: {
+                        sucursalId: Number(sucursalId),
+                        estado: 'ABIERTA',
+                        deletedAt: null,
+                    },
+                    orderBy: { id: 'desc' },
+                });
+
+                if (cajaActiva) {
+                    idAperturaFinal = idAperturaFinal || cajaActiva.id;
+                    idEmpleadoFinal = idEmpleadoFinal || cajaActiva.empleadoId;
+                } else {
+                    const cajaCualquiera = await this.dao.prisma.aperturaCaja.findFirst({
+                        where: {
+                            empresaId: this.obtenerEmpresaId(req),
+                            estado: 'ABIERTA',
+                            deletedAt: null,
+                        },
+                        orderBy: { id: 'desc' },
+                    });
+                    if (cajaCualquiera) {
+                        idAperturaFinal = idAperturaFinal || cajaCualquiera.id;
+                        idEmpleadoFinal = idEmpleadoFinal || cajaCualquiera.empleadoId;
+                    }
+                }
+            }
+
+            this.validar(idAperturaFinal, clienteId, detalleVenta);
 
             const registro = await this.dao.create({
-                empleadoId: this.leerId(empleadoId, 'empleado'),
-                aperturaCajaId: Number(aperturaCajaId),
+                empleadoId: this.leerId(idEmpleadoFinal, 'empleado'),
+                aperturaCajaId: Number(idAperturaFinal),
                 clienteId: Number(clienteId),
                 usuarioId: this.leerId(req.usuario?.id, 'usuario autenticado'),
                 empresaId: this.obtenerEmpresaId(req),

@@ -912,14 +912,24 @@ ventaRoutes.get(
 ventaRoutes.get(
     '/:id/pago',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
+            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
+        if (esCliente) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.consultarEstadoPago.bind(ventaController)
 )
 
 ventaRoutes.post(
     '/:id/pago/checkout',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Crear'),
+    (req, res, next) => {
+        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
+            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
+        if (esCliente) return next();
+        return verificarPermiso('Ventas', 'Crear')(req, res, next);
+    },
     ventaController.crearCheckoutPago.bind(ventaController)
 )
 
@@ -954,7 +964,12 @@ ventaRoutes.post(
 ventaRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Crear'),
+    (req, res, next) => {
+        const esCliente = req.usuario?.roles?.some((r) => r.nombre === 'Cliente')
+            || req.user?.roles?.some((r) => r.nombre === 'Cliente');
+        if (esCliente) return next();
+        return verificarPermiso('Ventas', 'Crear')(req, res, next);
+    },
     ventaController.create.bind(ventaController)
 )
 
