@@ -679,6 +679,18 @@ estadoClienteRoutes.delete(
 );
 
 // ── Rutas de Clientes ────────────────────────────────────────────────────────
+clienteRoutes.post(
+    '/verificarCredenciales',
+    clienteController.verificarCredenciales.bind(clienteController)
+);
+clienteRoutes.post(
+    '/verificarCorreo',
+    clienteController.verificarCorreo.bind(clienteController)
+);
+clienteRoutes.post(
+    '/registrar',
+    clienteController.registrar.bind(clienteController)
+);
 clienteRoutes.get(
     '/buscar',
     autenticarUsuario,
@@ -1157,6 +1169,25 @@ router.use('/sucursal', sucursalRoutes);
 router.use('/sucursales', sucursalRoutes);
 
 // ── Rutas de Asistencias ────────────────────────────────────────────────────
+asistenciaRoutes.get(
+    '/mi-qr',
+    autenticarUsuario,
+    asistenciaController.obtenerMiQr.bind(asistenciaController)
+);
+
+asistenciaRoutes.post(
+    '/mi-qr/regenerar',
+    autenticarUsuario,
+    asistenciaController.regenerarMiQr.bind(asistenciaController)
+);
+
+asistenciaRoutes.post(
+    '/validar-qr',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Listar'),
+    asistenciaController.validarQr.bind(asistenciaController)
+);
+
 asistenciaRoutes.get(
     '/',
     autenticarUsuario,

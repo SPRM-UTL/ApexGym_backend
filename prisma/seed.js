@@ -587,7 +587,21 @@ async function sembrarEjemplos(ejemplos) {
             areaTrabajoId: area.id,
             estadoEmpleadoId: estado.id,
             usuarioId: usuario?.id ?? null,
-            ...tomar(item, ['nombre', 'apellidoPaterno', 'apellidoMaterno', 'telefono', 'correo', 'direccion']),
+            ...tomar(item, [
+                'nombre',
+                'apellidoPaterno',
+                'apellidoMaterno',
+                'telefono',
+                'correo',
+                'calle',
+                'numeroExterior',
+                'numeroInterior',
+                'colonia',
+                'codigoPostal',
+                'municipio',
+                'estado',
+                'entreCalles',
+            ]),
             fechaNacimiento: dia(item.fechaNacimiento),
             fechaIngreso: dia(item.fechaIngreso),
         });
@@ -741,6 +755,12 @@ async function main() {
 
     await repararTextoDeModulos();
 
+    // 1. UPSERT OBLIGATORIO DE LA EMPRESA PRINCIPAL (id = 1)
+    await upsertEmpresaDefault();
+
+    // 1.1 UPSERT OBLIGATORIO DE LA SUCURSAL PRINCIPAL (id = 1)
+    await upsertSucursalDefault();
+
     await prisma.metodoPago.upsert({
         where: { codigo: 'EFECTIVO' },
         update: { estado: 'activo', deletedAt: null },
@@ -750,11 +770,6 @@ async function main() {
             descripcion: 'Pago en efectivo',
         },
     });
-    // 1. UPSERT OBLIGATORIO DE LA EMPRESA PRINCIPAL (id = 1)
-    await upsertEmpresaDefault();
-
-    // 1.1 UPSERT OBLIGATORIO DE LA SUCURSAL PRINCIPAL (id = 1)
-    await upsertSucursalDefault();
 
     const defaultUser = await crearUsuarioDefault();
 

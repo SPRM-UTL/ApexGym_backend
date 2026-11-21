@@ -3,6 +3,12 @@ import { BaseController } from './BaseController.js';
 import { guardarImagenServidor } from '../utils/guardarImagen.js';
 import { obtenerImagen } from '../middleware/uploadMiddleware.js';
 
+const limpiarOpcional = (valor) => {
+    if (valor === undefined || valor === null) return null;
+    const texto = String(valor).trim();
+    return texto.length > 0 ? texto : null;
+};
+
 export class EmpleadoController extends BaseController {
     constructor() {
         super(empleadoDao);
@@ -20,7 +26,14 @@ export class EmpleadoController extends BaseController {
                 apellidoMaterno,
                 telefono,
                 correo,
-                direccion,
+                calle,
+                numeroExterior,
+                numeroInterior,
+                colonia,
+                codigoPostal,
+                municipio,
+                estado,
+                entreCalles,
                 fechaNacimiento,
                 fechaIngreso,
                 imagenUrl,
@@ -36,7 +49,14 @@ export class EmpleadoController extends BaseController {
                 apellidoMaterno,
                 telefono,
                 correo,
-                direccion,
+                calle,
+                numeroExterior,
+                numeroInterior,
+                colonia,
+                codigoPostal,
+                municipio,
+                estado,
+                entreCalles,
                 fechaNacimiento,
                 fechaIngreso,
             });
@@ -54,14 +74,21 @@ export class EmpleadoController extends BaseController {
                 usuarioId: usuarioId ? Number(usuarioId) : null,
                 nombre: nombre.trim(),
                 apellidoPaterno: apellidoPaterno.trim(),
-                apellidoMaterno: apellidoMaterno ? apellidoMaterno.trim() : null,
+                apellidoMaterno: limpiarOpcional(apellidoMaterno),
                 telefono: telefono.trim(),
-                correo: correo ? correo.trim() : null,
-                direccion: direccion ? direccion.trim() : null,
+                correo: limpiarOpcional(correo),
+                calle: limpiarOpcional(calle),
+                numeroExterior: limpiarOpcional(numeroExterior),
+                numeroInterior: limpiarOpcional(numeroInterior),
+                colonia: limpiarOpcional(colonia),
+                codigoPostal: limpiarOpcional(codigoPostal),
+                municipio: limpiarOpcional(municipio),
+                estado: limpiarOpcional(estado),
+                entreCalles: limpiarOpcional(entreCalles),
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
                 imagenUrl: rutaImagen,
-                imagenPublicId: publicIdImagen ? publicIdImagen.trim() : null,
+                imagenPublicId: limpiarOpcional(publicIdImagen),
             });
 
             return this.respuestaExito(res, registro, 'Empleado creado correctamente');
@@ -85,7 +112,14 @@ export class EmpleadoController extends BaseController {
                 apellidoMaterno,
                 telefono,
                 correo,
-                direccion,
+                calle,
+                numeroExterior,
+                numeroInterior,
+                colonia,
+                codigoPostal,
+                municipio,
+                estado,
+                entreCalles,
                 fechaNacimiento,
                 fechaIngreso,
                 imagenUrl,
@@ -101,7 +135,14 @@ export class EmpleadoController extends BaseController {
                 apellidoMaterno,
                 telefono,
                 correo,
-                direccion,
+                calle,
+                numeroExterior,
+                numeroInterior,
+                colonia,
+                codigoPostal,
+                municipio,
+                estado,
+                entreCalles,
                 fechaNacimiento,
                 fechaIngreso,
             });
@@ -119,15 +160,22 @@ export class EmpleadoController extends BaseController {
                 usuarioId: usuarioId ? Number(usuarioId) : null,
                 nombre: nombre.trim(),
                 apellidoPaterno: apellidoPaterno.trim(),
-                apellidoMaterno: apellidoMaterno ? apellidoMaterno.trim() : null,
+                apellidoMaterno: limpiarOpcional(apellidoMaterno),
                 telefono: telefono.trim(),
-                correo: correo ? correo.trim() : null,
-                direccion: direccion ? direccion.trim() : null,
+                correo: limpiarOpcional(correo),
+                calle: limpiarOpcional(calle),
+                numeroExterior: limpiarOpcional(numeroExterior),
+                numeroInterior: limpiarOpcional(numeroInterior),
+                colonia: limpiarOpcional(colonia),
+                codigoPostal: limpiarOpcional(codigoPostal),
+                municipio: limpiarOpcional(municipio),
+                estado: limpiarOpcional(estado),
+                entreCalles: limpiarOpcional(entreCalles),
                 fechaNacimiento: new Date(fechaNacimiento),
                 fechaIngreso: new Date(fechaIngreso),
                 ...(rutaImagen !== undefined && { imagenUrl: rutaImagen }),
                 ...(publicIdImagen !== undefined && {
-                    imagenPublicId: publicIdImagen ? publicIdImagen.trim() : null,
+                    imagenPublicId: limpiarOpcional(publicIdImagen),
                 }),
             });
 
@@ -157,7 +205,14 @@ export class EmpleadoController extends BaseController {
         apellidoMaterno,
         telefono,
         correo,
-        direccion,
+        calle,
+        numeroExterior,
+        numeroInterior,
+        colonia,
+        codigoPostal,
+        municipio,
+        estado,
+        entreCalles,
         fechaNacimiento,
         fechaIngreso,
     }) {
@@ -180,7 +235,14 @@ export class EmpleadoController extends BaseController {
             if (!emailRegex.test(correo.trim())) throw new Error('El formato del correo electrónico no es válido');
         }
 
-        if (direccion && direccion.trim().length > 500) throw new Error('La dirección no puede exceder 500 caracteres');
+        if (calle && String(calle).trim().length > 150) throw new Error('La calle no puede exceder 150 caracteres');
+        if (numeroExterior && String(numeroExterior).trim().length > 20) throw new Error('El número exterior no puede exceder 20 caracteres');
+        if (numeroInterior && String(numeroInterior).trim().length > 20) throw new Error('El número interior no puede exceder 20 caracteres');
+        if (colonia && String(colonia).trim().length > 100) throw new Error('La colonia no puede exceder 100 caracteres');
+        if (codigoPostal && String(codigoPostal).trim().length > 10) throw new Error('El código postal no puede exceder 10 caracteres');
+        if (municipio && String(municipio).trim().length > 100) throw new Error('El municipio no puede exceder 100 caracteres');
+        if (estado && String(estado).trim().length > 100) throw new Error('El estado no puede exceder 100 caracteres');
+        if (entreCalles && String(entreCalles).trim().length > 200) throw new Error('Entre calles no puede exceder 200 caracteres');
 
         if (!fechaNacimiento || isNaN(Date.parse(fechaNacimiento))) throw new Error('La fecha de nacimiento es requerida y debe ser válida');
 

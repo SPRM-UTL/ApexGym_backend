@@ -1,12 +1,190 @@
+import crypto from 'crypto';
 import { asistenciaDao } from '../dao/AsistenciaDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
 import { clienteMembresiaDao } from '../dao/ClienteMembresiaDao.js';
 import { BaseController } from './BaseController.js';
 
+const QR_SECRET = process.env.QR_SECRET || process.env.JWT_SECRET || 'apexgym-qr-signing-key-2026';
+const QR_TTL_MS = 15 * 60 * 1000;
+
+function generarCodigoQrUnico() {
+    return `APX-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+}
+
+function firmarPayloadQr(codigoQr, expiraMs) {
+    const base = `APEXGYM|${codigoQr}|${expiraMs}`;
+    const firma = crypto.createHmac('sha256', QR_SECRET).update(base).digest('hex').slice(0, 16).toUpperCase();
+    return `${base}|${firma}`;
+}
+
+function verificarPayloadQr(rawQr) {
+    const texto = String(rawQr ?? '').trim();
+    if (!texto) throw new Error('Código QR vacío');
+
+    if (texto.startsWith('APEXGYM|')) {
+        const partes = texto.split('|');
+        if (partes.length !== 4) throw new Error('Formato de código QR no válido');
+        const [, codigoQr, expiraStr, firmaRecibida] = partes;
+        const expiraMs = Number(expiraStr);
+        if (!codigoQr || !Number.isFinite(expiraMs)) {
+            throw new Error('Formato de código QR no válido');
+        }
+        const esperado = firmarPayloadQr(codigoQr, expiraMs).split('|')[3];
+        if (firmaRecibida !== esperado) {
+            throw new Error('Código QR inválido o alterado');
+        }
+        if (Date.now() > expiraMs) {
+            throw new Error('El código QR expiró. Pide al cliente actualizar su pase QR.');
+        }
+        return codigoQr;
+    }
+
+    if (/^APX-[A-F0-9]{8,32}$/i.test(texto)) {
+        return texto.toUpperCase();
+    }
+
+    throw new Error('El código escaneado no corresponde a un pase de ApexGym');
+}
+
+function calcularDiasRestantesFecha(fechaFin) {
+    if (!fechaFin) return 0;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const fin = new Date(fechaFin);
+    fin.setHours(0, 0, 0, 0);
+    const diffTime = fin.getTime() - hoy.getTime();
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+}
+
 export class AsistenciaController extends BaseController {
     constructor() {
         super(asistenciaDao);
     }
+
+    _construirRespuestaMiQr = async (usuarioId, regenerar = false) => {
+        let cliente = await clienteDao.getByUser(usuarioId);
+        if (!cliente) {
+            throw new Error('No se encontró un perfil de cliente asociado a tu cuenta');
+        }
+
+        if (regenerar || !cliente.codigoQr) {
+            const nuevoCodigo = generarCodigoQrUnico();
+            cliente = await clienteDao.actualizarCodigoQr(cliente.id, nuevoCodigo);
+        }
+
+        const membresiaActiva = await clienteMembresiaDao.getActivaPorCliente(cliente.id);
+        let membresia = membresiaActiva;
+        let vigente = Boolean(membresiaActiva);
+        let mensaje = 'Membresía vigente';
+
+        if (!membresiaActiva) {
+            const historial = await clienteMembresiaDao.getHistorialPorCliente(cliente.id);
+            membresia = Array.isArray(historial) && historial.length > 0 ? historial[0] : null;
+            if (membresia?.fechaFin) {
+                const f = new Date(membresia.fechaFin);
+                const d = String(f.getUTCDate()).padStart(2, '0');
+                const m = String(f.getUTCMonth() + 1).padStart(2, '0');
+                const y = f.getUTCFullYear();
+                mensaje = `Membresía vencida el ${d}/${m}/${y}`;
+            } else {
+                mensaje = 'Sin membresía activa asignada';
+            }
+        }
+
+        const expiraMs = Date.now() + QR_TTL_MS;
+        const qrPayload = firmarPayloadQr(cliente.codigoQr, expiraMs);
+
+        return {
+            codigoQr: cliente.codigoQr,
+            qrPayload,
+            expiraEn: new Date(expiraMs).toISOString(),
+            vigente,
+            diasRestantes: vigente ? calcularDiasRestantesFecha(membresia?.fechaFin) : 0,
+            mensaje,
+            cliente,
+            membresia,
+        };
+    };
+
+    /** GET /api/asistencias/mi-qr */
+    obtenerMiQr = async (req, res) => {
+        try {
+            const usuarioId = req.usuario?.id ?? req.user?.id;
+            const data = await this._construirRespuestaMiQr(usuarioId, false);
+            return this.respuestaExito(res, data, 'Pase QR obtenido correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    /** POST /api/asistencias/mi-qr/regenerar */
+    regenerarMiQr = async (req, res) => {
+        try {
+            const usuarioId = req.usuario?.id ?? req.user?.id;
+            const data = await this._construirRespuestaMiQr(usuarioId, true);
+            return this.respuestaExito(res, data, 'Código QR regenerado correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    /** POST /api/asistencias/validar-qr */
+    validarQr = async (req, res) => {
+        try {
+            const { qr } = req.body ?? {};
+            const codigoQr = verificarPayloadQr(qr);
+
+            const cliente = await clienteDao.getByCodigoQr(codigoQr);
+            if (!cliente) {
+                return this.respuestaNoEncontrado(res, 'No se encontró ningún cliente asociado a este código QR');
+            }
+
+            const membresiaActiva = await clienteMembresiaDao.getActivaPorCliente(cliente.id);
+            if (!membresiaActiva) {
+                const historial = await clienteMembresiaDao.getHistorialPorCliente(cliente.id);
+                const ultima = Array.isArray(historial) && historial.length > 0 ? historial[0] : null;
+                let mensajeDetalle = 'Membresía inexistente o no asignada';
+                if (ultima?.fechaFin) {
+                    const f = new Date(ultima.fechaFin);
+                    const d = String(f.getUTCDate()).padStart(2, '0');
+                    const m = String(f.getUTCMonth() + 1).padStart(2, '0');
+                    const y = f.getUTCFullYear();
+                    mensajeDetalle = `Membresía vencida el ${d}/${m}/${y}`;
+                }
+
+                return this.respuestaExito(
+                    res,
+                    {
+                        acceso: false,
+                        codigo: 'MEMBRESIA_NO_VIGENTE',
+                        cliente,
+                        membresia: ultima,
+                        diasRestantes: 0,
+                        fechaExpiracion: ultima?.fechaFin ?? null,
+                        mensaje: mensajeDetalle,
+                    },
+                    `Acceso denegado: ${mensajeDetalle}`
+                );
+            }
+
+            const diasRestantes = calcularDiasRestantesFecha(membresiaActiva.fechaFin);
+            return this.respuestaExito(
+                res,
+                {
+                    acceso: true,
+                    codigo: 'ACCESO_AUTORIZADO',
+                    cliente,
+                    membresia: membresiaActiva,
+                    diasRestantes,
+                    fechaExpiracion: membresiaActiva.fechaFin,
+                    mensaje: 'Membresía vigente - Listo para registrar entrada',
+                },
+                'Código QR validado correctamente'
+            );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
 
     /**
      * GET /api/asistencias/buscar-cliente?q=termino

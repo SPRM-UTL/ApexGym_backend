@@ -886,7 +886,12 @@
         "apellidoMaterno": "García",
         "telefono": "4771234501",
         "correo": "ana.lopez@apexgym.com",
-        "direccion": "Blvd. La Luz 120, León, Gto.",
+        "calle": "Blvd. La Luz",
+        "numeroExterior": "120",
+        "colonia": "Brisas del Carmen",
+        "codigoPostal": "37297",
+        "municipio": "León",
+        "estado": "Guanajuato",
         "fechaNacimiento": "1996-03-14",
         "fechaIngreso": "2024-02-01"
       },
@@ -900,7 +905,12 @@
         "apellidoMaterno": "Ríos",
         "telefono": "4771234502",
         "correo": "luis.hernandez@apexgym.com",
-        "direccion": "Calle Madero 45, León, Gto.",
+        "calle": "Calle Madero",
+        "numeroExterior": "45",
+        "colonia": "Centro",
+        "codigoPostal": "37000",
+        "municipio": "León",
+        "estado": "Guanajuato",
         "fechaNacimiento": "1992-11-02",
         "fechaIngreso": "2023-08-15"
       },
@@ -913,7 +923,12 @@
         "apellidoMaterno": "Vega",
         "telefono": "4771234503",
         "correo": "mariana.soto@apexgym.com",
-        "direccion": "Av. Panorama 880, León, Gto.",
+        "calle": "Av. Panorama",
+        "numeroExterior": "880",
+        "colonia": "Panorama",
+        "codigoPostal": "37160",
+        "municipio": "León",
+        "estado": "Guanajuato",
         "fechaNacimiento": "1994-07-21",
         "fechaIngreso": "2025-01-06"
       }
@@ -1032,11 +1047,7 @@
         "fechaRegistro": "2026-11-12"
       }
     ],
-    "visitas": [
-      { "clave": "visita-andrea", "nombreVisitante": "Andrea Guzmán", "tipo": "Pase de día", "costo": "80.00", "fechaHora": "2026-11-12T10:20:00-06:00", "observaciones": "Visita de prueba en horario matutino" },
-      { "clave": "visita-roberto", "nombreVisitante": "Roberto Salinas", "tipo": "Pase de semana", "costo": "350.00", "fechaHora": "2026-11-11T16:45:00-06:00", "observaciones": "Pase semanal pagado en efectivo" },
-      { "clave": "visita-irene", "nombreVisitante": "Irene Campos", "tipo": "Clase de prueba", "costo": "0.00", "fechaHora": "2026-11-10T19:00:00-06:00", "observaciones": "Clase de spinning de cortesía" }
-    ],
+    "visitas": [],
     "aperturasCaja": [
       {
         "clave": "apertura-recepcion-abierta",

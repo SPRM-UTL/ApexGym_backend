@@ -269,7 +269,14 @@ model Empleado {
   apellidoMaterno  String?   @map("apellido_materno") @db.VarChar(100)
   telefono         String    @db.VarChar(20)
   correo           String?   @db.VarChar(191)
-  direccion        String?   @db.Text
+  calle            String?   @db.VarChar(150)
+  numeroExterior   String?   @map("numero_exterior") @db.VarChar(20)
+  numeroInterior   String?   @map("numero_interior") @db.VarChar(20)
+  colonia          String?   @db.VarChar(100)
+  codigoPostal     String?   @map("codigo_postal") @db.VarChar(10)
+  municipio        String?   @db.VarChar(100)
+  estado           String?   @db.VarChar(100)
+  entreCalles      String?   @map("entre_calles") @db.VarChar(200)
   fechaNacimiento  DateTime  @map("fecha_nacimiento")
   fechaIngreso     DateTime  @map("fecha_ingreso")
   imagenUrl        String?   @map("imagen_url") @db.LongText
@@ -458,6 +465,7 @@ model Cliente {
   genero                     String    @db.VarChar(50)
   telefono                   String    @db.VarChar(20)
   correo                     String?   @db.VarChar(150)
+  codigoQr                   String?   @unique @map("codigo_qr") @db.VarChar(64)
   direccion                  String?   @db.Text
   contactoEmergenciaNombre   String?   @map("contacto_emergencia_nombre") @db.VarChar(150)
   contactoEmergenciaTelefono String?   @map("contacto_emergencia_telefono") @db.VarChar(20)
