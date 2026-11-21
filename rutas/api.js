@@ -40,6 +40,7 @@ import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
+import { PedidoCompraController } from '../controller/PedidoCompraController.js';
 import { notificacionRoutes } from './notificacionRoutes.js';
 import { dispositivoRoutes } from './dispositivoRoutes.js';
 
@@ -120,6 +121,8 @@ const sucursalController = new SucursalController();
 const sucursalRoutes = express.Router();
 const pagoController = new PagoController();
 const pagoRoutes = express.Router();
+const pedidoCompraController = new PedidoCompraController();
+const pedidoCompraRoutes = express.Router();
 const asistenciaController = new AsistenciaController();
 const asistenciaRoutes = express.Router();
 const visitaController = new VisitaController();
@@ -465,6 +468,11 @@ CategoriaProductoRoutes.delete(
     categoriaProductoController.eliminar.bind(categoriaProductoController)
 );
 //------Productos ------------------
+productoRoutes.get(
+    '/productosClientes/traer',
+    autenticarUsuario,
+    productoController.getProductosCliente.bind(productoController)
+);
 productoRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
@@ -1302,6 +1310,40 @@ router.use('/asistencias', asistenciaRoutes);
 router.use('/visitas', visitaRoutes);
 router.use('/notificaciones', notificacionRoutes);
 router.use('/dispositivos', dispositivoRoutes);
+
+// ─── Pedidos de compra (Android -> validación web -> suma a inventario) ───────
+pedidoCompraRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Listar'),
+    pedidoCompraController.obtenerTodos.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Listar'),
+    pedidoCompraController.obtenerPorId.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Crear'),
+    pedidoCompraController.crear.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/:id/aprobar',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Editar'),
+    pedidoCompraController.aprobar.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/:id/rechazar',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Editar'),
+    pedidoCompraController.rechazar.bind(pedidoCompraController)
+);
+
+router.use('/pedidos-compra', pedidoCompraRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
