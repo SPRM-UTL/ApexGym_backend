@@ -3,6 +3,7 @@ import { asistenciaDao } from '../dao/AsistenciaDao.js';
 import { clienteDao } from '../dao/ClienteDao.js';
 import { clienteMembresiaDao } from '../dao/ClienteMembresiaDao.js';
 import { BaseController } from './BaseController.js';
+import { esEscaneoDesdeAndroid, notificarRevisionQr } from '../services/notificacionesQr.js';
 
 const QR_SECRET = process.env.QR_SECRET || process.env.JWT_SECRET || 'apexgym-qr-signing-key-2026';
 const QR_TTL_MS = 15 * 60 * 1000;
@@ -57,28 +58,36 @@ function calcularDiasRestantesFecha(fechaFin) {
 }
 
 export class AsistenciaController extends BaseController {
-    constructor() {
-        super(asistenciaDao);
+    constructor({
+        dao = asistenciaDao,
+        clientes = clienteDao,
+        membresias = clienteMembresiaDao,
+        notificarQr = notificarRevisionQr,
+    } = {}) {
+        super(dao);
+        this.clienteDao = clientes;
+        this.clienteMembresiaDao = membresias;
+        this.notificarQr = notificarQr;
     }
 
     _construirRespuestaMiQr = async (usuarioId, regenerar = false) => {
-        let cliente = await clienteDao.getByUser(usuarioId);
+        let cliente = await this.clienteDao.getByUser(usuarioId);
         if (!cliente) {
             throw new Error('No se encontró un perfil de cliente asociado a tu cuenta');
         }
 
         if (regenerar || !cliente.codigoQr) {
             const nuevoCodigo = generarCodigoQrUnico();
-            cliente = await clienteDao.actualizarCodigoQr(cliente.id, nuevoCodigo);
+            cliente = await this.clienteDao.actualizarCodigoQr(cliente.id, nuevoCodigo);
         }
 
-        const membresiaActiva = await clienteMembresiaDao.getActivaPorCliente(cliente.id);
+        const membresiaActiva = await this.clienteMembresiaDao.getActivaPorCliente(cliente.id);
         let membresia = membresiaActiva;
         let vigente = Boolean(membresiaActiva);
         let mensaje = 'Membresía vigente';
 
         if (!membresiaActiva) {
-            const historial = await clienteMembresiaDao.getHistorialPorCliente(cliente.id);
+            const historial = await this.clienteMembresiaDao.getHistorialPorCliente(cliente.id);
             membresia = Array.isArray(historial) && historial.length > 0 ? historial[0] : null;
             if (membresia?.fechaFin) {
                 const f = new Date(membresia.fechaFin);
@@ -134,14 +143,19 @@ export class AsistenciaController extends BaseController {
             const { qr } = req.body ?? {};
             const codigoQr = verificarPayloadQr(qr);
 
-            const cliente = await clienteDao.getByCodigoQr(codigoQr);
+            const cliente = await this.clienteDao.getByCodigoQr(codigoQr);
             if (!cliente) {
                 return this.respuestaNoEncontrado(res, 'No se encontró ningún cliente asociado a este código QR');
             }
 
-            const membresiaActiva = await clienteMembresiaDao.getActivaPorCliente(cliente.id);
+            const scannerUsuarioId = req.usuario?.id ?? req.user?.id ?? null;
+            const empresaId = req.usuario?.empresaId ?? req.user?.empresaId ?? cliente.empresaId ?? 1;
+            const sucursalId = req.usuario?.sucursalId ?? req.user?.sucursalId ?? cliente.sucursalId ?? null;
+            const desdeAndroid = esEscaneoDesdeAndroid(req);
+
+            const membresiaActiva = await this.clienteMembresiaDao.getActivaPorCliente(cliente.id);
             if (!membresiaActiva) {
-                const historial = await clienteMembresiaDao.getHistorialPorCliente(cliente.id);
+                const historial = await this.clienteMembresiaDao.getHistorialPorCliente(cliente.id);
                 const ultima = Array.isArray(historial) && historial.length > 0 ? historial[0] : null;
                 let mensajeDetalle = 'Membresía inexistente o no asignada';
                 if (ultima?.fechaFin) {
@@ -151,6 +165,18 @@ export class AsistenciaController extends BaseController {
                     const y = f.getUTCFullYear();
                     mensajeDetalle = `Membresía vencida el ${d}/${m}/${y}`;
                 }
+
+                await this.notificarQr({
+                    cliente,
+                    acceso: false,
+                    mensajeDetalle,
+                    membresia: ultima,
+                    diasRestantes: 0,
+                    scannerUsuarioId,
+                    empresaId,
+                    sucursalId,
+                    desdeAndroid,
+                });
 
                 return this.respuestaExito(
                     res,
@@ -168,6 +194,18 @@ export class AsistenciaController extends BaseController {
             }
 
             const diasRestantes = calcularDiasRestantesFecha(membresiaActiva.fechaFin);
+            await this.notificarQr({
+                cliente,
+                acceso: true,
+                mensajeDetalle: 'Membresía vigente - Listo para registrar entrada',
+                membresia: membresiaActiva,
+                diasRestantes,
+                scannerUsuarioId,
+                empresaId,
+                sucursalId,
+                desdeAndroid,
+            });
+
             return this.respuestaExito(
                 res,
                 {
@@ -196,7 +234,7 @@ export class AsistenciaController extends BaseController {
             if (!termino || termino.length < 2) {
                 return this.respuestaExito(res, [], 'Ingresa al menos 2 caracteres para buscar');
             }
-            const clientes = await clienteDao.buscarPorNombre(termino, {
+            const clientes = await this.clienteDao.buscarPorNombre(termino, {
                 sucursalId: req.query.sucursalId ?? null,
             });
             return this.respuestaExito(res, clientes, 'Clientes encontrados');
@@ -219,18 +257,18 @@ export class AsistenciaController extends BaseController {
             }
 
             // 1. Verificar que el cliente existe con sus datos completos y usuario
-            const cliente = await clienteDao.getById(Number(clienteId));
+            const cliente = await this.clienteDao.getById(Number(clienteId));
             if (!cliente) {
                 return this.respuestaNoEncontrado(res, 'Cliente no encontrado');
             }
 
             // 2. Verificar vigencia de membresía
             // getActivaPorCliente también sincroniza las membresías vencidas en BD
-            const membresiaActiva = await clienteMembresiaDao.getActivaPorCliente(Number(clienteId));
+            const membresiaActiva = await this.clienteMembresiaDao.getActivaPorCliente(Number(clienteId));
 
             if (!membresiaActiva) {
                 // Consultar la última membresía para proporcionar detalles exactos
-                const historial = await clienteMembresiaDao.getHistorialPorCliente(Number(clienteId));
+                const historial = await this.clienteMembresiaDao.getHistorialPorCliente(Number(clienteId));
                 const ultimaMembresia = (historial && historial.length > 0) ? historial[0] : null;
 
                 let mensajeExplicativo = 'Membresía inexistente o no asignada';

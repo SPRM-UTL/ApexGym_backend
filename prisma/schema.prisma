@@ -56,6 +56,7 @@ model Empresa {
   asistencias            Asistencia[]
   visitas                Visita[]
   transaccionesPagos     TransaccionPago[]
+  pedidosCompra          PedidoCompra[]
 
   @@map("empresas")
 }
@@ -101,6 +102,7 @@ model Sucursal {
   transaccionesPagos     TransaccionPago[]
   asistencias            Asistencia[]
   visitas                Visita[]
+  pedidosCompra          PedidoCompra[]
 
   @@index([empresaId], map: "idx_sucursales_empresa_id")
   @@map("sucursales")
@@ -293,11 +295,13 @@ model Empleado {
   estadoEmpleado EstadoEmpleado @relation(fields: [estadoEmpleadoId], references: [id], onDelete: Cascade)
   usuario        Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
-  aperturasCaja   AperturaCaja[]
-  movimientosCaja MovimientoCaja[]
-  cortesCaja      CorteCaja[]
-  ventas          Venta[]
-  devoluciones    Devolucion[]
+  aperturasCaja            AperturaCaja[]
+  movimientosCaja          MovimientoCaja[]
+  cortesCaja               CorteCaja[]
+  ventas                   Venta[]
+  devoluciones             Devolucion[]
+  pedidosCompraSolicitados PedidoCompra[] @relation("PedidosCompraSolicitados")
+  pedidosCompraValidados   PedidoCompra[] @relation("PedidosCompraValidados")
 
   @@map("empleados")
 }
@@ -702,11 +706,12 @@ model Producto {
   deletedAt           DateTime? @map("deleted_at")
   disponibleCompra    Boolean   @default(false) @map("disponible_compra")
 
-  empresa   Empresa           @relation(fields: [empresaId], references: [id], onDelete: Restrict)
-  sucursalId Int      @default(1) @map("sucursal_id")
-  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  categoria CategoriaProducto @relation(fields: [categoriaProductoId], references: [id])
+  empresa             Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursalId          Int                   @default(1) @map("sucursal_id")
+  sucursal            Sucursal              @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  categoria           CategoriaProducto     @relation(fields: [categoriaProductoId], references: [id])
   detallesVenta       DetalleVenta[]
+  detallesPedidoCompra DetallePedidoCompra[]
   @@map("producto")
 }
 
@@ -1026,4 +1031,54 @@ model Dispositivo {
 
   @@index([empresaId, usuarioId, tipo], map: "idx_dispositivos_usuario")
   @@map("dispositivos")
+}
+
+enum EstadoPedidoCompra {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+model PedidoCompra {
+  id                    Int                @id @default(autoincrement())
+  empresaId             Int                @default(1) @map("empresa_id")
+  sucursalId            Int                @default(1) @map("sucursal_id")
+  solicitanteEmpleadoId Int                @map("solicitante_empleado_id")
+  validadorEmpleadoId   Int?               @map("validador_empleado_id")
+  proveedor             String?            @db.VarChar(150)
+  estado                EstadoPedidoCompra @default(PENDIENTE)
+  totalEstimado         Decimal            @default(0) @map("total_estimado") @db.Decimal(12, 2)
+  observaciones         String?            @db.Text
+  motivoRechazo         String?            @map("motivo_rechazo") @db.VarChar(500)
+  fechaValidacion       DateTime?          @map("fecha_validacion")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  deletedAt             DateTime?          @map("deleted_at")
+
+  empresa             Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursal            Sucursal              @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  solicitanteEmpleado Empleado              @relation("PedidosCompraSolicitados", fields: [solicitanteEmpleadoId], references: [id], onDelete: Restrict)
+  validadorEmpleado   Empleado?             @relation("PedidosCompraValidados", fields: [validadorEmpleadoId], references: [id], onDelete: SetNull)
+  detalles            DetallePedidoCompra[]
+
+  @@index([empresaId, sucursalId, estado], map: "idx_pedidos_compra_contexto_estado")
+  @@index([solicitanteEmpleadoId], map: "idx_pedidos_compra_solicitante")
+  @@index([validadorEmpleadoId], map: "idx_pedidos_compra_validador")
+  @@map("pedidos_compra")
+}
+
+model DetallePedidoCompra {
+  id             Int      @id @default(autoincrement())
+  pedidoCompraId Int      @map("pedido_compra_id")
+  productoId     Int      @map("producto_id")
+  cantidad       Int
+  costoUnitario  Decimal  @default(0) @map("costo_unitario") @db.Decimal(10, 2)
+  subtotal       Decimal  @default(0) @map("subtotal") @db.Decimal(12, 2)
+
+  pedidoCompra PedidoCompra @relation(fields: [pedidoCompraId], references: [id], onDelete: Cascade)
+  producto     Producto     @relation(fields: [productoId], references: [id], onDelete: Restrict)
+
+  @@index([pedidoCompraId], map: "idx_detalle_pedido_compra_pedido")
+  @@index([productoId], map: "idx_detalle_pedido_compra_producto")
+  @@map("detalle_pedido_compra")
 }
