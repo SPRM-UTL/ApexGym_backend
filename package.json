@@ -8,7 +8,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "dev:cf": "wrangler dev",
-    "test": "node --test tests/unit/notificacionesFcm.test.js tests/unit/notificacionesQr.test.js tests/unit/pedidosCompra.test.js && node tests/api/run.js",
+    "test": "node --test tests/unit/notificacionesFcm.test.js tests/unit/notificacionesQr.test.js tests/unit/pedidosCompra.test.js tests/unit/pagos.test.js tests/unit/almacenesReportesActividad.test.js && node tests/api/run.js",
     "test:api": "node tests/api/run.js",
     "postinstall": "prisma generate",
     "deploy": "prisma db push && npx wrangler deploy",

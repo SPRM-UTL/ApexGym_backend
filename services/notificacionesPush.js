@@ -1,5 +1,6 @@
 import { prisma } from '../dao/BaseDao.js';
 import { firebaseMessaging } from './firebaseAdmin.js';
+import { publicarEventoNotificacion } from './notificacionesStream.js';
 
 const TAMANO_LOTE_FCM = 500;
 const CODIGOS_TOKEN_INVALIDO = new Set([
@@ -12,7 +13,19 @@ export async function enviarPushNotificacion({
     destinatarioUsuarioId,
     prismaClient = prisma,
     messaging = firebaseMessaging,
+    publicarSse = publicarEventoNotificacion,
 }) {
+    if (destinatarioUsuarioId && notificacion && typeof publicarSse === 'function') {
+        try {
+            publicarSse(destinatarioUsuarioId, {
+                tipo: 'NUEVA_NOTIFICACION',
+                notificacion,
+            });
+        } catch {
+            // No bloquear flujo push por error de stream SSE
+        }
+    }
+
     if (!messaging || !destinatarioUsuarioId) return { enviados: 0, eliminados: 0 };
 
     const dispositivos = await prismaClient.dispositivo.findMany({
@@ -23,7 +36,9 @@ export async function enviarPushNotificacion({
         },
         select: { token: true },
     });
-    const tokens = dispositivos.map(({ token }) => token);
+    const tokens = dispositivos
+        .map(({ token }) => token)
+        .filter((token) => typeof token === 'string' && token.trim() && !token.startsWith('web-'));
     let enviados = 0;
     let eliminados = 0;
 

@@ -1,7 +1,10 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
+import { pool } from '../../dao/BaseDao.js';
 import { PedidoCompraDao } from '../../dao/PedidoCompraDao.js';
 import { PedidoCompraController } from '../../controller/PedidoCompraController.js';
+
+after(() => pool.end());
 
 function crearRespuesta() {
     return {

@@ -5,8 +5,8 @@ import { ResponseModel } from '../modelos/ResponseModel.js';
 import { pagoService } from '../services/PagoService.js';
 
 export class VentaController extends BaseController {
-    constructor() {
-        super(ventaDao);
+    constructor(dao = ventaDao) {
+        super(dao);
     }
 
     obtenerTodos = async (req, res) => {
@@ -254,6 +254,194 @@ export class VentaController extends BaseController {
         }
     };
 
+    sincronizarOffline = async (req, res) => {
+        try {
+            const { ventas } = req.body ?? {};
+            if (!Array.isArray(ventas) || ventas.length === 0 || ventas.length > 100) {
+                return res.status(400).json(new ResponseModel(
+                    null,
+                    1,
+                    'Debes enviar un arreglo "ventas" con entre 1 y 100 registros',
+                    400
+                ));
+            }
+
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursalContexto = this.obtenerSucursalId(req);
+            const usuarioId = this.leerId(req.usuario?.id ?? req.user?.id, 'usuario autenticado');
+
+            const sincronizadas = [];
+            const duplicadas = [];
+            const errores = [];
+            const uuidsEnLote = new Set();
+
+            const metodoEfectivo = await this.dao.prisma.metodoPago.findFirst({
+                where: { codigo: 'EFECTIVO', estado: 'activo', deletedAt: null },
+                select: { id: true, codigo: true },
+            });
+
+            for (const item of ventas) {
+                const folioLocal = typeof item?.folioLocal === 'string' ? item.folioLocal.trim() : null;
+                const uuidIdempotencia = this.sanitizarUuid(item?.uuidIdempotencia);
+
+                if (!uuidIdempotencia) {
+                    const msg = 'Cada venta sin conexión debe incluir un uuidIdempotencia válido';
+                    errores.push({
+                        uuidIdempotencia: item?.uuidIdempotencia ?? null,
+                        folioLocal,
+                        status: 400,
+                        error: msg,
+                        message: msg,
+                    });
+                    continue;
+                }
+
+                if (uuidsEnLote.has(uuidIdempotencia)) {
+                    duplicadas.push({ uuidIdempotencia, folioLocal, ventaId: null });
+                    continue;
+                }
+                uuidsEnLote.add(uuidIdempotencia);
+
+                try {
+                    const codigoEnviado = item?.metodoPagoCodigo !== undefined && item?.metodoPagoCodigo !== null
+                        ? String(item.metodoPagoCodigo).trim().toUpperCase()
+                        : null;
+
+                    if (codigoEnviado && codigoEnviado !== 'EFECTIVO') {
+                        const msg = 'Las ventas sin conexión solo están permitidas en efectivo';
+                        errores.push({ uuidIdempotencia, folioLocal, status: 400, error: msg, message: msg });
+                        continue;
+                    }
+
+                    let metodoPagoResuelto = null;
+                    if (item?.metodoPagoId !== undefined && item?.metodoPagoId !== null && item?.metodoPagoId !== '') {
+                        const idMetodo = Number(item.metodoPagoId);
+                        if (!Number.isInteger(idMetodo) || idMetodo <= 0) {
+                            const msg = 'Las ventas sin conexión solo están permitidas en efectivo';
+                            errores.push({ uuidIdempotencia, folioLocal, status: 400, error: msg, message: msg });
+                            continue;
+                        }
+                        metodoPagoResuelto = await this.dao.prisma.metodoPago.findFirst({
+                            where: { id: idMetodo, estado: 'activo', deletedAt: null },
+                            select: { id: true, codigo: true },
+                        });
+                    } else if (codigoEnviado === 'EFECTIVO') {
+                        metodoPagoResuelto = metodoEfectivo;
+                    }
+
+                    if (!metodoPagoResuelto || String(metodoPagoResuelto.codigo ?? '').toUpperCase() !== 'EFECTIVO') {
+                        const msg = 'Las ventas sin conexión solo están permitidas en efectivo';
+                        errores.push({ uuidIdempotencia, folioLocal, status: 400, error: msg, message: msg });
+                        continue;
+                    }
+
+                    const transaccionExistente = await this.dao.prisma.transaccionPago.findUnique({
+                        where: { uuidIdempotencia },
+                        select: { id: true, ventaId: true },
+                    });
+                    if (transaccionExistente) {
+                        duplicadas.push({
+                            uuidIdempotencia,
+                            folioLocal,
+                            ventaId: transaccionExistente.ventaId ?? null,
+                        });
+                        continue;
+                    }
+
+                    let clienteId = item?.clienteId ?? item?.clientId;
+                    if (!clienteId) {
+                        const primerCliente = await this.dao.prisma.cliente.findFirst({
+                            where: { deletedAt: null },
+                            orderBy: { id: 'asc' },
+                            select: { id: true },
+                        });
+                        clienteId = primerCliente?.id;
+                    }
+
+                    let idAperturaFinal = item?.aperturaCajaId ? Number(item.aperturaCajaId) : null;
+                    let idEmpleadoFinal = item?.empleadoId ? Number(item.empleadoId) : null;
+                    const sucursalItem = item?.sucursalId ? Number(item.sucursalId) : sucursalContexto;
+
+                    if (!idAperturaFinal || !idEmpleadoFinal) {
+                        const cajaActiva = await this.dao.prisma.aperturaCaja.findFirst({
+                            where: {
+                                empresaId,
+                                ...(sucursalItem && sucursalItem !== 'todas' ? { sucursalId: Number(sucursalItem) } : {}),
+                                estado: 'ABIERTA',
+                                deletedAt: null,
+                            },
+                            orderBy: { id: 'desc' },
+                        });
+                        if (cajaActiva) {
+                            idAperturaFinal = idAperturaFinal || cajaActiva.id;
+                            idEmpleadoFinal = idEmpleadoFinal || cajaActiva.empleadoId;
+                        }
+                    }
+
+                    this.validar(idAperturaFinal, clienteId, item?.detalleVenta);
+
+                    const ventaCreada = await this.dao.create({
+                        empleadoId: this.leerId(idEmpleadoFinal, 'empleado'),
+                        aperturaCajaId: Number(idAperturaFinal),
+                        clienteId: Number(clienteId),
+                        usuarioId,
+                        empresaId,
+                        uuidIdempotencia,
+                        metodoPagoId: metodoPagoResuelto.id,
+                        subtotal: this.leerMonto(item.subtotal, 'subtotal'),
+                        total: this.leerMonto(item.total, 'total'),
+                        montoRecibido: item.montoRecibido === undefined
+                            ? undefined
+                            : this.leerMonto(item.montoRecibido, 'monto recibido'),
+                        detalleVenta: this.normalizarDetalles(item.detalleVenta),
+                        pago: {},
+                    });
+
+                    sincronizadas.push({
+                        uuidIdempotencia,
+                        folioLocal,
+                        venta: ventaCreada,
+                    });
+                } catch (errItem) {
+                    if (errItem?.code === 'P2002' || errItem?.status === 409) {
+                        const txDup = await this.dao.prisma.transaccionPago.findUnique({
+                            where: { uuidIdempotencia },
+                            select: { id: true, ventaId: true },
+                        }).catch(() => null);
+                        if (txDup) {
+                            duplicadas.push({
+                                uuidIdempotencia,
+                                folioLocal,
+                                ventaId: txDup.ventaId ?? null,
+                            });
+                            continue;
+                        }
+                    }
+                    const statusErr = [400, 403, 404, 409].includes(errItem?.status) ? errItem.status : 400;
+                    const msgErr = errItem?.message || 'No se pudo sincronizar la venta offline';
+                    errores.push({
+                        uuidIdempotencia,
+                        folioLocal,
+                        status: statusErr,
+                        error: msgErr,
+                        message: msgErr,
+                    });
+                }
+            }
+
+            return this.respuestaExito(
+                res,
+                { sincronizadas, duplicadas, errores },
+                'Sincronización de ventas sin conexión procesada'
+            );
+        } catch (error) {
+            if ([400, 403, 409].includes(error?.status)) {
+                return res.status(error.status).json(new ResponseModel(null, 1, error.message, error.status));
+            }
+            return this.respuestaError(res, error);
+        }
+    };
+
     consultarEstadoPago = async (req, res) => {
         try {
             const ventaId = this.leerId(req.params.id, 'venta');
@@ -375,6 +563,13 @@ normalizarDetalles(detalleVenta) {
 
                 if (!Number.isInteger(detalle.productoId) || detalle.productoId <= 0) {
                     throw new Error("El productoId es obligatorio y debe ser válido");
+                }
+                if (d.almacenId !== undefined && d.almacenId !== null && d.almacenId !== '') {
+                    const idAlmacen = Number(d.almacenId);
+                    if (!Number.isInteger(idAlmacen) || idAlmacen <= 0) {
+                        throw new Error("El almacenId debe ser un entero positivo válido");
+                    }
+                    detalle.almacenId = idAlmacen;
                 }
                 break;
 
