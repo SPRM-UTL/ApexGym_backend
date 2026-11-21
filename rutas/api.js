@@ -925,7 +925,10 @@ metodoPagoRoutes.delete(
 ventaRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.obtenerTodos.bind(ventaController)
 )
 

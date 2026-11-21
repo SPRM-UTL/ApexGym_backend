@@ -228,7 +228,16 @@ async obtenerVentas({
         },
         metodoPago: { select: { id: true, nombre: true, codigo: true } },
         detalleVenta: {
-            select: { id: true, cantidad: true },
+            select: {
+                id: true,
+                cantidad: true,
+                subtotal: true,
+                descripcion: true,
+                tipoItem: true,
+                producto: { select: { nombre: true } },
+                servicio: { select: { nombre: true } },
+                tipoMembresia: { select: { nombre: true } },
+            },
         },
         devoluciones: {
             where: {
@@ -246,10 +255,14 @@ async obtenerVentas({
         transaccionesPago: {
             where: { deletedAt: null },
             select: {
+                id: true,
                 proveedor: true,
                 estado: true,
                 monto: true,
                 montoReembolsado: true,
+                folioVoucher: true,
+                referenciaExterna: true,
+                createdAt: true,
             },
             orderBy: { id: 'desc' },
         },

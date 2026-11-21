@@ -13,9 +13,16 @@ export class VentaController extends BaseController {
         try {
             const pagina = Number(req.query.pagina ?? 1);
             const limiteSolicitado = Number(req.query.limite ?? 20);
-            const clienteId = req.query.clienteId === undefined
+            let clienteId = req.query.clienteId === undefined
                 ? undefined
                 : this.leerId(req.query.clienteId, 'cliente');
+
+            if (req.usuario?.esCliente || req.user?.esCliente) {
+                const clienteUsuarioId = req.usuario?.clienteId ?? req.user?.clienteId;
+                if (clienteUsuarioId) {
+                    clienteId = Number(clienteUsuarioId);
+                }
+            }
             const cliente = typeof req.query.cliente === 'string'
                 ? req.query.cliente.trim()
                 : '';
