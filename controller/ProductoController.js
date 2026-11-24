@@ -220,7 +220,6 @@ export class ProductoController extends BaseController {
             const productos = await productoDao.getAll(
                 {
                     disponibleCompra: true,
-                    stockActual: { gt: 0 },
                     estado: 'ACTIVO',
                 },
                 { id: 'desc' },
