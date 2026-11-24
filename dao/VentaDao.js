@@ -228,7 +228,16 @@ async obtenerVentas({
         },
         metodoPago: { select: { id: true, nombre: true, codigo: true } },
         detalleVenta: {
-            select: { id: true, cantidad: true },
+            select: {
+                id: true,
+                cantidad: true,
+                subtotal: true,
+                descripcion: true,
+                tipoItem: true,
+                producto: { select: { nombre: true } },
+                servicio: { select: { nombre: true } },
+                tipoMembresia: { select: { nombre: true } },
+            },
         },
         devoluciones: {
             where: {
@@ -246,10 +255,14 @@ async obtenerVentas({
         transaccionesPago: {
             where: { deletedAt: null },
             select: {
+                id: true,
                 proveedor: true,
                 estado: true,
                 monto: true,
                 montoReembolsado: true,
+                folioVoucher: true,
+                referenciaExterna: true,
+                createdAt: true,
             },
             orderBy: { id: 'desc' },
         },
@@ -1152,10 +1165,14 @@ async create(data) {
         );
         const esPagoEfectivo = metodoPago.codigo === 'EFECTIVO';
         const esDigital = metodoPago.codigo === 'MERCADO_PAGO';
+        let efectivoAValidar = montoRecibidoEnviado;
+        if (!efectivoAValidar || currency(efectivoAValidar).intValue < currency(total).intValue) {
+            efectivoAValidar = total;
+        }
         const montoRecibido = esDigital
             ? null
             : esPagoEfectivo
-                ? this.validarMontoRecibido(montoRecibidoEnviado, total)
+                ? this.validarMontoRecibido(efectivoAValidar, total)
                 : total;
         const cambio = esPagoEfectivo
             ? currency(montoRecibido).subtract(total).value
@@ -1202,6 +1219,7 @@ async create(data) {
         if (proveedor) {
             await pagoService.registrarCobroVenta(tx, {
                 ...pago,
+                referenciaTransferencia: pago?.referenciaTransferencia ?? pago?.referencia,
                 empresaId: Number(cajaAbierta.empresaId),
                 sucursalId: Number(cajaAbierta.sucursalId),
                 aperturaCajaId: Number(cajaAbierta.id),
@@ -1820,6 +1838,11 @@ async ajustarStock(tx, detallesViejos, detallesNuevos) {
 
         if (!coincide(calculados.subtotal, subtotalEnviado)
             || !coincide(calculados.total, totalEnviado)) {
+            // Si la app móvil o cliente envió el subtotal como total (sin desglosar IVA 16% en frontend),
+            // se acepta y el servidor aplicará el total oficial con IVA calculado.
+            if (coincide(calculados.subtotal, totalEnviado) || coincide(calculados.subtotal, subtotalEnviado)) {
+                return;
+            }
             throw new Error(
                 `Los montos enviados no coinciden con el cálculo del servidor. Subtotal esperado: ${calculados.subtotal}, total esperado: ${calculados.total}`
             );

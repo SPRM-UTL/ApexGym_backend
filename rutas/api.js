@@ -40,10 +40,24 @@ import { VisitaController } from '../controller/VisitaController.js';
 
 
 import { PagoController } from '../controller/PagoController.js';
+import { PedidoCompraController } from '../controller/PedidoCompraController.js';
 import { notificacionRoutes } from './notificacionRoutes.js';
 import { dispositivoRoutes } from './dispositivoRoutes.js';
 
 const router = express.Router();
+
+const esClienteRequest = (req) => {
+    return Boolean(
+        req.usuario?.esCliente ||
+        req.user?.esCliente ||
+        req.usuario?.clienteId ||
+        req.user?.clienteId ||
+        req.usuario?.roles?.some((r) => r.nombre?.toLowerCase() === 'cliente') ||
+        req.user?.roles?.some((r) => r.nombre?.toLowerCase() === 'cliente')
+    );
+};
+
+
 const uploadImagenUsuario = uploadImagen('usuarios', {
     transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto:good' }],
 });
@@ -107,6 +121,8 @@ const sucursalController = new SucursalController();
 const sucursalRoutes = express.Router();
 const pagoController = new PagoController();
 const pagoRoutes = express.Router();
+const pedidoCompraController = new PedidoCompraController();
+const pedidoCompraRoutes = express.Router();
 const asistenciaController = new AsistenciaController();
 const asistenciaRoutes = express.Router();
 const visitaController = new VisitaController();
@@ -453,9 +469,17 @@ CategoriaProductoRoutes.delete(
 );
 //------Productos ------------------
 productoRoutes.get(
+    '/productosClientes/traer',
+    autenticarUsuario,
+    productoController.getProductosCliente.bind(productoController)
+);
+productoRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     productoController.obtenerDisponiblesParaVenta.bind(productoController)
 );
 productoRoutes.get(
@@ -746,7 +770,10 @@ estadoMembresiaRoutes.delete(
 tipoMembresiaRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     tipoMembresiaController.getTiposMembresiaCliente.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.get(
@@ -872,16 +899,24 @@ clienteMembresiaRoutes.delete(
 );
 //---Rutas Médodos de Pago-------------------------
 
+
+
 metodoPagoRoutes.get(
     '/activos',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago','Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+    },
     metodoPagoController.obtenerActivos.bind(metodoPagoController)
 );
 metodoPagoRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago','Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+    },
     metodoPagoController.obtenerTodos.bind(metodoPagoController)
 );
 
@@ -910,7 +945,10 @@ metodoPagoRoutes.delete(
 ventaRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.obtenerTodos.bind(ventaController)
 )
 
@@ -924,21 +962,30 @@ ventaRoutes.get(
 ventaRoutes.get(
     '/:id/pago',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.consultarEstadoPago.bind(ventaController)
 )
 
 ventaRoutes.post(
     '/:id/pago/checkout',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Crear'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Crear')(req, res, next);
+    },
     ventaController.crearCheckoutPago.bind(ventaController)
 )
 
 ventaRoutes.get(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     ventaController.obtenerPorId.bind(ventaController)
 )
 
@@ -966,7 +1013,10 @@ ventaRoutes.post(
 ventaRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Crear'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Crear')(req, res, next);
+    },
     ventaController.create.bind(ventaController)
 )
 
@@ -981,7 +1031,10 @@ ventaRoutes.post(
 servicioRoutes.get(
     '/venta/disponibles',
     autenticarUsuario,
-    verificarPermiso('Ventas', 'Listar'),
+    (req, res, next) => {
+        if (esClienteRequest(req)) return next();
+        return verificarPermiso('Ventas', 'Listar')(req, res, next);
+    },
     servicioController.obtenerDisponiblesParaVenta.bind(servicioController)
 );
 servicioRoutes.get(
@@ -1257,6 +1310,40 @@ router.use('/asistencias', asistenciaRoutes);
 router.use('/visitas', visitaRoutes);
 router.use('/notificaciones', notificacionRoutes);
 router.use('/dispositivos', dispositivoRoutes);
+
+// ─── Pedidos de compra (Android -> validación web -> suma a inventario) ───────
+pedidoCompraRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Listar'),
+    pedidoCompraController.obtenerTodos.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Listar'),
+    pedidoCompraController.obtenerPorId.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Crear'),
+    pedidoCompraController.crear.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/:id/aprobar',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Editar'),
+    pedidoCompraController.aprobar.bind(pedidoCompraController)
+);
+pedidoCompraRoutes.post(
+    '/:id/rechazar',
+    autenticarUsuario,
+    verificarPermiso('Productos', 'Editar'),
+    pedidoCompraController.rechazar.bind(pedidoCompraController)
+);
+
+router.use('/pedidos-compra', pedidoCompraRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));
