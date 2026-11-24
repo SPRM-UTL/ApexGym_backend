@@ -140,7 +140,7 @@ export class AsistenciaController extends BaseController {
     /** POST /api/asistencias/validar-qr */
     validarQr = async (req, res) => {
         try {
-            const { qr } = req.body ?? {};
+            const { qr, registrar = false, observaciones = null } = req.body ?? {};
             const codigoQr = verificarPayloadQr(qr);
 
             const cliente = await this.clienteDao.getByCodigoQr(codigoQr);
@@ -193,11 +193,21 @@ export class AsistenciaController extends BaseController {
                 );
             }
 
+            let asistencia = null;
+            if (registrar) {
+                asistencia = await this.dao.create({
+                    clienteId: cliente.id,
+                    clienteMembresiaId: membresiaActiva.id,
+                    observaciones: observaciones ? observaciones.trim() : 'Ingreso por escaneo QR',
+                    fechaHora: new Date()
+                });
+            }
+
             const diasRestantes = calcularDiasRestantesFecha(membresiaActiva.fechaFin);
             await this.notificarQr({
                 cliente,
                 acceso: true,
-                mensajeDetalle: 'Membresía vigente - Listo para registrar entrada',
+                mensajeDetalle: registrar ? 'Acceso registrado correctamente' : 'Membresía vigente - Listo para registrar entrada',
                 membresia: membresiaActiva,
                 diasRestantes,
                 scannerUsuarioId,
@@ -213,12 +223,150 @@ export class AsistenciaController extends BaseController {
                     codigo: 'ACCESO_AUTORIZADO',
                     cliente,
                     membresia: membresiaActiva,
+                    asistencia,
                     diasRestantes,
                     fechaExpiracion: membresiaActiva.fechaFin,
-                    mensaje: 'Membresía vigente - Listo para registrar entrada',
+                    mensaje: registrar ? 'Acceso Autorizado y Registrado' : 'Membresía vigente - Listo para registrar entrada',
                 },
-                'Código QR validado correctamente'
+                registrar ? 'Acceso autorizado y asistencia registrada' : 'Código QR validado correctamente'
             );
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
+    /**
+     * POST /api/asistencias/escanear-acceso
+     * Valida y registra en un solo paso mediante código QR, código APX, o ID de socio (#00042 o 42).
+     * Body: { codigo, observaciones? }
+     */
+    escanearAcceso = async (req, res) => {
+        try {
+            const { codigo, observaciones } = req.body ?? {};
+            const texto = String(codigo ?? '').trim();
+            if (!texto) {
+                throw new Error('Debe proporcionar un código QR o número de socio');
+            }
+
+            let cliente = null;
+
+            // 1. Si es formato de QR firmado o APX-...
+            if (texto.startsWith('APEXGYM|') || /^APX-/i.test(texto)) {
+                try {
+                    const codigoQrLimpio = verificarPayloadQr(texto);
+                    cliente = await this.clienteDao.getByCodigoQr(codigoQrLimpio);
+                } catch (qrErr) {
+                    return res.status(400).json({
+                        responseFlag: 1,
+                        message: qrErr.message || 'Código QR no válido o expirado'
+                    });
+                }
+            }
+
+            // 2. Si no se encontró por QR o es un ID/código de socio (ej. #00042, 42)
+            if (!cliente) {
+                const idLimpio = Number(texto.replace('#', ''));
+                if (Number.isSafeInteger(idLimpio) && idLimpio > 0) {
+                    cliente = await this.clienteDao.getById(idLimpio);
+                }
+            }
+
+            // 3. Intento adicional por coincidencia exacta de codigoQr almacenado
+            if (!cliente) {
+                cliente = await this.clienteDao.getByCodigoQr(texto);
+            }
+
+            if (!cliente) {
+                return res.status(404).json({
+                    responseFlag: 1,
+                    message: `No se encontró ningún socio con el identificador "${texto}".`
+                });
+            }
+
+            const scannerUsuarioId = req.usuario?.id ?? req.user?.id ?? null;
+            const empresaId = req.usuario?.empresaId ?? req.user?.empresaId ?? cliente.empresaId ?? 1;
+            const sucursalId = req.usuario?.sucursalId ?? req.user?.sucursalId ?? cliente.sucursalId ?? null;
+            const desdeAndroid = esEscaneoDesdeAndroid(req);
+
+            // Validar vigencia
+            const membresiaActiva = await this.clienteMembresiaDao.getActivaPorCliente(cliente.id);
+
+            if (!membresiaActiva) {
+                const historial = await this.clienteMembresiaDao.getHistorialPorCliente(cliente.id);
+                const ultima = Array.isArray(historial) && historial.length > 0 ? historial[0] : null;
+                let mensajeDetalle = 'Membresía inexistente o no asignada';
+                if (ultima?.fechaFin) {
+                    const f = new Date(ultima.fechaFin);
+                    const d = String(f.getUTCDate()).padStart(2, '0');
+                    const m = String(f.getUTCMonth() + 1).padStart(2, '0');
+                    const y = f.getUTCFullYear();
+                    mensajeDetalle = `Membresía vencida el ${d}/${m}/${y}`;
+                }
+
+                await this.notificarQr({
+                    cliente,
+                    acceso: false,
+                    mensajeDetalle,
+                    membresia: ultima,
+                    diasRestantes: 0,
+                    scannerUsuarioId,
+                    empresaId,
+                    sucursalId,
+                    desdeAndroid,
+                });
+
+                return res.status(200).json({
+                    responseFlag: 0,
+                    data: {
+                        acceso: false,
+                        codigo: 'MEMBRESIA_NO_VIGENTE',
+                        cliente,
+                        membresia: ultima,
+                        diasRestantes: 0,
+                        fechaExpiracion: ultima?.fechaFin ?? null,
+                        mensaje: mensajeDetalle,
+                    },
+                    message: `Acceso denegado: ${mensajeDetalle}`
+                });
+            }
+
+            // Registrar asistencia de inmediato
+            const asistencia = await this.dao.create({
+                clienteId: cliente.id,
+                clienteMembresiaId: membresiaActiva.id,
+                observaciones: observaciones ? observaciones.trim() : 'Ingreso por escaneo rápido',
+                fechaHora: new Date()
+            });
+
+            const asistenciaCompleta = await this.dao.getById(asistencia.id);
+            const diasRestantes = calcularDiasRestantesFecha(membresiaActiva.fechaFin);
+
+            await this.notificarQr({
+                cliente,
+                acceso: true,
+                mensajeDetalle: 'Acceso registrado correctamente',
+                membresia: membresiaActiva,
+                diasRestantes,
+                scannerUsuarioId,
+                empresaId,
+                sucursalId,
+                desdeAndroid,
+            });
+
+            return res.status(200).json({
+                responseFlag: 0,
+                data: {
+                    acceso: true,
+                    codigo: 'ACCESO_AUTORIZADO',
+                    cliente,
+                    membresia: membresiaActiva,
+                    asistencia: asistenciaCompleta,
+                    diasRestantes,
+                    fechaExpiracion: membresiaActiva.fechaFin,
+                    mensaje: 'Acceso Autorizado - Membresía Vigente',
+                },
+                message: 'Acceso autorizado y registrado'
+            });
         } catch (error) {
             return this.respuestaError(res, error);
         }

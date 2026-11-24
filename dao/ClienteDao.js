@@ -127,6 +127,7 @@ export class ClienteDao extends BaseDao {
      */
     async buscarPorNombre(termino, { sucursalId: _sucursalId = null } = {}) {
         const consulta = String(termino ?? '').trim();
+        const idNumerico = /^\d+$/.test(consulta.replace('#', '')) ? Number(consulta.replace('#', '')) : null;
         const palabras = consulta.split(/\s+/).filter(Boolean);
         return this.model.findMany({
             where: {
@@ -137,6 +138,8 @@ export class ClienteDao extends BaseDao {
                     { apellidoMaterno: { contains: consulta } },
                     { correo:          { contains: consulta } },
                     { telefono:        { contains: consulta } },
+                    { codigoQr:        { contains: consulta } },
+                    ...(Number.isSafeInteger(idNumerico) && idNumerico > 0 ? [{ id: idNumerico }] : []),
                     ...(palabras.length > 1 ? [{
                         AND: palabras.map((p) => ({
                             OR: [
