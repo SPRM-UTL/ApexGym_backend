@@ -57,6 +57,8 @@ model Empresa {
   visitas                Visita[]
   transaccionesPagos     TransaccionPago[]
   pedidosCompra          PedidoCompra[]
+  almacenes              Almacen[]
+  inventariosAlmacen     InventarioAlmacen[]
 
   @@map("empresas")
 }
@@ -103,6 +105,8 @@ model Sucursal {
   asistencias            Asistencia[]
   visitas                Visita[]
   pedidosCompra          PedidoCompra[]
+  almacenes              Almacen[]
+  inventariosAlmacen     InventarioAlmacen[]
 
   @@index([empresaId], map: "idx_sucursales_empresa_id")
   @@map("sucursales")
@@ -710,8 +714,9 @@ model Producto {
   sucursalId          Int                   @default(1) @map("sucursal_id")
   sucursal            Sucursal              @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
   categoria           CategoriaProducto     @relation(fields: [categoriaProductoId], references: [id])
-  detallesVenta       DetalleVenta[]
+  detallesVenta        DetalleVenta[]
   detallesPedidoCompra DetallePedidoCompra[]
+  inventariosAlmacen   InventarioAlmacen[]
   @@map("producto")
 }
 
@@ -764,6 +769,7 @@ model DetalleVenta {
   tipoItem         TipoItem       @default(PRODUCTO) @map("tipo_item")
 
   productoId       Int?           @map("producto_id")
+  almacenId        Int?           @map("almacen_id")
   servicioId       Int?           @map("servicio_id")
   tipoMembresiaId  Int?           @map("tipo_membresia_id")
 
@@ -777,11 +783,13 @@ model DetalleVenta {
 
   venta            Venta              @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   producto         Producto?          @relation(fields: [productoId], references: [id])
+  almacen          Almacen?           @relation(fields: [almacenId], references: [id], onDelete: SetNull)
   servicio         Servicio?          @relation(fields: [servicioId], references: [id])
   tipoMembresia    TipoMembresia?     @relation(fields: [tipoMembresiaId], references: [id])
   clienteMembresia ClienteMembresia?  @relation(fields: [clienteMembresiaId], references: [id])
   devoluciones    DevolucionDetalle[]
 
+  @@index([almacenId], map: "idx_detalle_venta_almacen")
   @@map("detalle_venta")
 }
 model MetodoPago {
@@ -984,6 +992,7 @@ model DevolucionDetalle {
 enum TipoDestinatarioNotificacion {
   CLIENTE
   EMPLEADO
+  USUARIO
 }
 
 enum EstadoNotificacion {
@@ -995,6 +1004,7 @@ enum EstadoNotificacion {
 enum TipoDestinatarioDispositivo {
   CLIENTE
   EMPLEADO
+  USUARIO
 }
 
 model Notificacion {
@@ -1043,6 +1053,7 @@ model PedidoCompra {
   id                    Int                @id @default(autoincrement())
   empresaId             Int                @default(1) @map("empresa_id")
   sucursalId            Int                @default(1) @map("sucursal_id")
+  almacenId             Int?               @map("almacen_id")
   solicitanteEmpleadoId Int                @map("solicitante_empleado_id")
   validadorEmpleadoId   Int?               @map("validador_empleado_id")
   proveedor             String?            @db.VarChar(150)
@@ -1057,11 +1068,13 @@ model PedidoCompra {
 
   empresa             Empresa               @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   sucursal            Sucursal              @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  almacen             Almacen?              @relation(fields: [almacenId], references: [id], onDelete: SetNull)
   solicitanteEmpleado Empleado              @relation("PedidosCompraSolicitados", fields: [solicitanteEmpleadoId], references: [id], onDelete: Restrict)
   validadorEmpleado   Empleado?             @relation("PedidosCompraValidados", fields: [validadorEmpleadoId], references: [id], onDelete: SetNull)
   detalles            DetallePedidoCompra[]
 
   @@index([empresaId, sucursalId, estado], map: "idx_pedidos_compra_contexto_estado")
+  @@index([almacenId], map: "idx_pedidos_compra_almacen")
   @@index([solicitanteEmpleadoId], map: "idx_pedidos_compra_solicitante")
   @@index([validadorEmpleadoId], map: "idx_pedidos_compra_validador")
   @@map("pedidos_compra")
@@ -1081,4 +1094,52 @@ model DetallePedidoCompra {
   @@index([pedidoCompraId], map: "idx_detalle_pedido_compra_pedido")
   @@index([productoId], map: "idx_detalle_pedido_compra_producto")
   @@map("detalle_pedido_compra")
+}
+
+model Almacen {
+  id          Int       @id @default(autoincrement())
+  empresaId   Int       @default(1) @map("empresa_id")
+  sucursalId  Int       @default(1) @map("sucursal_id")
+  nombre      String    @db.VarChar(120)
+  codigo      String?   @db.VarChar(40)
+  tipo        String    @default("PRINCIPAL") @db.VarChar(40)
+  ubicacion   String?   @db.VarChar(200)
+  esPrincipal Boolean   @default(false) @map("es_principal")
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  empresa       Empresa             @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursal      Sucursal            @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  inventarios   InventarioAlmacen[]
+  detallesVenta DetalleVenta[]
+  pedidosCompra PedidoCompra[]
+
+  @@unique([empresaId, sucursalId, nombre])
+  @@index([empresaId, sucursalId, activo])
+  @@map("almacenes")
+}
+
+model InventarioAlmacen {
+  id               Int       @id @default(autoincrement())
+  empresaId        Int       @default(1) @map("empresa_id")
+  sucursalId       Int       @default(1) @map("sucursal_id")
+  almacenId        Int       @map("almacen_id")
+  productoId       Int       @map("producto_id")
+  stockActual      Int       @default(0) @map("stock_actual")
+  stockMinimo      Int       @default(1) @map("stock_minimo")
+  ubicacionEstante String?   @map("ubicacion_estante") @db.VarChar(100)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  almacen  Almacen  @relation(fields: [almacenId], references: [id], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([almacenId, productoId])
+  @@index([empresaId, sucursalId, productoId])
+  @@map("inventario_almacen")
 }

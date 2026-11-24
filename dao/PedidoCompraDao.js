@@ -6,6 +6,9 @@ const INCLUDE_PEDIDO = {
     sucursal: {
         select: { id: true, nombre: true, codigo: true },
     },
+    almacen: {
+        select: { id: true, nombre: true, codigo: true, esPrincipal: true },
+    },
     solicitanteEmpleado: {
         select: { id: true, usuarioId: true, nombre: true, apellidoPaterno: true, apellidoMaterno: true },
     },
@@ -94,6 +97,7 @@ export class PedidoCompraDao extends BaseDao {
     async crearPedido({
         empresaId,
         sucursalId,
+        almacenId = null,
         solicitanteEmpleadoId,
         proveedor = null,
         observaciones = null,
@@ -103,6 +107,13 @@ export class PedidoCompraDao extends BaseDao {
         const sucId = Number(sucursalId);
         if (!Number.isInteger(sucId) || sucId < 1) {
             throw crearErrorPedido('Selecciona una sucursal válida para el pedido de compra', 400);
+        }
+        let idAlmacen = null;
+        if (almacenId !== undefined && almacenId !== null && almacenId !== '') {
+            idAlmacen = Number(almacenId);
+            if (!Number.isSafeInteger(idAlmacen) || idAlmacen < 1) {
+                throw crearErrorPedido('Selecciona un almacén válido para el pedido de compra', 400);
+            }
         }
 
         // Consolida productos repetidos preservando el costo unitario más reciente enviado si existe.
@@ -124,6 +135,22 @@ export class PedidoCompraDao extends BaseDao {
         const productoIds = Array.from(consolidado.keys());
 
         return this.prisma.$transaction(async (tx) => {
+            if (idAlmacen && typeof tx.almacen?.findFirst === 'function') {
+                const almacen = await tx.almacen.findFirst({
+                    where: {
+                        id: idAlmacen,
+                        empresaId: empId,
+                        sucursalId: sucId,
+                        activo: true,
+                        deletedAt: null,
+                    },
+                    select: { id: true },
+                });
+                if (!almacen) {
+                    throw crearErrorPedido(`El almacén #${idAlmacen} no existe en la sucursal seleccionada`, 404);
+                }
+            }
+
             const productos = await tx.producto.findMany({
                 where: {
                     id: { in: productoIds },
@@ -162,6 +189,7 @@ export class PedidoCompraDao extends BaseDao {
                 data: {
                     empresaId: empId,
                     sucursalId: sucId,
+                    ...(idAlmacen ? { almacenId: idAlmacen } : {}),
                     solicitanteEmpleadoId: Number(solicitanteEmpleadoId),
                     proveedor: proveedor ? proveedor.trim() : null,
                     observaciones: observaciones ? observaciones.trim() : null,
@@ -218,11 +246,47 @@ export class PedidoCompraDao extends BaseDao {
                 where: { id: pedidoId },
                 select: {
                     id: true,
+                    empresaId: true,
+                    sucursalId: true,
+                    almacenId: true,
                     detalles: {
                         select: { productoId: true, cantidad: true },
                     },
                 },
             });
+
+            let almacenDestinoId = pedidoConDetalles?.almacenId ?? null;
+            const empPedido = pedidoConDetalles?.empresaId ?? empId;
+            const sucPedido = pedidoConDetalles?.sucursalId ?? 1;
+
+            if (!almacenDestinoId && typeof tx.almacen?.findFirst === 'function') {
+                const almacenPrincipal = await tx.almacen.findFirst({
+                    where: {
+                        empresaId: empPedido,
+                        sucursalId: sucPedido,
+                        deletedAt: null,
+                    },
+                    orderBy: [{ esPrincipal: 'desc' }, { id: 'asc' }],
+                    select: { id: true },
+                });
+                if (almacenPrincipal) {
+                    almacenDestinoId = almacenPrincipal.id;
+                } else if (typeof tx.almacen?.create === 'function') {
+                    const creado = await tx.almacen.create({
+                        data: {
+                            empresaId: empPedido,
+                            sucursalId: sucPedido,
+                            nombre: 'Almacén Principal',
+                            codigo: 'ALM-01',
+                            tipo: 'PRINCIPAL',
+                            esPrincipal: true,
+                            activo: true,
+                        },
+                        select: { id: true },
+                    });
+                    almacenDestinoId = creado.id;
+                }
+            }
 
             for (const detalle of pedidoConDetalles?.detalles ?? []) {
                 const prodRes = await tx.producto.updateMany({
@@ -240,6 +304,31 @@ export class PedidoCompraDao extends BaseDao {
                         `El producto #${detalle.productoId} no está disponible para actualizar inventario`,
                         409
                     );
+                }
+
+                if (almacenDestinoId && typeof tx.inventarioAlmacen?.upsert === 'function') {
+                    await tx.inventarioAlmacen.upsert({
+                        where: {
+                            almacenId_productoId: {
+                                almacenId: almacenDestinoId,
+                                productoId: detalle.productoId,
+                            },
+                        },
+                        update: {
+                            empresaId: empPedido,
+                            sucursalId: sucPedido,
+                            stockActual: { increment: detalle.cantidad },
+                            deletedAt: null,
+                        },
+                        create: {
+                            empresaId: empPedido,
+                            sucursalId: sucPedido,
+                            almacenId: almacenDestinoId,
+                            productoId: detalle.productoId,
+                            stockActual: detalle.cantidad,
+                            stockMinimo: 1,
+                        },
+                    });
                 }
             }
 

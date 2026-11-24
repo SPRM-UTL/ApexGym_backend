@@ -76,6 +76,7 @@ async function obtenerEstadoDetallesVenta(tx, idVenta) {
             id: true,
             tipoItem: true,
             productoId: true,
+            almacenId: true,
             servicioId: true,
             tipoMembresiaId: true,
             descripcion: true,
@@ -230,6 +231,35 @@ async function aplicarStockDevolucion(tx, detalles) {
         });
         if (productoActualizado.count !== 1) {
             throw crearError(`No se pudo regresar al inventario el producto ${detalle.productoId}`, 409);
+        }
+
+        if (typeof tx.inventarioAlmacen?.findMany === 'function') {
+            let almacenIdDestino = detalle.almacenId ?? null;
+            if (!almacenIdDestino && typeof tx.detalleVenta?.findUnique === 'function' && detalle.detalleVentaId) {
+                const dv = await tx.detalleVenta.findUnique({
+                    where: { id: detalle.detalleVentaId },
+                    select: { almacenId: true },
+                });
+                almacenIdDestino = dv?.almacenId ?? null;
+            }
+            const inventarios = await tx.inventarioAlmacen.findMany({
+                where: {
+                    productoId: detalle.productoId,
+                    deletedAt: null,
+                    almacen: { deletedAt: null, activo: true },
+                },
+                include: { almacen: { select: { id: true, esPrincipal: true, empresaId: true, sucursalId: true } } },
+                orderBy: [{ almacen: { esPrincipal: 'desc' } }, { id: 'asc' }],
+            });
+            const objetivo = almacenIdDestino
+                ? inventarios.find((inv) => inv.almacenId === almacenIdDestino)
+                : (inventarios.find((inv) => inv.almacen?.esPrincipal) ?? inventarios[0]);
+            if (objetivo) {
+                await tx.inventarioAlmacen.update({
+                    where: { id: objetivo.id },
+                    data: { stockActual: { increment: detalle.cantidad } },
+                });
+            }
         }
     }
 }

@@ -41,10 +41,14 @@ import { VisitaController } from '../controller/VisitaController.js';
 
 import { PagoController } from '../controller/PagoController.js';
 import { PedidoCompraController } from '../controller/PedidoCompraController.js';
+import { AlmacenController } from '../controller/AlmacenController.js';
+import { ReporteController } from '../controller/ReporteController.js';
+import { actividadEmpleadoMiddleware } from '../middleware/actividadEmpleadoMiddleware.js';
 import { notificacionRoutes } from './notificacionRoutes.js';
 import { dispositivoRoutes } from './dispositivoRoutes.js';
 
 const router = express.Router();
+router.use(actividadEmpleadoMiddleware);
 
 const esClienteRequest = (req) => {
     return Boolean(
@@ -127,6 +131,10 @@ const asistenciaController = new AsistenciaController();
 const asistenciaRoutes = express.Router();
 const visitaController = new VisitaController();
 const visitaRoutes = express.Router();
+const almacenController = new AlmacenController();
+const almacenRoutes = express.Router();
+const reporteController = new ReporteController();
+const reporteRoutes = express.Router();
 
 // ── Rutas públicas (sin autenticación) ──────────────────────────────────────
 usuarioRoutes.post('/verificarCredenciales', usuarioController.verificarCredenciales.bind(usuarioController));
@@ -897,7 +905,7 @@ clienteMembresiaRoutes.delete(
     verificarPermiso('Clientes', 'Eliminar'),
     clienteMembresiaController.eliminar.bind(clienteMembresiaController)
 );
-//---Rutas Médodos de Pago-------------------------
+//---Rutas Métodos de Pago-------------------------
 
 
 
@@ -906,7 +914,7 @@ metodoPagoRoutes.get(
     autenticarUsuario,
     (req, res, next) => {
         if (esClienteRequest(req)) return next();
-        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+        return verificarPermiso('Métodos de Pago', 'Listar')(req, res, next);
     },
     metodoPagoController.obtenerActivos.bind(metodoPagoController)
 );
@@ -915,7 +923,7 @@ metodoPagoRoutes.get(
     autenticarUsuario,
     (req, res, next) => {
         if (esClienteRequest(req)) return next();
-        return verificarPermiso('Metodos de Pago', 'Listar')(req, res, next);
+        return verificarPermiso('Métodos de Pago', 'Listar')(req, res, next);
     },
     metodoPagoController.obtenerTodos.bind(metodoPagoController)
 );
@@ -923,21 +931,21 @@ metodoPagoRoutes.get(
 metodoPagoRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago', 'Crear'),
+    verificarPermiso('Métodos de Pago', 'Crear'),
     metodoPagoController.crear.bind(metodoPagoController)
 );
 
 metodoPagoRoutes.put(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago', 'Editar'),
+    verificarPermiso('Métodos de Pago', 'Editar'),
     metodoPagoController.actualizar.bind(metodoPagoController)
 );
 
 metodoPagoRoutes.delete(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Metodos de Pago', 'Eliminar'),
+    verificarPermiso('Métodos de Pago', 'Eliminar'),
     metodoPagoController.eliminar.bind(metodoPagoController)
 );
 
@@ -968,6 +976,13 @@ ventaRoutes.get(
     },
     ventaController.consultarEstadoPago.bind(ventaController)
 )
+
+ventaRoutes.post(
+    '/sincronizar-offline',
+    autenticarUsuario,
+    verificarPermiso('Ventas', 'Crear'),
+    ventaController.sincronizarOffline.bind(ventaController)
+);
 
 ventaRoutes.post(
     '/:id/pago/checkout',
@@ -1344,6 +1359,86 @@ pedidoCompraRoutes.post(
 );
 
 router.use('/pedidos-compra', pedidoCompraRoutes);
+
+// ─── Multialmacenes por sucursal ────────────────────────────────────────────
+almacenRoutes.get(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Listar'),
+    almacenController.obtenerTodos.bind(almacenController)
+);
+almacenRoutes.post(
+    '/transferir',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Editar'),
+    almacenController.transferirStock.bind(almacenController)
+);
+almacenRoutes.post(
+    '/',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Crear'),
+    almacenController.crear.bind(almacenController)
+);
+almacenRoutes.get(
+    '/:id/inventario',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Listar'),
+    almacenController.obtenerInventario.bind(almacenController)
+);
+almacenRoutes.put(
+    '/:id/inventario/:productoId',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Editar'),
+    almacenController.ajustarStock.bind(almacenController)
+);
+almacenRoutes.get(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Listar'),
+    almacenController.obtenerPorId.bind(almacenController)
+);
+almacenRoutes.put(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Editar'),
+    almacenController.actualizar.bind(almacenController)
+);
+almacenRoutes.delete(
+    '/:id',
+    autenticarUsuario,
+    verificarPermiso('Almacenes', 'Eliminar'),
+    almacenController.eliminar.bind(almacenController)
+);
+
+router.use('/almacenes', almacenRoutes);
+
+// ─── Dashboard y Reportes ───────────────────────────────────────────────────
+reporteRoutes.get(
+    '/resumen',
+    autenticarUsuario,
+    verificarPermiso('Dashboard y Reportes', 'Listar'),
+    reporteController.obtenerResumen.bind(reporteController)
+);
+reporteRoutes.get(
+    '/ventas',
+    autenticarUsuario,
+    verificarPermiso('Dashboard y Reportes', 'Listar'),
+    reporteController.obtenerVentas.bind(reporteController)
+);
+reporteRoutes.get(
+    '/rendimiento',
+    autenticarUsuario,
+    verificarPermiso('Dashboard y Reportes', 'Listar'),
+    reporteController.obtenerRendimiento.bind(reporteController)
+);
+reporteRoutes.get(
+    '/top-productos',
+    autenticarUsuario,
+    verificarPermiso('Dashboard y Reportes', 'Listar'),
+    reporteController.obtenerTopProductos.bind(reporteController)
+);
+
+router.use('/reportes', reporteRoutes);
 
 // ─── Webhook de Mercado Pago para el flujo de ventas ────────────────────────
 pagoRoutes.post('/webhook', pagoController.recibirWebhook.bind(pagoController));

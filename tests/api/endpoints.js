@@ -41,5 +41,7 @@ export const protegidos = [
     '/api/movimientos-caja',
     '/api/cortes-caja',
     '/api/ventas',
+    '/api/almacenes',
+    '/api/reportes/resumen',
 ].map((ruta) => ({ nombre: `GET ${ruta}`, metodo: 'GET', ruta, esperado: 200 }));
 

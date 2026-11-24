@@ -531,15 +531,37 @@ async function sembrarEjemplos(ejemplos) {
 
     for (const item of ejemplos.productos ?? []) {
         const categoria = exigir(categorias, item.categoria, 'categorías de producto');
-        const data = {
+        const existente = await prisma.producto.findUnique({
+            where: { codigoBarras: item.codigoBarras },
+            select: {
+                id: true,
+                _count: {
+                    select: {
+                        inventariosAlmacen: { where: { deletedAt: null } },
+                    },
+                },
+            },
+        });
+        const tieneInventarioAlmacen = (existente?._count?.inventariosAlmacen ?? 0) > 0;
+        const camposUpdate = tieneInventarioAlmacen
+            ? ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockMinimo', 'disponibleCompra']
+            : ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockActual', 'stockMinimo', 'disponibleCompra'];
+
+        const dataCreate = {
             ...tomar(item, ['nombre', 'descripcion', 'precioVenta', 'precioCompra', 'stockActual', 'stockMinimo', 'disponibleCompra']),
             estado: normalizarEstadoCatalogo(item.estado),
             categoriaProductoId: categoria.id,
         };
+        const dataUpdate = {
+            ...tomar(item, camposUpdate),
+            estado: normalizarEstadoCatalogo(item.estado),
+            categoriaProductoId: categoria.id,
+        };
+
         await prisma.producto.upsert({
             where: { codigoBarras: item.codigoBarras },
-            update: { ...data, deletedAt: null },
-            create: { ...data, codigoBarras: item.codigoBarras },
+            update: { ...dataUpdate, deletedAt: null },
+            create: { ...dataCreate, codigoBarras: item.codigoBarras },
         });
     }
 
@@ -578,7 +600,8 @@ async function sembrarEjemplos(ejemplos) {
     for (const item of ejemplos.empleados ?? []) {
         const puesto = exigir(puestos, `${item.area}::${item.puesto}`, 'puestos');
         const area = exigir(areas, item.area, 'áreas de trabajo');
-        const estado = exigir(estadosEmpleado, item.estado, 'estados de empleado');
+        const estadoNombre = item.estadoEmpleado ?? (estadosEmpleado.has(item.estado) ? item.estado : 'Activo');
+        const estado = exigir(estadosEmpleado, estadoNombre, 'estados de empleado');
         const usuario = item.usuarioEmail
             ? await prisma.usuario.findUnique({ where: { email: item.usuarioEmail } })
             : null;
@@ -750,6 +773,140 @@ async function sembrarEjemplos(ejemplos) {
     console.log('Registros de ejemplo sincronizados.');
 }
 
+async function asegurarAlmacenesEInventarioInicial() {
+    const empresaId = 1;
+    const sucursalId = 1;
+
+    const otroPrincipal = await prisma.almacen.findFirst({
+        where: {
+            empresaId,
+            sucursalId,
+            esPrincipal: true,
+            deletedAt: null,
+            nombre: { not: 'Almacén Principal' },
+        },
+        select: { id: true },
+    });
+
+    const almacenPrincipal = await prisma.almacen.upsert({
+        where: {
+            empresaId_sucursalId_nombre: {
+                empresaId,
+                sucursalId,
+                nombre: 'Almacén Principal',
+            },
+        },
+        update: {
+            ...(otroPrincipal ? {} : { esPrincipal: true }),
+            activo: true,
+            deletedAt: null,
+        },
+        create: {
+            empresaId,
+            sucursalId,
+            nombre: 'Almacén Principal',
+            codigo: 'ALM-01',
+            tipo: 'PRINCIPAL',
+            ubicacion: 'Mostrador y piso principal (Sucursal Matriz)',
+            esPrincipal: !otroPrincipal,
+            activo: true,
+        },
+    });
+
+    const bodegaGeneral = await prisma.almacen.upsert({
+        where: {
+            empresaId_sucursalId_nombre: {
+                empresaId,
+                sucursalId,
+                nombre: 'Bodega General',
+            },
+        },
+        update: {
+            esPrincipal: false,
+            activo: true,
+            deletedAt: null,
+        },
+        create: {
+            empresaId,
+            sucursalId,
+            nombre: 'Bodega General',
+            codigo: 'BOD-01',
+            tipo: 'BODEGA',
+            ubicacion: 'Bodega interna de respaldo (Sucursal Matriz)',
+            esPrincipal: false,
+            activo: true,
+        },
+    });
+
+    const productosSucursal = await prisma.producto.findMany({
+        where: { empresaId, sucursalId, deletedAt: null },
+        select: { id: true, stockActual: true, stockMinimo: true },
+    });
+
+    let inicializados = 0;
+    for (const prod of productosSucursal) {
+        const inventariosExistentes = await prisma.inventarioAlmacen.findMany({
+            where: { productoId: prod.id, deletedAt: null },
+            select: { id: true, almacenId: true },
+        });
+
+        if (inventariosExistentes.length === 0) {
+            await prisma.inventarioAlmacen.upsert({
+                where: {
+                    almacenId_productoId: {
+                        almacenId: almacenPrincipal.id,
+                        productoId: prod.id,
+                    },
+                },
+                update: {
+                    empresaId,
+                    sucursalId,
+                    stockActual: Math.max(0, Number(prod.stockActual ?? 0)),
+                    stockMinimo: Math.max(0, Number(prod.stockMinimo ?? 1)),
+                    deletedAt: null,
+                },
+                create: {
+                    empresaId,
+                    sucursalId,
+                    almacenId: almacenPrincipal.id,
+                    productoId: prod.id,
+                    stockActual: Math.max(0, Number(prod.stockActual ?? 0)),
+                    stockMinimo: Math.max(0, Number(prod.stockMinimo ?? 1)),
+                },
+            });
+
+            await prisma.inventarioAlmacen.upsert({
+                where: {
+                    almacenId_productoId: {
+                        almacenId: bodegaGeneral.id,
+                        productoId: prod.id,
+                    },
+                },
+                update: {
+                    empresaId,
+                    sucursalId,
+                    stockActual: 0,
+                    stockMinimo: 0,
+                    deletedAt: null,
+                },
+                create: {
+                    empresaId,
+                    sucursalId,
+                    almacenId: bodegaGeneral.id,
+                    productoId: prod.id,
+                    stockActual: 0,
+                    stockMinimo: 0,
+                },
+            });
+            inicializados += 1;
+        }
+    }
+
+    console.log(
+        `Almacenes Sucursal 1 asegurados: ${almacenPrincipal.nombre} (id=${almacenPrincipal.id}), ${bodegaGeneral.nombre} (id=${bodegaGeneral.id}). Productos inicializados en inventario_almacen: ${inicializados}.`
+    );
+}
+
 async function main() {
     console.log('Iniciando seed declarativo...');
 
@@ -882,6 +1039,7 @@ async function main() {
     console.log('Configuraciones del sistema sincronizadas.');
 
     await sembrarEjemplos(seedData.ejemplos);
+    await asegurarAlmacenesEInventarioInicial();
 
     console.log('Seed completado correctamente.');
 }
