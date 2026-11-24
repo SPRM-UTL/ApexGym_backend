@@ -307,3 +307,137 @@ test('VentaController.sincronizarOffline exige efectivo, deduplica uuidIdempoten
     assert.equal(ventasCreadas.length, 1);
     assert.equal(ventasCreadas[0].uuidIdempotencia, 'uuid-nueva-001');
 });
+
+test('PagoService valida token MP_ACCESS_TOKEN y TTL de expiración de checkout', () => {
+    const sinToken = new PagoService({ env: {} });
+    assert.throws(() => sinToken.validarConfiguracionSandbox(), (err) => err.status === 503);
+
+    const tokenInvalido = new PagoService({ env: { MP_ACCESS_TOKEN: 'INVALIDO-123' } });
+    assert.throws(() => tokenInvalido.validarConfiguracionSandbox(), (err) => err.status === 503);
+
+    const tokenTest = new PagoService({ env: { MP_ACCESS_TOKEN: 'TEST-token-ok' } });
+    assert.doesNotThrow(() => tokenTest.validarConfiguracionSandbox());
+
+    const tokenProd = new PagoService({ env: { MP_ACCESS_TOKEN: 'APP_USR-token-ok', MP_PAYMENT_TTL_MINUTES: '45' } });
+    assert.doesNotThrow(() => tokenProd.validarConfiguracionSandbox());
+
+    const base = new Date('2026-11-24T12:00:00.000Z');
+    const expira = tokenProd.obtenerExpiracionPagoDigital(base);
+    assert.equal(expira.toISOString(), '2026-11-24T12:45:00.000Z');
+
+    const ttlInvalido = new PagoService({ env: { MP_ACCESS_TOKEN: 'TEST-ok', MP_PAYMENT_TTL_MINUTES: '0' } });
+    assert.throws(() => ttlInvalido.obtenerExpiracionPagoDigital(base), (err) => err.status === 503);
+
+    const ttlExcedido = new PagoService({ env: { MP_ACCESS_TOKEN: 'TEST-ok', MP_PAYMENT_TTL_MINUTES: '2000' } });
+    assert.throws(() => ttlExcedido.obtenerExpiracionPagoDigital(base), (err) => err.status === 503);
+});
+
+test('PagoService.registrarMovimientoCobro marca PENDIENTE en TRANSFERENCIA y evita duplicados por transaccionPagoId', async () => {
+    const service = new PagoService({ env: { MP_ACCESS_TOKEN: 'TEST-1234' } });
+    const creados = [];
+    const actualizados = [];
+
+    const tx = {
+        movimientoCaja: {
+            findFirst: async () => null,
+            create: async ({ data }) => {
+                creados.push(data);
+                return { id: 91, ...data };
+            },
+        },
+    };
+
+    const movTransferencia = await service.registrarMovimientoCobro(tx, {
+        empresaId: 1,
+        sucursalId: 1,
+        aperturaCajaId: 5,
+        empleadoId: 2,
+        ventaId: 100,
+        transaccionPagoId: 500,
+        monto: 320,
+        proveedor: 'TRANSFERENCIA',
+    });
+
+    assert.equal(movTransferencia.estado, 'PENDIENTE');
+    assert.equal(movTransferencia.afectaEfectivo, false);
+    assert.equal(creados.length, 1);
+
+    const txExistente = {
+        movimientoCaja: {
+            findFirst: async () => ({ id: 91, estado: 'PENDIENTE' }),
+            update: async ({ where, data }) => {
+                actualizados.push({ id: where.id, data });
+                return { id: where.id, ...data };
+            },
+        },
+    };
+
+    const movValidado = await service.registrarMovimientoCobro(txExistente, {
+        empresaId: 1,
+        sucursalId: 1,
+        aperturaCajaId: 5,
+        empleadoId: 2,
+        ventaId: 100,
+        transaccionPagoId: 500,
+        monto: 320,
+        proveedor: 'TRANSFERENCIA',
+        estado: 'VALIDADO',
+    });
+
+    assert.equal(movValidado.estado, 'VALIDADO');
+    assert.equal(actualizados.length, 1);
+});
+
+test('resolverCobroPresencial y registrarCobroVenta rechazan tarjeta inválida y montos no válidos', async () => {
+    assert.throws(
+        () => resolverCobroPresencial({
+            proveedor: 'TERMINAL_MANUAL',
+            monto: 100,
+            tipoTarjeta: 'PREPAGO',
+            exigirDatosCompletos: true,
+        }),
+        /CREDITO o DEBITO/i
+    );
+
+    assert.throws(
+        () => resolverCobroPresencial({
+            proveedor: 'TERMINAL_MANUAL',
+            monto: 100,
+            folioVoucher: 'V'.repeat(101),
+            exigirDatosCompletos: true,
+        }),
+        /100 caracteres/i
+    );
+
+    const service = new PagoService({ env: { MP_ACCESS_TOKEN: 'TEST-1234' } });
+    const txDummy = { transaccionPago: {} };
+    await assert.rejects(
+        () => service.registrarCobroVenta(txDummy, {
+            empresaId: 0,
+            sucursalId: 1,
+            ventaId: 10,
+            aperturaCajaId: 1,
+            empleadoId: 1,
+            folioVenta: 100,
+            proveedor: 'EFECTIVO',
+            monto: 50,
+            efectivoRecibido: 50,
+        }),
+        /empresaId/i
+    );
+
+    await assert.rejects(
+        () => service.registrarCobroVenta(txDummy, {
+            empresaId: 1,
+            sucursalId: 1,
+            ventaId: 10,
+            aperturaCajaId: 1,
+            empleadoId: 1,
+            folioVenta: 100,
+            proveedor: 'EFECTIVO',
+            monto: -10,
+            efectivoRecibido: 50,
+        }),
+        /monto del cobro no es válido/i
+    );
+});
