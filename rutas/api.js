@@ -68,6 +68,7 @@ const uploadImagenUsuario = uploadImagen('usuarios', {
 const uploadImagenEmpleado = uploadImagen('empleados');
 const uploadImagenProducto = uploadImagen('productos');
 const uploadImagenServicio = uploadImagen('servicios');
+const uploadImagenMembresia = uploadImagen('mebresias');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -804,12 +805,14 @@ tipoMembresiaRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Crear'),
+    uploadImagenMembresia,
     tipoMembresiaController.crear.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Editar'),
+    uploadImagenMembresia,
     tipoMembresiaController.actualizar.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.delete(
