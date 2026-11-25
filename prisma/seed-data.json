@@ -395,6 +395,19 @@
             "Eliminar"
           ],
           "orden": 3
+        },
+        {
+          "nombre": "Pedidos de Compra",
+          "descripcion": "Revisión, aprobación y seguimiento de pedidos de compra de inventario",
+          "imagenUrl": "https://images.unsplash.com/photo-1553413077-190dd305871c?w=400&q=80",
+          "imagenPublicId": null,
+          "acciones": [
+            "Listar",
+            "Crear",
+            "Editar",
+            "Eliminar"
+          ],
+          "orden": 4
         }
       ],
       "orden": 5

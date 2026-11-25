@@ -1330,31 +1330,31 @@ router.use('/dispositivos', dispositivoRoutes);
 pedidoCompraRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Listar'),
+    verificarPermiso('Pedidos de Compra', 'Listar'),
     pedidoCompraController.obtenerTodos.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.get(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Listar'),
+    verificarPermiso('Pedidos de Compra', 'Listar'),
     pedidoCompraController.obtenerPorId.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Crear'),
+    verificarPermiso('Pedidos de Compra', 'Crear'),
     pedidoCompraController.crear.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/:id/aprobar',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Editar'),
+    verificarPermiso('Pedidos de Compra', 'Editar'),
     pedidoCompraController.aprobar.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/:id/rechazar',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Editar'),
+    verificarPermiso('Pedidos de Compra', 'Editar'),
     pedidoCompraController.rechazar.bind(pedidoCompraController)
 );
 
