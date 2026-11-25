@@ -9,12 +9,12 @@ export class VisitaController extends BaseController {
 
     /**
      * POST /api/visitas
-     * Registra un visitante eventual sin membresía.
-     * Body: { nombreVisitante, tipoVisitaId, observaciones? }
+     * Registra un visitante eventual sin membresía e integra el cobro en Caja.
+     * Body: { nombreVisitante, tipoVisitaId, observaciones?, metodoPago? }
      */
     crear = async (req, res) => {
         try {
-            const { nombreVisitante, tipoVisitaId, observaciones } = req.body;
+            const { nombreVisitante, tipoVisitaId, observaciones, metodoPago = 'EFECTIVO' } = req.body;
 
             // Validaciones
             if (!nombreVisitante?.trim()) throw new Error('El nombre del visitante es requerido');
@@ -24,8 +24,14 @@ export class VisitaController extends BaseController {
             const tipoVisita = await tipoVisitaDao.getById(Number(tipoVisitaId));
             if (!tipoVisita) throw new Error('El tipo de visita especificado no existe');
 
+            const empresaId = this.obtenerEmpresaId(req);
+            const sucursalId = this.obtenerSucursalId(req);
+            const costoNumero = Number(tipoVisita.costo || 0);
+
             // Registrar la visita con el costo actual del catálogo
             const visita = await this.dao.create({
+                empresaId,
+                sucursalId: typeof sucursalId === 'number' ? sucursalId : 1,
                 nombreVisitante: nombreVisitante.trim(),
                 tipoVisitaId: Number(tipoVisitaId),
                 costo: tipoVisita.costo,
@@ -33,24 +39,55 @@ export class VisitaController extends BaseController {
                 fechaHora: new Date()
             });
 
+            // Registrar automáticamente el cobro en Caja si el costo es mayor a 0
+            let movimientoCaja = null;
+            if (costoNumero > 0) {
+                try {
+                    const cajaActiva = await this.dao.prisma.aperturaCaja.findFirst({
+                        where: {
+                            ...(typeof sucursalId === 'number' ? { sucursalId } : { empresaId }),
+                            estado: 'ABIERTA',
+                            deletedAt: null,
+                        },
+                        orderBy: { id: 'desc' },
+                    });
+
+                    if (cajaActiva) {
+                        const empleadoId = req.usuario?.empleadoId ?? req.user?.empleadoId ?? cajaActiva.empleadoId;
+                        const metodoNormalizado = String(metodoPago || 'EFECTIVO').toUpperCase();
+                        const esEfectivo = metodoNormalizado === 'EFECTIVO';
+
+                        movimientoCaja = await this.dao.prisma.movimientoCaja.create({
+                            data: {
+                                empresaId,
+                                sucursalId: cajaActiva.sucursalId,
+                                aperturaCajaId: cajaActiva.id,
+                                empleadoId,
+                                tipo: 'ENTRADA',
+                                origen: 'MANUAL',
+                                monto: costoNumero,
+                                concepto: `Cobro Visita: ${nombreVisitante.trim()} (${tipoVisita.nombre})`,
+                                estado: 'VALIDADO',
+                                afectaEfectivo: esEfectivo,
+                                observaciones: `Pase temporal en recepción. Método: ${metodoNormalizado}`,
+                            }
+                        });
+                    }
+                } catch (cajaErr) {
+                    console.error('Advertencia: No se pudo registrar movimiento de caja para visita:', cajaErr);
+                }
+            }
+
             // Obtener visita completa con relaciones para la respuesta
             const visitaCompleta = await this.dao.getById(visita.id);
 
-            /* ── MOVIMIENTO DE CAJA (pendiente de activar) ──────────────────────
-             * Cuando se confirme la integración con caja, descomentar este bloque:
-             *
-             * import { movimientoCajaDao } from '../dao/MovimientoCajaDao.js';
-             * await movimientoCajaDao.create({
-             *     aperturaCajaId: req.aperturaCajaActiva.id,  // obtenido del middleware o session
-             *     empleadoId: req.usuario.empleadoId,
-             *     tipo: 'ENTRADA',
-             *     monto: tipoVisita.costo,
-             *     concepto: `Visita temporal - ${nombreVisitante.trim()}`,
-             *     estado: 'COMPLETADO'
-             * });
-             * ────────────────────────────────────────────────────────────────── */
-
-            return this.respuestaExito(res, visitaCompleta, 'Visita registrada correctamente');
+            return this.respuestaExito(
+                res,
+                { ...visitaCompleta, movimientoCaja },
+                movimientoCaja
+                    ? `Visita registrada y cobro de $${costoNumero.toFixed(2)} registrado en caja`
+                    : 'Visita registrada correctamente'
+            );
         } catch (error) {
             return this.respuestaError(res, error);
         }
