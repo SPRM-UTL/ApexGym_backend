@@ -295,8 +295,16 @@ async getById(id, clientOrEmpresaId = 1) {
                 { estado: { in: ['cancelada', 'cancelado'] } },
             ],
         },
-        omit: this.omit,
+        omit: {
+            updatedAt: true,
+            deletedAt: true,
+        },
         include: {
+            folioVenta: {
+                select: {
+                    id: true,
+                },
+            },
             cliente: {
                 select: {
                     id: true,
