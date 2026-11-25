@@ -1,9 +1,12 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { getApps } from 'firebase-admin/app';
+import { pool } from '../../dao/BaseDao.js';
 import { DispositivoController } from '../../controller/DispositivoController.js';
 import { firebaseMessaging } from '../../services/firebaseAdmin.js';
 import { enviarPushNotificacion } from '../../services/notificacionesPush.js';
+
+after(() => pool.end());
 
 function crearRespuesta() {
     return {

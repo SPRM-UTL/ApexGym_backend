@@ -32,7 +32,25 @@ export class DispositivoController {
                 where: { usuarioId, empresaId, deletedAt: null },
                 select: { id: true },
             });
-            const tipo = cliente ? 'CLIENTE' : empleado ? 'EMPLEADO' : null;
+
+            let tipo = cliente ? 'CLIENTE' : empleado ? 'EMPLEADO' : null;
+            if (!tipo && typeof this.prisma.usuarioRol?.findFirst === 'function') {
+                const rolAdmin = await this.prisma.usuarioRol.findFirst({
+                    where: {
+                        usuarioId,
+                        deletedAt: null,
+                        rol: {
+                            deletedAt: null,
+                            nombre: { not: 'Cliente' },
+                        },
+                    },
+                    include: { rol: { select: { nombre: true } } },
+                });
+                if (rolAdmin && rolAdmin.rol?.nombre?.toLowerCase() !== 'cliente') {
+                    tipo = 'USUARIO';
+                }
+            }
+
             if (!tipo) {
                 return res.status(403).json(new ResponseModel(null, 1, 'La cuenta no tiene un cliente o empleado activo asociado', 403));
             }

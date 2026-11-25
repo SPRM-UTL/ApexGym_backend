@@ -139,12 +139,7 @@ export class ServicioController extends BaseController {
                     400
                 ));
             }
-            const servicios = await servicioDao.getAll(
-                {
-                    disponibleCompra: true,
-                    estado: 'ACTIVO',
-                },
-                { id: 'desc' },
+            const servicios = await this.dao.obtenerDisponiblesParaVenta(
                 this.obtenerEmpresaId(req),
                 sucursalId
             );

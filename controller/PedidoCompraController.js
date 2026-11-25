@@ -135,7 +135,7 @@ export class PedidoCompraController extends BaseController {
     crear = async (req, res) => {
         try {
             const empleado = await this.resolverEmpleadoAutenticado(req);
-            const { proveedor, observaciones, detalles } = req.body ?? {};
+            const { proveedor, observaciones, detalles, almacenId } = req.body ?? {};
 
             if (proveedor !== undefined && proveedor !== null) {
                 if (typeof proveedor !== 'string' || proveedor.trim().length > 150) {
@@ -180,9 +180,19 @@ export class PedidoCompraController extends BaseController {
                 ? (empleado.sucursalId || 1)
                 : sucursalReq;
 
+            let almacenIdValidado = null;
+            if (almacenId !== undefined && almacenId !== null && almacenId !== '') {
+                const idAlm = Number(almacenId);
+                if (!Number.isSafeInteger(idAlm) || idAlm < 1) {
+                    throw crearErrorHttp('El identificador del almacén no es válido', 400);
+                }
+                almacenIdValidado = idAlm;
+            }
+
             const pedido = await this.dao.crearPedido({
                 empresaId: this.obtenerEmpresaId(req),
                 sucursalId,
+                almacenId: almacenIdValidado,
                 solicitanteEmpleadoId: empleado.id,
                 proveedor: proveedor ?? null,
                 observaciones: observaciones ?? null,

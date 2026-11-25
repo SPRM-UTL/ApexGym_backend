@@ -1228,6 +1228,7 @@ async create(data) {
                 folioVenta: nuevaVenta.folioVenta.id,
                 proveedor,
                 monto: total,
+                uuidIdempotencia: uuidIdempotencia ?? null,
                 efectivoRecibido: montoRecibido,
                 cambio,
             });
@@ -1613,6 +1614,7 @@ async prepararDetalles(tx, items, detallesViejos = [], contexto = {}) {
 
         let registro;
         let productoId = null;
+        let almacenId = null;
         let servicioId = null;
         let tipoMembresiaId = null;
         let precio;
@@ -1643,6 +1645,29 @@ async prepararDetalles(tx, items, detallesViejos = [], contexto = {}) {
                 }
 
                 const anterior = detallesAnteriores.get(productoId);
+                if (item.almacenId !== undefined && item.almacenId !== null && item.almacenId !== '') {
+                    const idAlmacen = this.validarId(item.almacenId, 'el almacén');
+                    if (typeof tx.almacen?.findFirst === 'function') {
+                        const almacen = await tx.almacen.findFirst({
+                            where: {
+                                id: idAlmacen,
+                                empresaId: contexto.empresaId,
+                                sucursalId: contexto.sucursalId,
+                                activo: true,
+                                deletedAt: null,
+                            },
+                            select: { id: true },
+                        });
+                        if (!almacen) {
+                            throw crearErrorArticuloNoDisponible(
+                                `El almacén ${idAlmacen} no existe o no está disponible en esta sucursal`
+                            );
+                        }
+                    }
+                    almacenId = idAlmacen;
+                } else if (anterior?.almacenId) {
+                    almacenId = anterior.almacenId;
+                }
 
                 precio =
                     anterior?.precioUnitario ??
@@ -1744,6 +1769,7 @@ async prepararDetalles(tx, items, detallesViejos = [], contexto = {}) {
         detalles.push({
             tipoItem,
             productoId,
+            ...(almacenId ? { almacenId } : {}),
             servicioId,
             tipoMembresiaId,
             clienteMembresiaId: null,
@@ -1766,13 +1792,17 @@ async ajustarStock(tx, detallesViejos, detallesNuevos) {
     const anteriores = filtrarProductos(detallesViejos);
     const nuevos = filtrarProductos(detallesNuevos);
 
-    const stockAnterior = new Map(
-        anteriores.map((d) => [d.productoId, d.cantidad])
-    );
+    const sumarPorProducto = (lista) => {
+        const mapa = new Map();
+        for (const d of lista) {
+            const prodId = Number(d.productoId);
+            mapa.set(prodId, (mapa.get(prodId) ?? 0) + Number(d.cantidad ?? 0));
+        }
+        return mapa;
+    };
 
-    const stockNuevo = new Map(
-        nuevos.map((d) => [d.productoId, d.cantidad])
-    );
+    const stockAnterior = sumarPorProducto(anteriores);
+    const stockNuevo = sumarPorProducto(nuevos);
 
     const ids = new Set([
         ...stockAnterior.keys(),
@@ -1808,6 +1838,120 @@ async ajustarStock(tx, detallesViejos, detallesNuevos) {
                     stockActual: { increment: -diferencia },
                 },
             });
+        }
+    }
+
+    if (typeof tx.inventarioAlmacen?.findMany !== 'function') {
+        return;
+    }
+
+    const deltasAlmacen = new Map();
+    const acumularAlmacen = (lista, signo) => {
+        for (const d of lista) {
+            const prodId = Number(d.productoId);
+            const almId = d.almacenId ? Number(d.almacenId) : null;
+            const clave = `${prodId}:${almId ?? ''}`;
+            const previo = deltasAlmacen.get(clave) ?? { productoId: prodId, almacenId: almId, delta: 0 };
+            previo.delta += signo * Number(d.cantidad ?? 0);
+            deltasAlmacen.set(clave, previo);
+        }
+    };
+    acumularAlmacen(nuevos, 1);
+    acumularAlmacen(anteriores, -1);
+
+    for (const { productoId, almacenId, delta } of deltasAlmacen.values()) {
+        if (delta === 0) continue;
+
+        const inventarios = await tx.inventarioAlmacen.findMany({
+            where: {
+                productoId,
+                deletedAt: null,
+                almacen: { deletedAt: null, activo: true },
+            },
+            include: {
+                almacen: { select: { id: true, esPrincipal: true, empresaId: true, sucursalId: true } },
+            },
+            orderBy: [{ almacen: { esPrincipal: 'desc' } }, { id: 'asc' }],
+        });
+
+        if (inventarios.length === 0 && !almacenId) {
+            continue;
+        }
+
+        if (delta > 0) {
+            if (almacenId) {
+                const resAlmacen = await tx.inventarioAlmacen.updateMany({
+                    where: {
+                        almacenId,
+                        productoId,
+                        deletedAt: null,
+                        stockActual: { gte: delta },
+                    },
+                    data: { stockActual: { decrement: delta } },
+                });
+                if (resAlmacen.count === 0) {
+                    throw new Error(
+                        `Stock insuficiente en el almacén seleccionado para el producto ${productoId}`
+                    );
+                }
+            } else {
+                let restante = delta;
+                for (const inv of inventarios) {
+                    if (restante <= 0) break;
+                    const disponible = Math.max(0, Number(inv.stockActual ?? 0));
+                    const tomar = Math.min(restante, disponible);
+                    if (tomar <= 0) continue;
+                    const resInv = await tx.inventarioAlmacen.updateMany({
+                        where: { id: inv.id, deletedAt: null, stockActual: { gte: tomar } },
+                        data: { stockActual: { decrement: tomar } },
+                    });
+                    if (resInv.count > 0) {
+                        restante -= tomar;
+                    }
+                }
+            }
+        } else {
+            const cantidadDevolver = -delta;
+            const objetivo = almacenId
+                ? inventarios.find((inv) => inv.almacenId === almacenId)
+                : (inventarios.find((inv) => inv.almacen?.esPrincipal) ?? inventarios[0]);
+
+            const targetAlmacenId = almacenId ?? objetivo?.almacenId ?? null;
+            if (!targetAlmacenId) continue;
+
+            if (objetivo) {
+                await tx.inventarioAlmacen.update({
+                    where: { id: objetivo.id },
+                    data: { stockActual: { increment: cantidadDevolver } },
+                });
+            } else if (typeof tx.almacen?.findFirst === 'function' && typeof tx.inventarioAlmacen?.upsert === 'function') {
+                const alm = await tx.almacen.findFirst({
+                    where: { id: targetAlmacenId, deletedAt: null },
+                    select: { id: true, empresaId: true, sucursalId: true },
+                });
+                if (alm) {
+                    await tx.inventarioAlmacen.upsert({
+                        where: {
+                            almacenId_productoId: {
+                                almacenId: alm.id,
+                                productoId,
+                            },
+                        },
+                        update: {
+                            stockActual: { increment: cantidadDevolver },
+                            deletedAt: null,
+                        },
+                        create: {
+                            empresaId: alm.empresaId,
+                            sucursalId: alm.sucursalId,
+                            almacenId: alm.id,
+                            productoId,
+                            stockActual: cantidadDevolver,
+                            stockMinimo: 1,
+                        },
+                    });
+                }
+            }
         }
     }
 }

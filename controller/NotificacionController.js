@@ -1,27 +1,55 @@
 import { prisma } from '../dao/BaseDao.js';
 import { ResponseModel } from '../modelos/ResponseModel.js';
 import { enviarPushNotificacion } from '../services/notificacionesPush.js';
+import { registrarClienteSse } from '../services/notificacionesStream.js';
 
-const TIPOS_DESTINATARIO = new Set(['CLIENTE', 'EMPLEADO']);
+const TIPOS_DESTINATARIO = new Set(['CLIENTE', 'EMPLEADO', 'USUARIO']);
 const ESTADOS = new Set(['PENDIENTE', 'LEIDA', 'IGNORADA']);
 
 export class NotificacionController {
+    constructor({ prismaClient = prisma, enviarPush = enviarPushNotificacion } = {}) {
+        this.prisma = prismaClient;
+        this.enviarPush = enviarPush;
+    }
+
     async obtenerDestinatarioAutenticado(req) {
         const usuarioId = Number(req.usuario?.id ?? req.user?.id);
         if (!Number.isSafeInteger(usuarioId) || usuarioId < 1) return null;
 
         const empresaId = Number(req.usuario?.empresaId ?? req.user?.empresaId ?? 1);
-        const cliente = await prisma.cliente.findFirst({
+        const cliente = await this.prisma.cliente.findFirst({
             where: { usuarioId, empresaId, deletedAt: null },
             select: { id: true },
         });
-        if (cliente) return { destinatarioId: cliente.id, destinatarioTipo: 'CLIENTE', empresaId };
+        if (cliente) {
+            return { destinatarioId: cliente.id, destinatarioTipo: 'CLIENTE', empresaId, usuarioId };
+        }
 
-        const empleado = await prisma.empleado.findFirst({
+        const empleado = await this.prisma.empleado.findFirst({
             where: { usuarioId, empresaId, deletedAt: null },
             select: { id: true },
         });
-        if (empleado) return { destinatarioId: empleado.id, destinatarioTipo: 'EMPLEADO', empresaId };
+        if (empleado) {
+            return { destinatarioId: empleado.id, destinatarioTipo: 'EMPLEADO', empresaId, usuarioId };
+        }
+
+        if (typeof this.prisma.usuarioRol?.findFirst === 'function') {
+            const rolAdmin = await this.prisma.usuarioRol.findFirst({
+                where: {
+                    usuarioId,
+                    deletedAt: null,
+                    rol: {
+                        deletedAt: null,
+                        nombre: { not: 'Cliente' },
+                    },
+                },
+                include: { rol: { select: { nombre: true } } },
+            });
+            if (rolAdmin && rolAdmin.rol?.nombre?.toLowerCase() !== 'cliente') {
+                return { destinatarioId: usuarioId, destinatarioTipo: 'USUARIO', empresaId, usuarioId };
+            }
+        }
+
         return null;
     }
 
@@ -43,25 +71,53 @@ export class NotificacionController {
                 return this.responderError(res, 400, 'Los datos de la notificación no son válidos');
             }
 
+            const usuarioId = Number(req.usuario?.id ?? req.user?.id);
             const empresaId = Number(req.usuario?.empresaId ?? req.user?.empresaId ?? 1);
-            const remitente = await prisma.empleado.findFirst({
+            const remitente = await this.prisma.empleado.findFirst({
                 where: {
-                    usuarioId: Number(req.usuario?.id ?? req.user?.id),
+                    usuarioId,
                     empresaId,
                     deletedAt: null,
                 },
                 select: { id: true },
             });
-            if (!remitente) return this.responderError(res, 403, 'Solo los empleados pueden crear notificaciones');
 
-            const modeloDestinatario = destinatarioTipo === 'CLIENTE' ? prisma.cliente : prisma.empleado;
-            const existe = await modeloDestinatario.findFirst({
-                where: { id, empresaId, deletedAt: null },
-                select: { id: true, usuarioId: true },
-            });
+            if (!remitente) {
+                const esAdmin = typeof this.prisma.usuarioRol?.findFirst === 'function'
+                    ? await this.prisma.usuarioRol.findFirst({
+                        where: {
+                            usuarioId,
+                            deletedAt: null,
+                            rol: { deletedAt: null, nombre: { not: 'Cliente' } },
+                        },
+                        select: { rolId: true },
+                    })
+                    : null;
+                if (!esAdmin) {
+                    return this.responderError(res, 403, 'Solo los empleados o administradores pueden crear notificaciones');
+                }
+            }
+
+            let existe;
+            let destinatarioUsuarioId = null;
+            if (destinatarioTipo === 'USUARIO') {
+                existe = await this.prisma.usuario.findFirst({
+                    where: { id, empresaId, deletedAt: null },
+                    select: { id: true },
+                });
+                destinatarioUsuarioId = existe?.id ?? null;
+            } else {
+                const modeloDestinatario = destinatarioTipo === 'CLIENTE' ? this.prisma.cliente : this.prisma.empleado;
+                existe = await modeloDestinatario.findFirst({
+                    where: { id, empresaId, deletedAt: null },
+                    select: { id: true, usuarioId: true },
+                });
+                destinatarioUsuarioId = existe?.usuarioId ?? null;
+            }
+
             if (!existe) return this.responderError(res, 404, 'El destinatario no existe');
 
-            const notificacion = await prisma.notificacion.create({
+            const notificacion = await this.prisma.notificacion.create({
                 data: {
                     empresaId,
                     titulo: titulo.trim(),
@@ -69,14 +125,15 @@ export class NotificacionController {
                     tipo: tipo.trim(),
                     destinatarioId: id,
                     destinatarioTipo,
-                    remitenteId: remitente.id,
+                    remitenteId: remitente?.id ?? null,
                     sucursalId: sucursal,
                 },
             });
             try {
-                await enviarPushNotificacion({
+                await this.enviarPush({
                     notificacion,
-                    destinatarioUsuarioId: existe.usuarioId,
+                    destinatarioUsuarioId,
+                    prismaClient: this.prisma,
                 });
             } catch (error) {
                 console.error('[Notificaciones Push Error]:', error.code ?? 'envío fallido');
@@ -99,7 +156,7 @@ export class NotificacionController {
                 return this.responderError(res, 400, 'Los filtros de notificaciones no son válidos');
             }
 
-            const notificaciones = await prisma.notificacion.findMany({
+            const notificaciones = await this.prisma.notificacion.findMany({
                 where: {
                     empresaId: destinatario.empresaId,
                     destinatarioId: destinatario.destinatarioId,
@@ -121,7 +178,7 @@ export class NotificacionController {
             const destinatario = await this.obtenerDestinatarioAutenticado(req);
             if (!destinatario) return this.responderError(res, 403, 'La cuenta no tiene un destinatario asociado');
 
-            const count = await prisma.notificacion.count({
+            const count = await this.prisma.notificacion.count({
                 where: {
                     empresaId: destinatario.empresaId,
                     destinatarioId: destinatario.destinatarioId,
@@ -136,6 +193,53 @@ export class NotificacionController {
         }
     };
 
+    marcarTodasLeidas = async (req, res) => {
+        try {
+            const destinatario = await this.obtenerDestinatarioAutenticado(req);
+            if (!destinatario) return this.responderError(res, 403, 'La cuenta no tiene un destinatario asociado');
+
+            const resultado = await this.prisma.notificacion.updateMany({
+                where: {
+                    empresaId: destinatario.empresaId,
+                    destinatarioId: destinatario.destinatarioId,
+                    destinatarioTipo: destinatario.destinatarioTipo,
+                    estado: 'PENDIENTE',
+                },
+                data: {
+                    estado: 'LEIDA',
+                    leidaAt: new Date(),
+                },
+            });
+            return res.status(200).json(
+                new ResponseModel(
+                    { actualizadas: resultado.count },
+                    0,
+                    'Todas las notificaciones fueron marcadas como leídas',
+                    200
+                )
+            );
+        } catch (error) {
+            console.error('[NotificacionController Error]:', error);
+            return this.responderError(res, 500, 'No se pudieron marcar las notificaciones como leídas');
+        }
+    };
+
+    stream = async (req, res) => {
+        try {
+            const destinatario = await this.obtenerDestinatarioAutenticado(req);
+            if (!destinatario) return this.responderError(res, 403, 'La cuenta no tiene un destinatario asociado');
+
+            registrarClienteSse(destinatario.usuarioId, req, res);
+            return undefined;
+        } catch (error) {
+            console.error('[NotificacionController Stream Error]:', error);
+            if (!res.headersSent) {
+                return this.responderError(res, 500, 'No se pudo iniciar el stream de notificaciones');
+            }
+            return undefined;
+        }
+    };
+
     cambiarEstado = (estado) => async (req, res) => {
         try {
             const id = Number(req.params.id);
@@ -143,7 +247,7 @@ export class NotificacionController {
             const destinatario = await this.obtenerDestinatarioAutenticado(req);
             if (!destinatario) return this.responderError(res, 403, 'La cuenta no tiene un destinatario asociado');
 
-            const notificacion = await prisma.notificacion.findFirst({
+            const notificacion = await this.prisma.notificacion.findFirst({
                 where: { id, empresaId: destinatario.empresaId },
             });
             if (!notificacion) return this.responderError(res, 404, 'Notificación no encontrada');
@@ -152,7 +256,7 @@ export class NotificacionController {
                 return this.responderError(res, 403, 'No puedes modificar una notificación ajena');
             }
 
-            const actualizada = await prisma.notificacion.update({
+            const actualizada = await this.prisma.notificacion.update({
                 where: { id },
                 data: { estado, leidaAt: estado === 'LEIDA' ? new Date() : null },
             });

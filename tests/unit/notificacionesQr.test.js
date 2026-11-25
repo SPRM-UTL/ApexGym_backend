@@ -1,6 +1,9 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
+import { pool } from '../../dao/BaseDao.js';
 import { AsistenciaController } from '../../controller/AsistenciaController.js';
+
+after(() => pool.end());
 import {
     TIPO_NOTIFICACION_QR,
     esEscaneoDesdeAndroid,
