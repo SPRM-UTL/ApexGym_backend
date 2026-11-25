@@ -1211,6 +1211,13 @@ asistenciaRoutes.post(
     asistenciaController.validarQr.bind(asistenciaController)
 );
 
+asistenciaRoutes.post(
+    '/escanear-acceso',
+    autenticarUsuario,
+    verificarPermiso('Accesos y Visitas', 'Crear'),
+    asistenciaController.escanearAcceso.bind(asistenciaController)
+);
+
 asistenciaRoutes.get(
     '/',
     autenticarUsuario,
