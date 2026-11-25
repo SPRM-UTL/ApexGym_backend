@@ -545,6 +545,8 @@ model TipoMembresia {
   duracionDias Int       @map("duracion_dias")
   precio       Decimal   @db.Decimal(10, 2)
   estado       String    @db.VarChar(30)
+  imagenUrl    String?   @map("imagen_url") @db.LongText
+  imagenPublicId String? @map("imagen_public_id") @db.VarChar(255)
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")

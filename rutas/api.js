@@ -68,6 +68,7 @@ const uploadImagenUsuario = uploadImagen('usuarios', {
 const uploadImagenEmpleado = uploadImagen('empleados');
 const uploadImagenProducto = uploadImagen('productos');
 const uploadImagenServicio = uploadImagen('servicios');
+const uploadImagenMembresia = uploadImagen('mebresias');
 const usuarioController = new UsuarioController();
 const seccionController = new SeccionController();
 const rolController = new RolController();
@@ -804,12 +805,14 @@ tipoMembresiaRoutes.post(
     '/',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Crear'),
+    uploadImagenMembresia,
     tipoMembresiaController.crear.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.put(
     '/:id',
     autenticarUsuario,
     verificarPermiso('Tipos de Membresía', 'Editar'),
+    uploadImagenMembresia,
     tipoMembresiaController.actualizar.bind(tipoMembresiaController)
 );
 tipoMembresiaRoutes.delete(
@@ -1337,31 +1340,31 @@ router.use('/dispositivos', dispositivoRoutes);
 pedidoCompraRoutes.get(
     '/',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Listar'),
+    verificarPermiso('Pedidos de Compra', 'Listar'),
     pedidoCompraController.obtenerTodos.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.get(
     '/:id',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Listar'),
+    verificarPermiso('Pedidos de Compra', 'Listar'),
     pedidoCompraController.obtenerPorId.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Crear'),
+    verificarPermiso('Pedidos de Compra', 'Crear'),
     pedidoCompraController.crear.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/:id/aprobar',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Editar'),
+    verificarPermiso('Pedidos de Compra', 'Editar'),
     pedidoCompraController.aprobar.bind(pedidoCompraController)
 );
 pedidoCompraRoutes.post(
     '/:id/rechazar',
     autenticarUsuario,
-    verificarPermiso('Productos', 'Editar'),
+    verificarPermiso('Pedidos de Compra', 'Editar'),
     pedidoCompraController.rechazar.bind(pedidoCompraController)
 );
 
