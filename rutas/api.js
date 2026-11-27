@@ -1105,6 +1105,12 @@ servicioRoutes.get(
 
 // ── Rutas de Empresa ─────────────────────────────────────────────────────────
 empresaRoutes.get(
+    '/info-ticket',
+    autenticarUsuario,
+    empresaController.obtenerInfoTicket.bind(empresaController)
+);
+
+empresaRoutes.get(
     '/actual',
     autenticarUsuario,
     verificarPermiso('Empresa', 'Listar'),

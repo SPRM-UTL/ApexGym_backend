@@ -19,6 +19,25 @@ export class EmpresaController extends BaseController {
         }
     };
 
+    obtenerInfoTicket = async (req, res) => {
+        try {
+            const empresaId = this.obtenerEmpresaId(req);
+            const empresa = await this.dao.obtenerActual(empresaId);
+            if (!empresa) {
+                return this.respuestaNoEncontrado(res, 'Empresa no encontrada');
+            }
+            return this.respuestaExito(res, {
+                nombreComercial: empresa.nombreComercial,
+                razonSocial: empresa.razonSocial,
+                ciudad: empresa.ciudad,
+                estado: empresa.estado,
+                mensajeTicket: empresa.mensajeTicket,
+            }, 'Información de ticket obtenida correctamente');
+        } catch (error) {
+            return this.respuestaError(res, error);
+        }
+    };
+
     actualizarActual = async (req, res) => {
         try {
             const empresaId = req.params.id ? Number(req.params.id) : this.obtenerEmpresaId(req);
