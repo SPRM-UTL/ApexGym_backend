@@ -26,7 +26,8 @@ export class ClienteDao extends BaseDao {
                 deletedAt: null,
             }, empresaId, sucursalId),
             include: {
-                estadoCliente: true
+                estadoCliente: true,
+                usuario: { select: { fotoUrl: true } }
             },
             omit: this.omit
         });
@@ -60,7 +61,8 @@ export class ClienteDao extends BaseDao {
                 deletedAt: null,
             },
             include: {
-                estadoCliente: true
+                estadoCliente: true,
+                usuario: { select: { fotoUrl: true } }
             },
             omit: this.omit
         });
@@ -151,7 +153,10 @@ export class ClienteDao extends BaseDao {
                     }] : []),
                 ]
             },
-            include: { estadoCliente: true },
+            include: {
+                estadoCliente: true,
+                usuario: { select: { fotoUrl: true } }
+            },
             orderBy: { nombre: 'asc' },
             take: 20,
             omit: this.omit
