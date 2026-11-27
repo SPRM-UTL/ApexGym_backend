@@ -175,8 +175,8 @@ export class ClienteMembresiaDao extends BaseDao {
 
     async sincronizarEstadosVencidos() {
         try {
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
+            const ahora = new Date();
+            const hoy = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
 
             const vencidas = await this.model.findMany({
                 where: {
