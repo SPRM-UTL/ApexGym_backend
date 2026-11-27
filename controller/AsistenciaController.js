@@ -49,12 +49,12 @@ function verificarPayloadQr(rawQr) {
 
 function calcularDiasRestantesFecha(fechaFin) {
     if (!fechaFin) return 0;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
     const fin = new Date(fechaFin);
-    fin.setHours(0, 0, 0, 0);
-    const diffTime = fin.getTime() - hoy.getTime();
-    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    if (Number.isNaN(fin.getTime())) return 0;
+    const hoy = new Date();
+    const hoyUtc = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const finUtc = Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth(), fin.getUTCDate());
+    return Math.max(0, Math.round((finUtc - hoyUtc) / (1000 * 60 * 60 * 24)));
 }
 
 export class AsistenciaController extends BaseController {
@@ -456,12 +456,7 @@ export class AsistenciaController extends BaseController {
             const asistenciaCompleta = await this.dao.getById(asistencia.id);
 
             // Calcular días restantes de vigencia
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-            const fin = new Date(membresiaActiva.fechaFin);
-            fin.setHours(0, 0, 0, 0);
-            const diffTime = fin.getTime() - hoy.getTime();
-            const diasRestantes = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+            const diasRestantes = calcularDiasRestantesFecha(membresiaActiva.fechaFin);
 
             const response = {
                 acceso: true,
