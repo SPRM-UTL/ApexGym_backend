@@ -918,15 +918,32 @@ async function main() {
     // 1.1 UPSERT OBLIGATORIO DE LA SUCURSAL PRINCIPAL (id = 1)
     await upsertSucursalDefault();
 
-    await prisma.metodoPago.upsert({
-        where: { codigo: 'EFECTIVO' },
-        update: { estado: 'activo', deletedAt: null },
-        create: {
-            nombre: 'Efectivo',
-            codigo: 'EFECTIVO',
-            descripcion: 'Pago en efectivo',
+    const metodoEfectivo = await prisma.metodoPago.findFirst({
+        where: {
+            OR: [{ codigo: 'EFECTIVO' }, { nombre: 'Efectivo' }],
         },
     });
+
+    if (metodoEfectivo) {
+        await prisma.metodoPago.update({
+            where: { id: metodoEfectivo.id },
+            data: {
+                nombre: 'Efectivo',
+                codigo: 'EFECTIVO',
+                estado: 'activo',
+                deletedAt: null,
+            },
+        });
+    } else {
+        await prisma.metodoPago.create({
+            data: {
+                nombre: 'Efectivo',
+                codigo: 'EFECTIVO',
+                descripcion: 'Pago en efectivo',
+                estado: 'activo',
+            },
+        });
+    }
 
     const defaultUser = await crearUsuarioDefault();
 
